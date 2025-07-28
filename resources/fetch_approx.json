@@ -1,0 +1,10 @@
+{
+    "name": "Fetch",
+    "urdf": "fetch/fetch_spherized_1.urdf",
+    "srdf": "fetch/fetch.srdf",
+    "end_effector": "gripper_link",
+    "resolution": 32,
+    "template": "templates/panda_approx_template.hh",
+    "subtemplates": [],
+    "output": "fetch_prrtc_approx.hh"
+}

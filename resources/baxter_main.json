@@ -1,0 +1,9 @@
+{
+    "name": "Baxter",
+    "urdf": "baxter/baxter_spherized.urdf",
+    "srdf": "baxter/baxter.srdf",
+    "end_effector": "right_gripper",
+    "resolution": 64,
+    "template": "templates/panda_main_template.hh",
+    "output": "baxter_prrtc_main.hh"
+}

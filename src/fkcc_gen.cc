@@ -26,6 +26,15 @@
 
 #include "lang_gen.hh"
 
+// Joint types
+#define FIXED -1
+#define X_PRISM 0
+#define Y_PRISM 1
+#define Z_PRISM 2
+#define X_ROT 3
+#define Y_ROT 4
+#define Z_ROT 5
+
 using namespace pinocchio;
 using namespace CppAD;
 using namespace CppAD::cg;
@@ -44,6 +53,12 @@ struct SphereInfo
     std::size_t parent_joint;
     std::size_t parent_frame;
     SE3 relative;
+};
+
+struct JointTreeInfo {
+    std::vector<std::size_t> parent_joints;
+    std::vector<std::size_t> saved_joint_memory_idx;
+    std::vector<std::size_t> dfs_order;
 };
 
 auto min_sphere_of_spheres(const std::vector<SphereInfo> &info) -> std::array<float, 4>
@@ -136,6 +151,119 @@ struct RobotInfo
         json["links_with_geometry"] = links_with_geometry;
         json["bounding_sphere_index"] = bounding_sphere_index;
         json["end_effector_collisions"] = get_frames_colliding_end_effector();
+        json["per_joint_spheres"] = per_joint_spheres;
+
+        // print parent joint for each joint
+        for (auto i = 0U; i < model.joints.size(); ++i) {
+            fmt::print("Joint {}: {}\n", i, model.parents[i]);
+        }
+
+        // sphere_to_joint
+        std::vector<std::size_t> sphere_to_joint(spheres.size(), -1);
+        for (auto i = 0U; i < spheres.size(); ++i)
+        {
+            sphere_to_joint[i] = spheres[i].parent_joint;
+        }
+        json["sphere_to_joint"] = sphere_to_joint;
+
+        // joint type for each joint
+        std::vector<int> joint_types(model.joints.size());
+        for (auto i = 0U; i < model.joints.size(); ++i)
+        {
+            fmt::print("Joint type {}: {}\n", i, model.joints[i].shortname());
+            if (model.joints[i].shortname() == "JointModelRX") {
+                joint_types[i] = X_ROT;
+            }
+            else if (model.joints[i].shortname() == "JointModelRY") {
+                joint_types[i] = Y_ROT;
+            }
+            else if (model.joints[i].shortname() == "JointModelRZ") {
+                joint_types[i] = Z_ROT;
+            }
+            else if (model.joints[i].shortname() == "JointModelPX") {
+                joint_types[i] = X_PRISM;
+            }
+            else if (model.joints[i].shortname() == "JointModelPY") {
+                joint_types[i] = Y_PRISM;
+            }
+            else if (model.joints[i].shortname() == "JointModelPZ") {
+                joint_types[i] = Z_PRISM;
+            }
+            else {
+                throw std::runtime_error(fmt::format("Invalid joint type {}", model.joints[i].shortname()));
+            }
+        }
+        json["joint_types"] = joint_types;
+
+        // joint matrices
+        std::vector<std::array<std::array<float, 4>, 4>> joint_matrices(model.joints.size());
+        for (auto i = 0U; i < model.joints.size(); ++i)
+        {
+            const auto &joint = model.joints[i];
+            const auto &placement = model.jointPlacements[i];
+            const auto &matrix = placement.toHomogeneousMatrix();
+            for (auto row = 0U; row < 4; ++row)
+            {
+                for (auto col = 0U; col < 4; ++col)
+                {
+                    joint_matrices[i][row][col] = matrix(row, col);
+                }
+            }
+        }
+        json["joint_matrices"] = joint_matrices;
+
+        std::vector<std::array<int, 2>> collision_pairs;
+        for (auto &pair : collision_model.collisionPairs)
+        {
+            collision_pairs.emplace_back(std::array<int, 2>{static_cast<int>(pair.first), static_cast<int>(pair.second)});
+        }
+        json["collision_pairs"] = collision_pairs;
+
+        // instead of each pair of spheres to check like (i, j),(i, j+1),...,(i, j+k) we store a range
+        // like (i, j, j+k). This is calculated from the collision pairs.
+        std::vector<std::array<int, 3>> self_cc_ranges;
+        int cur_sphere1 = collision_pairs[0][0];
+        int i = 0;
+        int range_start = collision_pairs[0][1];
+        int range_end = collision_pairs[0][1] - 1;
+        while (i < collision_pairs.size()) {
+            if (collision_pairs[i][0] == cur_sphere1 && collision_pairs[i][1] == range_end + 1) {
+                range_end = collision_pairs[i][1];
+                i++;
+            }
+            else {
+                self_cc_ranges.emplace_back(std::array<int, 3>{cur_sphere1, range_start, range_end});
+                cur_sphere1 = collision_pairs[i][0];
+                range_start = collision_pairs[i][1];
+                range_end = collision_pairs[i][1];
+                i++;
+            }
+        }
+        json["self_cc_ranges"] = self_cc_ranges;
+
+        auto joint_tree_info = analyze_joint_tree();
+        json["joint_parents"] = joint_tree_info.parent_joints;
+        json["T_memory_idx"] = joint_tree_info.saved_joint_memory_idx;
+        json["dfs_order"] = joint_tree_info.dfs_order;
+
+
+        std::vector<std::array<float, 4>> spheres_array;
+        for (auto i = 0U; i < spheres.size(); ++i)
+        {
+            spheres_array.emplace_back(std::array<float, 4>{
+                static_cast<float>(spheres[i].relative.translation()[0]),
+                static_cast<float>(spheres[i].relative.translation()[1]),
+                static_cast<float>(spheres[i].relative.translation()[2]),
+                static_cast<float>(spheres[i].radius)});
+        }
+        json["spheres_array"] = spheres_array;
+
+        std::vector<int> sphere_to_link(spheres.size(), -1);
+        for (auto i = 0U; i < spheres.size(); ++i)
+        {
+            sphere_to_link[i] = spheres[i].parent_frame;
+        }
+        json["sphere_to_link"] = sphere_to_link;
 
         std::vector<std::string> link_names;
         for (auto i = 0U; i < model.frames.size(); ++i)
@@ -205,13 +333,39 @@ struct RobotInfo
             end_effector_allowed_collisions.begin(), end_effector_allowed_collisions.end());
     }
 
+    auto print_fixed_transforms() -> void
+    {
+        fmt::print("_device__ __constant__ float panda_fixed_transforms[] = {{\n");
+        
+        for (auto i = 0U; i < model.joints.size(); ++i)
+        {
+            const auto& placement = model.jointPlacements[i];
+            const auto& matrix = placement.toHomogeneousMatrix();
+            
+            fmt::print("        // Joint {}\n", i);
+            for (auto row = 0U; row < 4; ++row)
+            {
+                fmt::print("        ");
+                for (auto col = 0U; col < 4; ++col)
+                {
+                    fmt::print("{:.6f}", matrix(row, col));
+                    if (col < 3) fmt::print(", ");
+                }
+                if (row < 3) fmt::print(",");
+                fmt::print("\n");
+            }
+            if (i < model.joints.size() - 1) fmt::print("\n");
+        }
+        
+        fmt::print("    }};\n");
+    }
+
     auto extract_spheres() -> void
     {
         for (auto i = 0U; i < collision_model.ngeoms; ++i)
         {
             const auto &geom_obj = collision_model.geometryObjects[i];
             const auto &sphere_ptr = std::dynamic_pointer_cast<coal::Sphere>(geom_obj.geometry);
-
             if (sphere_ptr)
             {
                 SphereInfo info;
@@ -225,12 +379,25 @@ struct RobotInfo
 
                 min_radius = std::min(min_radius, info.radius);
                 max_radius = std::max(max_radius, info.radius);
+                // fmt::print("Sphere {}: {} {} {} {}\n", i, info.relative.translation()[0], info.relative.translation()[1], info.relative.translation()[2], info.radius);
             }
             else
             {
                 throw std::runtime_error(
                     fmt::format("Invalid non-sphere geometry in URDF {}", geom_obj.name));
             }
+        }
+
+        // extract spheres per joint
+        for (auto i = 0U; i < model.joints.size(); ++i) {
+            std::vector<std::size_t> sphere_indices;
+            for (const auto &info : spheres) {
+                if (info.parent_joint == i) {
+                    sphere_indices.emplace_back(info.geom_index);
+                }
+            }
+
+            per_joint_spheres.emplace_back(sphere_indices);
         }
 
         std::size_t bs = 0;
@@ -289,6 +456,7 @@ struct RobotInfo
     {
         for (const auto &cp : collision_model.collisionPairs)
         {
+            // fmt::print("Collision pair: {} {}\n", cp.first, cp.second);
             allowed_link_pairs.insert(collision_pair_to_frame_pair(cp));
         }
     }
@@ -387,6 +555,45 @@ struct RobotInfo
         }
     }
 
+    auto analyze_joint_tree() -> JointTreeInfo {
+        JointTreeInfo info;
+        info.parent_joints.resize(model.joints.size(), -1);
+        std::vector<std::vector<std::size_t>> children_joints(model.joints.size());
+        for (auto i = 0U; i < model.joints.size(); ++i) {
+            info.parent_joints[i] = model.parents[i];
+            children_joints[model.parents[i]].emplace_back(i);
+        }
+        std::size_t n_joints_with_multiple_children = 0;
+        for (auto i = 0U; i < model.joints.size(); ++i) {
+            if (children_joints[i].size() > 1) {
+                n_joints_with_multiple_children++;
+            }
+        }
+        
+        info.saved_joint_memory_idx.resize(model.joints.size(), 0);
+        std::size_t idx = 0;
+        for (auto i = 0U; i < model.joints.size(); ++i) {
+            if (children_joints[i].size() > 1) {
+                info.saved_joint_memory_idx[i] = idx;
+                idx++;
+            }
+            else {
+                info.saved_joint_memory_idx[i] = n_joints_with_multiple_children;
+            }
+        }
+
+        auto dfs = [&](std::size_t joint_idx, std::vector<std::size_t>& order) -> void {
+            order.push_back(joint_idx);
+            for (auto child : children_joints[joint_idx]) {
+                dfs(child, order);
+            }
+        };
+        info.dfs_order.resize(model.joints.size(), 0);
+        dfs(0, info.dfs_order);
+
+        return info;
+    }
+
     Model model;
     GeometryModel collision_model;
     std::string end_effector_name;
@@ -398,6 +605,7 @@ struct RobotInfo
     std::map<std::size_t, SphereInfo> bounding_spheres;
     std::vector<std::size_t> links_with_geometry;
     std::vector<std::vector<std::size_t>> per_link_spheres;
+    std::vector<std::vector<std::size_t>> per_joint_spheres;
     std::set<std::pair<std::size_t, std::size_t>> allowed_link_pairs;
     std::vector<std::size_t> bounding_sphere_index;
 };
@@ -543,6 +751,9 @@ int main(int argc, char **argv)
 
     RobotInfo robot(parent_path / data["urdf"], srdf_path, data["end_effector"]);
 
+    // Print fixed transforms
+    robot.print_fixed_transforms();
+
     data.update(robot.json());
 
     auto traced_eefk_code = trace_sphere_cc_fk(robot, false, false, true);
@@ -565,6 +776,15 @@ int main(int argc, char **argv)
     data["ccfkee_code_output"] = traced_ccfkee_code.outputs;
 
     inja::Environment env;
+
+    env.add_callback("capitalize", 1, [](inja::Arguments& args) {
+        std::string str = args.at(0)->get<std::string>();
+        if (!str.empty())
+        {
+            str[0] = std::toupper(str[0]);
+        }
+        return str;
+    });
 
     for (const auto &subt : data["subtemplates"])
     {
