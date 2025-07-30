@@ -246,6 +246,7 @@ struct RobotInfo
         json["joint_parents"] = joint_tree_info.parent_joints;
         json["T_memory_idx"] = joint_tree_info.saved_joint_memory_idx;
         json["dfs_order"] = joint_tree_info.dfs_order;
+        json["n_joints_with_multiple_children"] = joint_tree_info.n_joints_with_multiple_children;
 
 
         std::vector<std::array<float, 4>> spheres_array;
