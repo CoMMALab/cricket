@@ -58,6 +58,7 @@ struct SphereInfo
 struct JointTreeInfo {
     std::vector<std::size_t> parent_joints;
     std::vector<std::size_t> saved_joint_memory_idx;
+    std::size_t n_joints_with_multiple_children;
     std::vector<std::size_t> dfs_order;
 };
 
@@ -561,16 +562,19 @@ struct RobotInfo
         std::vector<std::vector<std::size_t>> children_joints(model.joints.size());
         for (auto i = 0U; i < model.joints.size(); ++i) {
             info.parent_joints[i] = model.parents[i];
-            children_joints[model.parents[i]].emplace_back(i);
-        }
-        std::size_t n_joints_with_multiple_children = 0;
-        for (auto i = 0U; i < model.joints.size(); ++i) {
-            if (children_joints[i].size() > 1) {
-                n_joints_with_multiple_children++;
+            // Don't add root joint as child of itself to avoid cycles
+            if (model.parents[i] != i) {
+                children_joints[model.parents[i]].emplace_back(i);
             }
         }
-        
-        info.saved_joint_memory_idx.resize(model.joints.size(), 0);
+        info.n_joints_with_multiple_children = 0;
+        for (auto i = 0U; i < model.joints.size(); ++i) {
+            if (children_joints[i].size() > 1) {
+                info.n_joints_with_multiple_children++;
+            }
+        }
+        std::cout << "here1" << std::endl;
+        info.saved_joint_memory_idx.resize(model.joints.size(), info.n_joints_with_multiple_children);
         std::size_t idx = 0;
         for (auto i = 0U; i < model.joints.size(); ++i) {
             if (children_joints[i].size() > 1) {
@@ -578,17 +582,19 @@ struct RobotInfo
                 idx++;
             }
             else {
-                info.saved_joint_memory_idx[i] = n_joints_with_multiple_children;
+                info.saved_joint_memory_idx[i] = info.n_joints_with_multiple_children;
             }
         }
-
-        auto dfs = [&](std::size_t joint_idx, std::vector<std::size_t>& order) -> void {
-            order.push_back(joint_idx);
-            for (auto child : children_joints[joint_idx]) {
-                dfs(child, order);
-            }
-        };
-        info.dfs_order.resize(model.joints.size(), 0);
+        std::cout << "here2" << std::endl;  
+        std::function<void(std::size_t, std::vector<std::size_t>&)> dfs = 
+            [&](std::size_t joint_idx, std::vector<std::size_t>& order) {
+                order.push_back(joint_idx);
+                for (auto child : children_joints[joint_idx]) {
+                    dfs(child, order);
+                }
+            };
+        info.dfs_order.clear();
+        info.dfs_order.reserve(model.joints.size());
         dfs(0, info.dfs_order);
 
         return info;
