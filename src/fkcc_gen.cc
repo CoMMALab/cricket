@@ -42,6 +42,7 @@ using namespace CppAD::cg;
 // Typedef for AD types
 using CGD = CG<double>;
 using ADCG = AD<CGD>;
+
 using ADModel = ModelTpl<ADCG>;
 using ADData = DataTpl<ADCG>;
 using ADVectorXs = Eigen::Matrix<ADCG, Eigen::Dynamic, 1>;
@@ -657,22 +658,23 @@ auto trace_sphere(const SphereInfo &sphere, const ADData &ad_data, ADVectorXs &d
 auto trace_frame(std::size_t ee_index, const ADData &ad_data, ADVectorXs &data, std::size_t index)
 {
     const auto &oMf = ad_data.oMf[ee_index];
-    const auto &R = oMf.rotation();
-
-    // quaternion conversion from rotation matrix using the trace-based method which avoids conditionals
-    ADCG trace = R(0, 0) + R(1, 1) + R(2, 2);
-    ADCG s = sqrt(trace + 1.0 + 1e-10);  // Add small epsilon for numerical stability
-    ADCG w = s * 0.5;
-    ADCG inv_s = 1.0 / (2.0 * w);
 
     data[index + 0] = oMf.translation()[0];
     data[index + 1] = oMf.translation()[1];
     data[index + 2] = oMf.translation()[2];
 
-    data[index + 3] = (R(2, 1) - R(1, 2)) * inv_s;  // x
-    data[index + 4] = (R(0, 2) - R(2, 0)) * inv_s;  // y
-    data[index + 5] = (R(1, 0) - R(0, 1)) * inv_s;  // z
-    data[index + 6] = w;                            // w
+    const auto &R = oMf.rotation();
+
+    // Eigen stores as column major
+    data[index + 3] = R(0, 0);
+    data[index + 4] = R(1, 0);
+    data[index + 5] = R(2, 0);
+    data[index + 6] = R(0, 1);
+    data[index + 7] = R(1, 1);
+    data[index + 8] = R(2, 1);
+    data[index + 9] = R(0, 2);
+    data[index + 10] = R(1, 2);
+    data[index + 11] = R(2, 2);
 }
 
 struct Traced
@@ -705,7 +707,7 @@ auto trace_sphere_cc_fk(
 
     std::size_t n_spheres_data = (spheres) ? info.spheres.size() * 4 : 0;
     std::size_t n_bounding_spheres_data = (bounding_spheres) ? info.bounding_spheres.size() * 4 : 0;
-    std::size_t n_fk_data = (fk) ? 7 : 0;
+    std::size_t n_fk_data = (fk) ? 12 : 0;
 
     std::size_t n_out = n_spheres_data + n_bounding_spheres_data + n_fk_data;
 
@@ -785,6 +787,7 @@ int main(int argc, char **argv)
     auto traced_eefk_code = trace_sphere_cc_fk(robot, false, false, true);
     data["eefk_code"] = traced_eefk_code.code;
     data["eefk_code_vars"] = traced_eefk_code.temp_variables;
+    data["eefk_code_output"] = traced_eefk_code.outputs;
 
     auto traced_spherefk_code = trace_sphere_cc_fk(robot, true, false, false);
     data["spherefk_code"] = traced_spherefk_code.code;

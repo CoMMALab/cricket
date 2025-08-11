@@ -2,7 +2,7 @@
 
 Cricket is a library to trace the forward kinematics of spherized robots (generated through, for example, [`foam`](github.com/CoMMALab/foam/)).
 It is built on [Pinocchio](https://github.com/stack-of-tasks/pinocchio) for forward kinematics, [CppAD](https://github.com/coin-or/CppAD) for tracing execution, [CppADCodeGen](https://github.com/joaoleal/CppADCodeGen) for generating code, and [CGAL](https://www.cgal.org/) for computing the bounding sphere of spheres.
-It was used to generate the collision checking kernels in [VAMP](https://github.com/kavrakiLab/vamp).
+It was used to generate the collision checking kernels in [VAMP](https://github.com/kavrakiLab/vamp) and [pRRTC](https://github.com/CoMMALab/pRRTC).
 
 ## Compilation Instructions
 
@@ -14,16 +14,9 @@ micromamba env create -f environment.yaml
 micromamba activate cricket
 ```
 
-Build and locally install CppADCodeGen:
-```bash
-cmake -GNinja -DCMAKE_INSTALL_PREFIX=build/cppadcg/install -Bbuild/cppadcg CppADCodeGen/
-cmake --build build/cppadcg
-cmake --install build/cppadcg
-```
-
 Build cricket:
 ```bash
-cmake -GNinja -Bbuild -DCMAKE_PREFIX_PATH=build/cppadcg/install .
+cmake -GNinja -Bbuild .
 cmake --build build
 ```
 

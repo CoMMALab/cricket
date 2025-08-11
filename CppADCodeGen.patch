@@ -1,0 +1,23 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 31babe6..3f6edb3 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -167,18 +167,10 @@ ENDIF()
+ # Currently building tests as normal executables
+ # ----------------------------------------------------------------------------
+ ADD_SUBDIRECTORY(include)
+-ADD_SUBDIRECTORY(example EXCLUDE_FROM_ALL)
+ #ADD_SUBDIRECTORY(introduction EXCLUDE_FROM_ALL)
+-ADD_SUBDIRECTORY(speed EXCLUDE_FROM_ALL)
+-ADD_SUBDIRECTORY(python)
+-ADD_SUBDIRECTORY(pkgconfig)
+-ADD_SUBDIRECTORY(doc)
+ 
+ # enable testing must be called here in order for the target test to be created
+-ENABLE_TESTING()
+-ADD_SUBDIRECTORY(test EXCLUDE_FROM_ALL)
+ 
+ # =============================================================================
+ # uninstall procedure
+ # =============================================================================
+-ADD_CUSTOM_TARGET(uninstall COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cppadcodegen_uninstall.cmake)

@@ -182,15 +182,7 @@ struct {{name}}
         {% include "ccfk" %}
 
         // attaching at {{ end_effector }}
-        set_attachment_pose(environment,
-                            y[{{ccfkee_code_output - 7}}],
-                            y[{{ccfkee_code_output - 6}}],
-                            y[{{ccfkee_code_output - 5}}],
-                            y[{{ccfkee_code_output - 4}}],
-                            y[{{ccfkee_code_output - 3}}],
-                            y[{{ccfkee_code_output - 2}}],
-                            y[{{ccfkee_code_output - 1}}]
-            );
+        set_attachment_pose(environment, to_isometry(&y[{{ccfkee_code_output - 12}}]));
 
         //
         // attachment vs. environment collisions
@@ -219,10 +211,10 @@ struct {{name}}
             {% for j in range(length(link_spheres)) %}
             {% set sphere_index = at(link_spheres, j) %}
             if (attachment_sphere_collision<decltype(x[0])>(environment,
-                                 y[{{sphere_index * 4 + 0}}],
-                                 y[{{sphere_index * 4 + 1}}],
-                                 y[{{sphere_index * 4 + 2}}],
-                                 y[{{sphere_index * 4 + 3}}]))
+                                                            y[{{sphere_index * 4 + 0}}],
+                                                            y[{{sphere_index * 4 + 1}}],
+                                                            y[{{sphere_index * 4 + 2}}],
+                                                            y[{{sphere_index * 4 + 3}}]))
             {
                 return false;
             }
@@ -233,14 +225,14 @@ struct {{name}}
         return true;
     }
 
-    static inline auto eefk(const std::array<float, {{n_q}}> &x) noexcept -> std::array<float, 7>
+    static inline auto eefk(const std::array<float, {{n_q}}> &x) noexcept -> Eigen::Isometry3f
     {
         std::array<float, {{eefk_code_vars}}> v;
-        std::array<float, 7> y;
+        std::array<float, {{eefk_code_output}}> y;
 
         {{eefk_code}}
 
-        return y;
+        return to_isometry(y.data());
     }
 };
 }
