@@ -167,6 +167,25 @@ struct RobotInfo
         }
         json["sphere_to_joint"] = sphere_to_joint;
 
+        // joint to spheres
+        std::vector<std::vector<std::size_t>> joint_to_spheres(model.joints.size());
+        for (auto i = 0U; i < spheres.size(); ++i)
+        {
+            joint_to_spheres[spheres[i].parent_joint].emplace_back(i);
+        }
+        json["joint_to_spheres"] = joint_to_spheres;
+        
+        std::vector<int> flattened_joint_to_spheres;
+        for (auto i = 0U; i < joint_to_spheres.size(); ++i)
+        {
+            for (auto j = 0U; j < joint_to_spheres[i].size(); ++j)
+            {
+                flattened_joint_to_spheres.emplace_back(joint_to_spheres[i][j]);
+            }
+            flattened_joint_to_spheres.emplace_back(-1);
+        }
+        json["flattened_joint_to_spheres"] = flattened_joint_to_spheres;
+
         // joint type for each joint
         std::vector<int> joint_types(model.joints.size());
         for (auto i = 0U; i < model.joints.size(); ++i)
