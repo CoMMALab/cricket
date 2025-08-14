@@ -4,6 +4,7 @@
     "srdf": "fetch/fetch.srdf",
     "end_effector": "gripper_link",
     "resolution": 32,
+    "batch_size": 16,
     "template": "templates/panda_main_template.hh",
     "subtemplates": [],
     "output": "fetch_prrtc_main.hh"

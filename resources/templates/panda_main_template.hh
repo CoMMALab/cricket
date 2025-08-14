@@ -143,8 +143,10 @@ template <>
 __device__ bool self_collision_check<ppln::robots::{{robot_template_name}}>(volatile float* sphere_pos, volatile int* joint_in_collision, const int tid){
     const int thread_ind = tid % 4;
     const int batch_ind = tid / 4;
+    bool has_collision = false;
 
     for (int i = thread_ind; i < {{name_upper}}_SELF_CC_RANGE_COUNT; i += 4) {
+        if (warp_any_active_mask(has_collision)) return false;
         int sphere_1_ind = {{name}}_self_cc_ranges[i][0];
         if (joint_in_collision[20*batch_ind + {{name}}_sphere_to_joint[sphere_1_ind]] == 0) continue;
         float sphere_1[3] = {
@@ -162,11 +164,12 @@ __device__ bool self_collision_check<ppln::robots::{{robot_template_name}}>(vola
                 sphere_1[0], sphere_1[1], sphere_1[2], {{name}}_spheres_array[sphere_1_ind].w,
                 sphere_2[0], sphere_2[1], sphere_2[2], {{name}}_spheres_array[j].w
             )){
-                return false;
+                //return false;
+                has_collision=true;
             }
         }
     }
-    return true;
+    return !has_collision;
 
 }
 
@@ -175,8 +178,9 @@ template <>
 __device__ bool env_collision_check<ppln::robots::{{robot_template_name}}>(volatile float* sphere_pos, volatile int* joint_in_collision, ppln::collision::Environment<float> *env, const int tid){
     const int thread_ind = tid % 4;
     const int batch_ind = tid / 4;
+    bool has_collision=false;
 
-    for (int i = thread_ind; i < {{name_upper}}_SPHERE_COUNT; i += 4){
+    for (int i = {{name_upper}}_SPHERE_COUNT-1-thread_ind; i >={{name_upper}}_SPHERE_COUNT%4; i -= 4){
         // sphere i, robot batch_ind ({{batch_size}} robots)
         if (joint_in_collision[20*batch_ind + {{name}}_sphere_to_joint[i]] > 0 && 
             sphere_environment_in_collision(
@@ -187,8 +191,25 @@ __device__ bool env_collision_check<ppln::robots::{{robot_template_name}}>(volat
                 {{name}}_spheres_array[i].w
             )
         ) {
-            return false;
+            has_collision=true;
+            //return false;
         } 
+        if (warp_any_full_mask(has_collision)) return false;
     }
-    return true;
+
+    int i=thread_ind;
+    if (joint_in_collision[20*batch_ind + {{name}}_sphere_to_joint[i]] > 0 && 
+        sphere_environment_in_collision(
+            env,
+            sphere_pos[i * BATCH_SIZE * 3 + batch_ind * 3 + 0],
+            sphere_pos[i * BATCH_SIZE * 3 + batch_ind * 3 + 1],
+            sphere_pos[i * BATCH_SIZE * 3 + batch_ind * 3 + 2],
+            {{name}}_spheres_array[i].w
+        )
+    ) {
+        has_collision=true;
+        //return false;
+    } 
+
+    return !has_collision;
 }
