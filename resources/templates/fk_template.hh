@@ -234,6 +234,17 @@ struct {{name}}
 
         return to_isometry(y.data());
     }
+
+    static inline auto jacobian(const std::array<float, {{n_q}}> &x) noexcept -> Eigen::Matrix<float, 6, Eigen::Dynamic>
+    {
+        std::array<float, {{jacobian_code_vars}} v;
+        std::array<float, {{jacobian_code_output}} y;
+
+        {{jacobian_code}}
+        return y.data();
+
+    
+    }
 };
 }
 

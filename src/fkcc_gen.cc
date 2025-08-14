@@ -4,6 +4,7 @@
 #include <pinocchio/parsers/srdf.hpp>
 #include <pinocchio/algorithm/joint-configuration.hpp>
 #include <pinocchio/algorithm/frames.hpp>
+#include <pinocchio/algorithm/jacobian.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
 #include <pinocchio/algorithm/geometry.hpp>
 #include <pinocchio/multibody/geometry.hpp>
@@ -37,6 +38,7 @@ using ADCG = AD<CGD>;
 using ADModel = ModelTpl<ADCG>;
 using ADData = DataTpl<ADCG>;
 using ADVectorXs = Eigen::Matrix<ADCG, Eigen::Dynamic, 1>;
+using ADMatrixXs = Eigen::Matrix<ADCG, Eigen::Dynamic, Eigen::Dynamic>;
 
 struct SphereInfo
 {
@@ -443,6 +445,15 @@ auto trace_frame(std::size_t ee_index, const ADData &ad_data, ADVectorXs &data, 
     data[index + 11] = R(2, 2);
 }
 
+auto trace_jacobian(const ADMatrixXs &J, ADVectorXs &data, const int nv, std::size_t index)
+{
+    // Eigen is column major
+    for (auto j = 0U; j < nv; j++)
+        for (auto i = 0U; i < 6; i++)
+            data[index + j * 6 + i] = J(i, j);
+        
+}
+
 struct Traced
 {
     std::string code;
@@ -450,17 +461,24 @@ struct Traced
     std::size_t outputs;
 };
 
-auto trace_sphere_cc_fk(
+auto trace_sphere_cc_fk_jacobian(
     const RobotInfo &info,
     bool spheres = true,
     bool bounding_spheres = true,
-    bool fk = true) -> Traced
+    bool fk = true,
+    bool jacobian = false
+    ) -> Traced
 {
     auto nq = info.model.nq;
+    auto nv = info.model.nv;
     ADModel ad_model = info.model.cast<ADCG>();
     ADData ad_data(ad_model);
 
     ADVectorXs ad_q(nq);
+
+    ADMatrixXs ad_J(6, nv); // 6 is for the SE3 space.
+    ad_J.setZero();
+
     for (auto i = 0U; i < nq; ++i)
     {
         ad_q[i] = ADCG(0.0);
@@ -474,8 +492,10 @@ auto trace_sphere_cc_fk(
     std::size_t n_spheres_data = (spheres) ? info.spheres.size() * 4 : 0;
     std::size_t n_bounding_spheres_data = (bounding_spheres) ? info.bounding_spheres.size() * 4 : 0;
     std::size_t n_fk_data = (fk) ? 12 : 0;
+    std::size_t n_jacobian_data = (jacobian) ? nv * 6 : 0;
+    // std::size_t n_jacobian_pinv_data = (jacobian_pinv) ? nv * 6 : 0;
 
-    std::size_t n_out = n_spheres_data + n_bounding_spheres_data + n_fk_data;
+    std::size_t n_out = n_spheres_data + n_bounding_spheres_data + n_fk_data + n_jacobian_data;
 
     ADVectorXs data(n_out);
 
@@ -504,6 +524,12 @@ auto trace_sphere_cc_fk(
     if (fk)
     {
         trace_frame(info.end_effector_index, ad_data, data, n_spheres_data + n_bounding_spheres_data);
+    }
+
+    if (jacobian)
+    {
+        computeJointJacobian(ad_model, ad_data, ad_q, info.model.frames[info.end_effector_index].parentJoint, ad_J);
+        trace_jacobian(ad_J, data, nv, n_spheres_data + n_bounding_spheres_data + n_fk_data);
     }
 
     // Create the AD function
@@ -547,25 +573,32 @@ int main(int argc, char **argv)
 
     data.update(robot.json());
 
-    auto traced_eefk_code = trace_sphere_cc_fk(robot, false, false, true);
+    auto traced_eefk_code = trace_sphere_cc_fk_jacobian(robot, false, false, true, false);
     data["eefk_code"] = traced_eefk_code.code;
     data["eefk_code_vars"] = traced_eefk_code.temp_variables;
     data["eefk_code_output"] = traced_eefk_code.outputs;
 
-    auto traced_spherefk_code = trace_sphere_cc_fk(robot, true, false, false);
+    auto traced_spherefk_code = trace_sphere_cc_fk_jacobian(robot, true, false, false, false);
     data["spherefk_code"] = traced_spherefk_code.code;
     data["spherefk_code_vars"] = traced_spherefk_code.temp_variables;
     data["spherefk_code_output"] = traced_spherefk_code.outputs;
 
-    auto traced_ccfk_code = trace_sphere_cc_fk(robot, true, true, false);
+    auto traced_ccfk_code = trace_sphere_cc_fk_jacobian(robot, true, true, false, false);
     data["ccfk_code"] = traced_ccfk_code.code;
     data["ccfk_code_vars"] = traced_ccfk_code.temp_variables;
     data["ccfk_code_output"] = traced_ccfk_code.outputs;
 
-    auto traced_ccfkee_code = trace_sphere_cc_fk(robot, true, true, true);
+    auto traced_ccfkee_code = trace_sphere_cc_fk_jacobian(robot, true, true, true, false);
     data["ccfkee_code"] = traced_ccfkee_code.code;
     data["ccfkee_code_vars"] = traced_ccfkee_code.temp_variables;
     data["ccfkee_code_output"] = traced_ccfkee_code.outputs;
+
+    // now I need something for robotJacobian
+
+    auto traced_jacobian_code = trace_sphere_cc_fk_jacobian(robot, false, false, false, true);
+    data["jacobian_code"] = traced_jacobian_code.code;
+    data["jacobian_code_vars"] = traced_jacobian_code.temp_variables;
+    data["jacobian_code_output"] = traced_jacobian_code.outputs;
 
     inja::Environment env;
 
