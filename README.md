@@ -8,6 +8,8 @@ It was used to generate the collision checking kernels in [VAMP](https://github.
 
 See either the provided Dockerfile or follow the instructions for compilation in a Conda environment.
 
+### Conda/Mamba Installation
+
 Set up the environment:
 ```bash
 micromamba env create -f environment.yaml
@@ -23,6 +25,21 @@ cmake --build build
 Run the script.
 ```bash
 ./build/fkcc_gen resources/panda.json
+
+# Optionally format the code
+clang-format -i panda_fk.hh
+```
+
+### Docker Installation
+
+Build the container:
+```bash
+docker build . -t cricket
+```
+
+Run the script:
+```bash
+docker run --rm -v "$(pwd):/workspace" -w /workspace --user "$(id -u):$(id -g)" cricket:latest resources/panda.json
 
 # Optionally format the code
 clang-format -i panda_fk.hh

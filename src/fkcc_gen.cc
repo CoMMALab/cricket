@@ -19,6 +19,7 @@
 #include <fmt/core.h>
 #include <nlohmann/json.hpp>
 #include <inja/inja.hpp>
+#include <cxxopts.hpp>
 
 #include <filesystem>
 #include <stdexcept>
@@ -552,7 +553,37 @@ auto trace_sphere_cc_fk_jacobian(
 
 int main(int argc, char **argv)
 {
-    std::filesystem::path json_path(argv[1]);
+    cxxopts::Options options(argv[0], "Tracing compiler for forward kinematics and collision checking");
+
+    options
+        .positional_help("[JSON configuration filename]")
+        .show_positional_help();
+
+    options.add_options()                                                                   //
+        ("f,configuration_file", "JSON configuration filename", cxxopts::value<std::string>())  //
+        ("o,output_filename", "Output JSON filename", cxxopts::value<std::string>())            //
+        ("t,output_template",
+         "Output template filename (override configuration file)",
+         cxxopts::value<std::string>())  //
+        ("h,help", "Print usage")        //
+        ;
+
+    options.parse_positional({"configuration_file"});
+
+    auto result = options.parse(argc, argv);
+
+    if (result.count("help"))
+    {
+        std::cout << options.help() << std::endl;
+        exit(0);
+    }
+
+    if (not result.count("configuration_file"))
+    {
+        throw std::runtime_error(fmt::format("Must provide configuration file!"));
+    }
+
+    std::filesystem::path json_path(result["configuration_file"].as<std::string>());
     auto parent_path = json_path.parent_path();
 
     if (not std::filesystem::exists(json_path))
@@ -608,11 +639,31 @@ int main(int argc, char **argv)
         env.include_template(subt["name"], temp);
     }
 
-    inja::Template temp = env.parse_template(parent_path / data["template"]);
-    env.write(temp, data, data["output"]);
+    std::string output_template;
+    if (result.count("output_template"))
+    {
+        output_template = result["output_template"].as<std::string>();
+    }
+    else
+    {
+        output_template = data["output"];
+    }
 
-    std::ofstream output_file("output.json");
-    output_file << data.dump(4);  // 4 spaces indentation
+    inja::Template temp = env.parse_template(parent_path / data["template"]);
+    env.write(temp, data, output_template);
+
+    std::string output_filename;
+    if (result.count("output_filename"))
+    {
+        output_filename = result["output_filename"].as<std::string>();
+    }
+    else
+    {
+        output_filename = "output.json";
+    }
+
+    std::ofstream output_file(output_filename);
+    output_file << data.dump();
     output_file.close();
 
     return 0;

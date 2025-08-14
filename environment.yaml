@@ -4,7 +4,6 @@ channels:
   - conda-forge
 
 dependencies:
-  - python
   - pinocchio
   - cppad
   - eigen
@@ -17,3 +16,5 @@ dependencies:
   - ninja
   - fmt
   - pkg-config
+  - patch
+  - git
