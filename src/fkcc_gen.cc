@@ -631,6 +631,11 @@ int main(int argc, char **argv)
     data["jacobian_code_vars"] = traced_jacobian_code.temp_variables;
     data["jacobian_code_output"] = traced_jacobian_code.outputs;
 
+    auto traced_jacobian_eefk_code = trace_sphere_cc_fk_jacobian(robot, false, false, true, true);
+    data["jacobian_eefk_code"] = traced_jacobian_eefk_code.code;
+    data["jacobian_eefk_code_vars"] = traced_jacobian_eefk_code.temp_variables;
+    data["jacobian_eefk_code_output"] = traced_jacobian_eefk_code.outputs;
+
     inja::Environment env;
 
     for (const auto &subt : data["subtemplates"])
