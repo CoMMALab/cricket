@@ -237,17 +237,17 @@ struct {{name}}
 
     static inline auto jacobian(const std::array<float, {{n_q}}> &x) noexcept -> Eigen::Matrix<float, 6, Eigen::Dynamic>
     {
-        std::array<float, {{jacobian_code_vars}} v;
-        std::array<float, {{jacobian_code_output}} y;
+        std::array<float, {{jacobian_code_vars}}> v;
+        std::array<float, {{jacobian_code_output}}> y;
 
         {{jacobian_code}}
-        return y.data();
+        return to_matrix(y.data(), 6, {{jacobian_code_output}} / 6);
     }
 
-    static inline auto jacobian_eefk(const std::array<float, {{n_q}}> &x, Eigen::Matrix<float, 6, Eigen::Dynamic> &jac,  Eigen::Isometry3f &fk) noexcept -> 
+    static inline auto jacobian_eefk(const std::array<float, {{n_q}}> &x, Eigen::Matrix<float, 6, Eigen::Dynamic> &jac,  Eigen::Isometry3f &fk) noexcept
     {
-        std::array<float, {{jacobian_eefk_code_vars}} v;
-        std::array<float, {{jacobian_eefk_code_output}} y;
+        std::array<float, {{jacobian_eefk_code_vars}}> v;
+        std::array<float, {{jacobian_eefk_code_output}}> y;
 
         {{jacobian_eefk_code}}
 
@@ -255,8 +255,9 @@ struct {{name}}
         std::copy_n(&y[0], 12, pose_arr.begin());
         fk = to_isometry(pose_arr.data());
 
-        jac = to_matrix(&y[{{12}}]), 6, (jacobian_eefk_code_output - 12) // 6);
+        jac = to_matrix(&y[{{12}}], 6, ({{jacobian_eefk_code_output}} - 12) / 6);
     }
+
 
 
 };
