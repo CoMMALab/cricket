@@ -455,6 +455,16 @@ auto trace_jacobian(const ADMatrixXs &J, ADVectorXs &data, const int nv, std::si
         
 }
 
+auto trace_matrix(const ADMatrixXs &J, ADVectorXs &data, const int rows, const int cols, std::size_t index)
+{
+    // Eigen is column major
+    for (auto j = 0U; j < rows; j++)
+        for (auto i = 0U; i < cols; i++)
+            data[index + j * cols + i] = J(i, j);
+        
+}
+
+
 struct Traced
 {
     std::string code;
@@ -551,6 +561,124 @@ auto trace_sphere_cc_fk_jacobian(
     return Traced{function_code.str(), handler.getTemporaryVariableCount(), n_out};
 }
 
+
+auto trace_jacobian_pinv_adj(
+    const RobotInfo &info,
+    bool return_jacobian = true,
+    bool jacobian_pinv = true
+    ) -> Traced
+{
+
+    const double DT = 0.1;
+    const double damp = 1e-6;
+    auto nq = info.model.nq;
+    auto nv = info.model.nv;
+    ADModel ad_model = info.model.cast<ADCG>();
+    ADData ad_data(ad_model);
+
+
+
+    const size_t nt = 6; // task space is se3
+
+    ADVectorXs ad_q(nq);
+    ADVectorXs ad_err(nt);
+    ad_err.setZero();
+
+    ADMatrixXs ad_J(nt, nv); // 6 is for the SE3 space.
+    ad_J.setZero();
+    ADMatrixXs ad_Jinv(nt, nt);
+    ad_Jinv.setZero();
+
+
+    for (auto i = 0U; i < nq; ++i)
+    {
+        ad_q[i] = ADCG(0.0);
+    }
+
+
+    Independent(ad_q, ad_err);
+
+    forwardKinematics(ad_model, ad_data, ad_q);
+    updateFramePlacements(ad_model, ad_data);
+    computeJointJacobian(ad_model, ad_data, ad_q, info.model.frames[info.end_effector_index].parentJoint, ad_J);
+
+    std::size_t n_jacobian_data = (return_jacobian) ? nv * nt * 0: 0;
+    std::size_t n_jacobian_signed_det = (jacobian_pinv) ? 1 : 0;
+    std::size_t n_jacobian_jjt = (jacobian_pinv) ? nq : 0;
+    std::size_t n_out = return_jacobian + n_jacobian_signed_det + n_jacobian_jjt;
+
+    ADVectorXs data(n_out);
+
+    // if (return_jacobian)
+    //     trace_matrix(ad_J, data, nv, nt, 0);
+
+    const auto JJt_lds = ad_J * ad_J.transpose();
+    ADVectorXs err_solved(nt);
+
+
+    // Eigen::Vector<ADCG, Eigen::Dynamic> JJt_lds_vec = Eigen::Vector<ADCG, Eigen::Dynamic> {JJt_lds.reshaped()};
+
+
+    // Need to copy over to vecad
+   ADCG index(0);
+   VecAD<CGD> Copy (nt * nt);
+   VecAD<CGD> Rhs (nt * 1);
+   VecAD<CGD> Result (nt * 1);
+   for(size_t i = 0; i < nt*nt; i++)
+   {  Copy[index] = JJt_lds(i % nt, i / nt);
+      index += 1.;
+   }
+   index = 0.0;
+   for(size_t j = 0; j < nt; j++)
+   {
+         Rhs[ index ] = ad_err(j);
+         index += 1.0;
+   }
+
+    ADCG logdet;
+   const auto signdet = lu_vec_ad(nt, 1, Copy, Rhs, Result, logdet);
+
+   // cast back into matrix
+    index = 0.0;
+    for(size_t i = 0; i < nt; i++)
+    {
+        err_solved[i, 0] = Result[index];
+        index += 1.0;
+    }
+    const auto grad = ad_J.transpose() * err_solved;
+
+
+    if (jacobian_pinv)
+    {
+        data[n_jacobian_data] = signdet;
+
+        trace_matrix(grad, data, 1, nq, n_jacobian_data + n_jacobian_signed_det);
+    }
+
+
+
+    // Create the AD function
+    ADFun<CGD> jacobian_gradient_func(ad_q, data);
+
+    CodeHandler<double> handler;
+    CppAD::vector<CGD> ind_vars(nq + nt);
+    handler.makeVariables(ind_vars);
+
+    CppAD::vector<CGD> result = jacobian_gradient_func.Forward(0, ind_vars);
+
+    // CppAD::vector<CGD> jac = jacobian_gradient_func.Jacobian(ad_q);
+
+    LanguageCCustom<double> langC("double");
+    LangCDefaultVariableNameGenerator<double> nameGen;
+
+    std::ostringstream function_code;
+    handler.generateCode(function_code, langC, result, nameGen);
+
+    return Traced{function_code.str(), handler.getTemporaryVariableCount(), n_out};
+
+}
+
+
 int main(int argc, char **argv)
 {
     cxxopts::Options options(argv[0], "Tracing compiler for forward kinematics and collision checking");
@@ -635,6 +763,13 @@ int main(int argc, char **argv)
     data["jacobian_eefk_code"] = traced_jacobian_eefk_code.code;
     data["jacobian_eefk_code_vars"] = traced_jacobian_eefk_code.temp_variables;
     data["jacobian_eefk_code_output"] = traced_jacobian_eefk_code.outputs;
+
+
+    auto traced_trace_jacobian_pinv_adj_code = trace_jacobian_pinv_adj(robot, true, true);
+    data["trace_jacobian_pinv_adj_code"] = traced_trace_jacobian_pinv_adj_code.code;
+    data["trace_jacobian_pinv_adj_code_vars"] = traced_trace_jacobian_pinv_adj_code.temp_variables;
+    data["trace_jacobian_pinv_adj_code_output"] = traced_trace_jacobian_pinv_adj_code.outputs;
+
 
     inja::Environment env;
 

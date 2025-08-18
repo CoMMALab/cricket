@@ -258,6 +258,20 @@ struct {{name}}
         jac = to_matrix(&y[{{12}}], 6, ({{jacobian_eefk_code_output}} - 12) / 6);
     }
 
+    static inline auto jacobian_solve(const std::array<float, {{n_q}}> &q, const std::array<float, 6> &e, Eigen::Matrix<float, 6, Eigen::Dynamic> &jac,  Eigen::Matrix<float, {{n_q}}, 1) noexcept
+    {
+        std::array<float, {{trace_jacobian_pinv_adj_code_vars}}> v;
+        std::array<float, {{trace_jacobian_pinv_adj_code_output}}> y;
+
+        {{trace_jacobian_pinv_adj_code}}
+
+        std::array<float, 12> pose_arr;
+        std::copy_n(&y[0], 12, pose_arr.begin());
+        fk = to_isometry(pose_arr.data());
+
+        jac = to_matrix(&y[{{12}}], 6, ({{trace_jacobian_pinv_adj_code_output}} - 12) / 6);
+    }
+
 
 
 };

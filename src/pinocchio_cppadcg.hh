@@ -12,6 +12,7 @@
 #include <cmath>
 #include <boost/mpl/int.hpp>
 #include <cppad/cg/support/cppadcg_eigen.hpp>
+# include "lu_vec_ad.hpp"
 
 #include "pinocchio/autodiff/cppad.hpp"
 
