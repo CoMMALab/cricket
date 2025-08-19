@@ -580,23 +580,36 @@ auto trace_jacobian_pinv_adj(
 
     const size_t nt = 6; // task space is se3
 
-    ADVectorXs ad_q(nq);
-    ADVectorXs ad_err(nt);
-    ad_err.setZero();
+    ADVectorXs ad_inp(nq + nt);
+    for (auto i = 0U; i < nq + nt; ++i)
+        ad_inp[i] = ADCG(0.0);
+
+
+    // ADVectorXs ad_q(nq);
+    // for (auto i = 0U; i < nq; ++i)
+    //     ad_q[i] = ADCG(0.0);
+
+    // ADVectorXs ad_q = 
+    // ad_q = ad_inp.seqN(0, nq);
+    const auto ad_q = ad_inp.segment(0, nq);
+    const auto ad_err = ad_inp.segment(nq, nq + nt);
+
+    // ADVectorXs ad_err(nt);
+    // add_err = ad_inp.seqN(nq, nt);
+    // ad_err.setZero();
 
     ADMatrixXs ad_J(nt, nv); // 6 is for the SE3 space.
     ad_J.setZero();
     ADMatrixXs ad_Jinv(nt, nt);
     ad_Jinv.setZero();
 
-
-    for (auto i = 0U; i < nq; ++i)
-    {
-        ad_q[i] = ADCG(0.0);
-    }
+    ADMatrixXs ad_JIdentity(nt, nt);
+    ad_JIdentity.setIdentity();
 
 
-    Independent(ad_q, ad_err);
+
+
+    Independent(ad_inp);
 
     forwardKinematics(ad_model, ad_data, ad_q);
     updateFramePlacements(ad_model, ad_data);
@@ -612,7 +625,7 @@ auto trace_jacobian_pinv_adj(
     // if (return_jacobian)
     //     trace_matrix(ad_J, data, nv, nt, 0);
 
-    const auto JJt_lds = ad_J * ad_J.transpose();
+    const auto JJt_lds = (ad_J * ad_J.transpose() + damp * ad_JIdentity);
     ADVectorXs err_solved(nt);
 
 
@@ -658,7 +671,7 @@ auto trace_jacobian_pinv_adj(
 
 
     // Create the AD function
-    ADFun<CGD> jacobian_gradient_func(ad_q, data);
+    ADFun<CGD> jacobian_gradient_func(ad_inp, data);
 
     CodeHandler<double> handler;
     CppAD::vector<CGD> ind_vars(nq + nt);

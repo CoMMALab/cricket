@@ -260,6 +260,10 @@ struct {{name}}
 
     static inline auto jacobian_solve(const std::array<float, {{n_q}}> &q, const std::array<float, 6> &e, Eigen::Matrix<float, 6, Eigen::Dynamic> &jac,  Eigen::Matrix<float, {{n_q}}, 1) noexcept
     {
+        std::array<float, {{n_q}} + 6> x;
+        std::copy(q.begin(), q.end(), x.begin());
+        std::copy(e.begin(), e.end(), x.begin() + {{n_q}});
+
         std::array<float, {{trace_jacobian_pinv_adj_code_vars}}> v;
         std::array<float, {{trace_jacobian_pinv_adj_code_output}}> y;
 
