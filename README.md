@@ -41,11 +41,12 @@ docker build . -t cricket
 
 Run the script:
 ```bash
-docker run --rm -v "$(pwd):/workspace" -w /workspace --user "$(id -u):$(id -g)" cricket:latest resources/panda.json
+docker run --rm -v "$(pwd):/mount" --user "$(id -u):$(id -g)" cricket:latest /mount/resources/panda.json -t /mount/panda.hh
 
 # Optionally format the code
 clang-format -i panda_fk.hh
 ```
+Note the use of the `/mount` directory and specification of output file.
 
 ## Configuration
 
