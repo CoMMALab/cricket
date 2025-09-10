@@ -8,4 +8,4 @@ ARG MAMBA_DOCKERFILE_ACTIVATE=1
 
 COPY . cricket/
 RUN cmake -GNinja -Bbuild -DCPM_SOURCE_CACHE=.cpm_cache cricket && cmake --build build
-ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "./build/fkcc_gen"]
+ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "/tmp/build/fkcc_gen"]
