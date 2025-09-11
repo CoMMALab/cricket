@@ -1,0 +1,9 @@
+{
+    "name": "Bipanda",
+    "urdf": "bipanda/bipanda_spherized_1.urdf",
+    "srdf": "bipanda/bipanda.srdf",
+    "end_effector": "right_panda_grasptarget",
+    "batch_size": 16,
+    "template": "templates/panda_approx_template.hh",
+    "output": "bipanda_prrtc_approx.hh"
+}
