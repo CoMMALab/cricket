@@ -3,7 +3,7 @@
     "urdf": "baxter/baxter_spherized.urdf",
     "srdf": "baxter/baxter.srdf",
     "end_effector": "right_gripper",
-    "batch_size": 32,
+    "batch_size": 16,
     "template": "templates/panda_main_template.hh",
     "output": "baxter_prrtc_main.hh"
 }

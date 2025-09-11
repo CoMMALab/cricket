@@ -1,6 +1,6 @@
 {% set robot_template_name = capitalize(name) %}
-{% set name = lower(name) %}
-{% set name_upper = upper(name) %}
+{% set approx_name = lower(name) + "_approx" %}
+{% set approx_name_upper = upper(approx_name) %}
 {% set n_matrices_saved = n_joints_with_multiple_children + 1 %}
 
 #define {{name_upper}}_SPHERE_COUNT {{length(spheres_array)}}
@@ -68,9 +68,9 @@ __device__ __constant__ int {{name}}_joint_id_to_dof[{{length(joint_id_to_dof)}}
 };
 
 template <>
-__device__ void fk<ppln::robots::{{robot_template_name}}>(
+__device__ void fk_approx<ppln::robots::{{robot_template_name}}>(
     const float* q,
-    volatile float* sphere_pos, // {{length(spheres_array)}} spheres x {{batch_size}} robots x 3 coordinates (each column is a robot)
+    volatile float* sphere_pos_approx, // {{length(spheres_array)}} spheres x {{batch_size}} robots x 3 coordinates (each column is a robot)
     float *T, // {{batch_size}} robots x {{n_matrices_saved}} x 4x4 transform matrix , column major
     const int tid
 )
@@ -132,7 +132,7 @@ __device__ void fk<ppln::robots::{{robot_template_name}}>(
             int sphere_ind = {{name}}_flattened_joint_to_spheres[joint_to_sphere_ind];
             if (col_ind < 3) {
                 // sphere sphere_ind, robot batch_ind (BATCH_SIZE robots), coord col_ind
-                sphere_pos[sphere_ind * BATCH_SIZE * 3 + batch_ind * 3 + col_ind] = 
+                sphere_pos_approx[sphere_ind * BATCH_SIZE * 3 + batch_ind * 3 + col_ind] = 
                     T_base[T_memory_idx*16 + col_ind] * {{name}}_spheres_array[sphere_ind].x +
                     T_base[T_memory_idx*16 + col_ind + M] * {{name}}_spheres_array[sphere_ind].y +
                     T_base[T_memory_idx*16 + col_ind + M*2] * {{name}}_spheres_array[sphere_ind].z +
@@ -147,55 +147,56 @@ __device__ void fk<ppln::robots::{{robot_template_name}}>(
 
 // 4 threads per discretized motion for self-collision check
 template <>
-__device__ bool self_collision_check<ppln::robots::{{robot_template_name}}>(volatile float* sphere_pos, volatile int* joint_in_collision, const int tid){
+__device__ bool self_collision_check_approx<ppln::robots::{{robot_template_name}}>(volatile float* sphere_pos_approx, volatile int* joint_in_collision, const int tid){
     const int thread_ind = tid % 4;
     const int batch_ind = tid / 4;
-
-    for (int i = thread_ind; i < {{name_upper}}_SELF_CC_RANGE_COUNT; i += 4) {
+    bool out = true;
+    for (int i = thread_ind; i < {{name_upper}}_SELF_CC_RANGE_COUNT; i+=4) {
         int sphere_1_ind = {{name}}_self_cc_ranges[i][0];
-        if (joint_in_collision[20*batch_ind + {{name}}_sphere_to_joint[sphere_1_ind]] == 0) continue;
         float sphere_1[3] = {
-            sphere_pos[sphere_1_ind * BATCH_SIZE * 3 + batch_ind * 3 + 0],
-            sphere_pos[sphere_1_ind * BATCH_SIZE * 3 + batch_ind * 3 + 1],
-            sphere_pos[sphere_1_ind * BATCH_SIZE * 3 + batch_ind * 3 + 2]
+            sphere_pos_approx[sphere_1_ind * BATCH_SIZE * 3 + batch_ind * 3 + 0],
+            sphere_pos_approx[sphere_1_ind * BATCH_SIZE * 3 + batch_ind * 3 + 1],
+            sphere_pos_approx[sphere_1_ind * BATCH_SIZE * 3 + batch_ind * 3 + 2]
         };
         for (int j = {{name}}_self_cc_ranges[i][1]; j <= {{name}}_self_cc_ranges[i][2]; j++) {
             float sphere_2[3] = {
-                sphere_pos[j * BATCH_SIZE * 3 + batch_ind * 3 + 0],
-                sphere_pos[j * BATCH_SIZE * 3 + batch_ind * 3 + 1],
-                sphere_pos[j * BATCH_SIZE * 3 + batch_ind * 3 + 2]
+                sphere_pos_approx[j * BATCH_SIZE * 3 + batch_ind * 3 + 0],
+                sphere_pos_approx[j * BATCH_SIZE * 3 + batch_ind * 3 + 1],
+                sphere_pos_approx[j * BATCH_SIZE * 3 + batch_ind * 3 + 2]
             };
             if (sphere_sphere_self_collision(
                 sphere_1[0], sphere_1[1], sphere_1[2], {{name}}_spheres_array[sphere_1_ind].w,
                 sphere_2[0], sphere_2[1], sphere_2[2], {{name}}_spheres_array[j].w
             )){
-                return false;
+                atomicAdd((int*)&joint_in_collision[20*batch_ind + {{name}}_sphere_to_joint[sphere_1_ind]], 1);
+                out = false;
             }
-        }
+        } 
     }
-    return true;
-
+    return out;
 }
 
 // 4 threads per discretized motion for env collision check
 template <>
-__device__ bool env_collision_check<ppln::robots::{{robot_template_name}}>(volatile float* sphere_pos, volatile int* joint_in_collision, ppln::collision::Environment<float> *env, const int tid){
+__device__ bool env_collision_check_approx<ppln::robots::{{robot_template_name}}>(volatile float* sphere_pos_approx, volatile int* joint_in_collision, ppln::collision::Environment<float> *env, const int tid){
     const int thread_ind = tid % 4;
     const int batch_ind = tid / 4;
+    bool out = true;
 
     for (int i = thread_ind; i < {{name_upper}}_SPHERE_COUNT; i += 4){
-        // sphere i, robot batch_ind ({{batch_size}} robots)
-        if (joint_in_collision[20*batch_ind + {{name}}_sphere_to_joint[i]] > 0 && 
+        // sphere i, robot batch_ind (32 robots)
+        if ( 
             sphere_environment_in_collision(
                 env,
-                sphere_pos[i * BATCH_SIZE * 3 + batch_ind * 3 + 0],
-                sphere_pos[i * BATCH_SIZE * 3 + batch_ind * 3 + 1],
-                sphere_pos[i * BATCH_SIZE * 3 + batch_ind * 3 + 2],
+                sphere_pos_approx[i * BATCH_SIZE * 3 + batch_ind * 3 + 0],
+                sphere_pos_approx[i * BATCH_SIZE * 3 + batch_ind * 3 + 1],
+                sphere_pos_approx[i * BATCH_SIZE * 3 + batch_ind * 3 + 2],
                 {{name}}_spheres_array[i].w
             )
         ) {
-            return false;
+            atomicAdd((int*)&joint_in_collision[20*batch_ind + {{name}}_sphere_to_joint[i]],1);
+            out = false;
         } 
     }
-    return true;
+    return out;
 }
