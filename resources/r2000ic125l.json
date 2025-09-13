@@ -1,0 +1,9 @@
+{
+    "name": "R2000IC125L",
+    "urdf": "r2000ic125l/spherized.urdf",
+    "srdf": "r2000ic125l/r2000ic125l.srdf",
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "r2000ic125l.hh"
+}

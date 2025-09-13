@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<robot name="fanuc_m900ib700l" path="m900ib400l.urdf">
+<robot name="fanuc_m900ib400l" path="spherized.urdf">
 	<link name="base_link">
 		<visual>
 			<origin rpy="0 0 0" xyz="0 0 0"></origin>
@@ -12,15 +12,27 @@
 		</visual>
 		<collision>
 			<geometry>
-				<sphere radius="0.466763"></sphere>
+				<sphere radius="0.347906"></sphere>
 			</geometry>
-			<origin xyz="0.09766299122619629 -0.007193999284744262 0.1695009933242798" rpy="0 0 0"></origin>
+			<origin xyz="-0.2658250087738037 0.10600300071525574 0.16075299332427978" rpy="0 0 0"></origin>
 		</collision>
 		<collision>
 			<geometry>
-				<sphere radius="0.46019"></sphere>
+				<sphere radius="0.388726"></sphere>
 			</geometry>
-			<origin xyz="-0.1671580087738037 -0.0001529992847442629 0.1695029933242798" rpy="0 0 0"></origin>
+			<origin xyz="-0.1591290087738037 -0.18758099928474425 0.1530159933242798" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.386244"></sphere>
+			</geometry>
+			<origin xyz="0.20711199122619628 -0.06814899928474427 0.15488999332427977" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.355754"></sphere>
+			</geometry>
+			<origin xyz="0.09927099122619629 0.18888400071525574 0.13671299332427977" rpy="0 0 0"></origin>
 		</collision>
 	</link>
 	<link name="link_1">
@@ -35,15 +47,27 @@
 		</visual>
 		<collision>
 			<geometry>
-				<sphere radius="0.684194"></sphere>
+				<sphere radius="0.46688"></sphere>
 			</geometry>
-			<origin xyz="0.2045247544002533 -0.12632 -0.2605495031690598" rpy="0 0 0"></origin>
+			<origin xyz="0.036164754400253296 -0.023046 -0.3557895031690598" rpy="0 0 0"></origin>
 		</collision>
 		<collision>
 			<geometry>
-				<sphere radius="0.504338"></sphere>
+				<sphere radius="0.541849"></sphere>
 			</geometry>
-			<origin xyz="0.2725277544002533 0.265272 -0.15647350316905975" rpy="0 0 0"></origin>
+			<origin xyz="0.2377407544002533 0.001885 -0.27363150316905976" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.452197"></sphere>
+			</geometry>
+			<origin xyz="0.3463507544002533 -0.28608 -0.061284503169059756" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.464921"></sphere>
+			</geometry>
+			<origin xyz="0.3557287544002533 0.271377 -0.049166503169059766" rpy="0 0 0"></origin>
 		</collision>
 	</link>
 	<link name="link_2">
