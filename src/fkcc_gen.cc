@@ -77,7 +77,7 @@ struct RobotInfo
     RobotInfo(
         const std::filesystem::path &urdf_file,
         const std::optional<std::filesystem::path> &srdf_file,
-        const std::optional<std::string> &end_effector)
+        const std::vector<std::string> &end_effectors)
     {
         if (not std::filesystem::exists(urdf_file))
         {
@@ -105,21 +105,15 @@ struct RobotInfo
 
         extract_spheres();
 
-        if (not end_effector)
-        {
-            end_effector_name = model.frames[model.nframes - 1].name;
-            fmt::print("No EE provided, using distal link `{}`.\n", end_effector_name);
-        }
-        else if (not model.existFrame(*end_effector))
-        {
-            throw std::runtime_error(fmt::format("Invalid EE name {}", *end_effector));
-        }
-        else
-        {
-            end_effector_name = *end_effector;
+        for(const auto end_effector: end_effectors) {
+            if (not model.existFrame(end_effector))
+                throw std::runtime_error(fmt::format("Invalid EE name {}", end_effector));
+            else
+                end_effector_names.push_back(end_effector);
         }
 
-        end_effector_index = model.getFrameId(end_effector_name);
+        for(const auto end_effector_name: end_effector_names)
+            end_effector_indexes.push_back(model.getFrameId(end_effector_name));
     }
 
     auto json() -> nlohmann::json
@@ -136,8 +130,9 @@ struct RobotInfo
         json["bound_range"] = std::vector<float>(bound_range.data(), bound_range.data() + model.nq);
         json["bound_descale"] = std::vector<float>(bound_descale.data(), bound_descale.data() + model.nq);
         json["measure"] = bound_range.prod();
-        json["end_effector"] = end_effector_name;
-        json["end_effector_index"] = end_effector_index;
+        json["end_effectors"] = end_effector_names;
+        std::cout << "Num eefs : " << end_effector_names.size() << std::endl;
+        json["end_effector_indexes"] = end_effector_indexes;
         json["min_radius"] = min_radius;
         json["max_radius"] = max_radius;
         json["joint_names"] = dof_to_joint_names();
@@ -183,31 +178,34 @@ struct RobotInfo
 
     auto get_frames_colliding_end_effector() -> std::vector<std::size_t>
     {
-        std::size_t end_effector_joint = model.frames[end_effector_index].parentJoint;
+        std::set<std::size_t> end_effector_allowed_collisions;
 
-        std::vector<std::size_t> frames;
-        for (auto i = 0U; i < model.frames.size(); ++i)
-        {
-            if (model.frames[i].parentJoint == end_effector_joint)
+        for(const auto end_effector_index: end_effector_indexes){
+            std::size_t end_effector_joint = model.frames[end_effector_index].parentJoint;
+
+            std::vector<std::size_t> frames;
+            for (auto i = 0U; i < model.frames.size(); ++i)
             {
-                if (bounding_spheres.find(i) != bounding_spheres.end())
+                if (model.frames[i].parentJoint == end_effector_joint)
                 {
-                    frames.emplace_back(i);
+                    if (bounding_spheres.find(i) != bounding_spheres.end())
+                    {
+                        frames.emplace_back(i);
+                    }
                 }
             }
-        }
 
-        std::set<std::size_t> end_effector_allowed_collisions;
-        for (const auto &[first, second] : allowed_link_pairs)
-        {
-            if (std::find(frames.begin(), frames.end(), first) != frames.end())
+            for (const auto &[first, second] : allowed_link_pairs)
             {
-                end_effector_allowed_collisions.emplace(second);
-            }
+                if (std::find(frames.begin(), frames.end(), first) != frames.end())
+                {
+                    end_effector_allowed_collisions.emplace(second);
+                }
 
-            if (std::find(frames.begin(), frames.end(), second) != frames.end())
-            {
-                end_effector_allowed_collisions.emplace(first);
+                if (std::find(frames.begin(), frames.end(), second) != frames.end())
+                {
+                    end_effector_allowed_collisions.emplace(first);
+                }
             }
         }
 
@@ -399,8 +397,8 @@ struct RobotInfo
 
     Model model;
     GeometryModel collision_model;
-    std::string end_effector_name;
-    std::size_t end_effector_index;
+    std::vector<std::string> end_effector_names;
+    std::vector<std::size_t> end_effector_indexes;
 
     float min_radius{std::numeric_limits<float>::max()};
     float max_radius{std::numeric_limits<float>::min()};
@@ -482,7 +480,7 @@ auto trace_sphere_cc_fk(
 
     std::size_t n_spheres_data = (spheres) ? info.spheres.size() * 4 : 0;
     std::size_t n_bounding_spheres_data = (bounding_spheres) ? info.bounding_spheres.size() * 4 : 0;
-    std::size_t n_fk_data = (fk) ? 12 : 0;
+    std::size_t n_fk_data = (fk) ? 12 * info.end_effector_indexes.size() : 0;
     std::size_t n_out = n_spheres_data + n_bounding_spheres_data + n_fk_data;
 
     ADVectorXs data(n_out);
@@ -511,7 +509,8 @@ auto trace_sphere_cc_fk(
 
     if (fk)
     {
-        trace_frame(info.end_effector_index, ad_data, data, n_spheres_data + n_bounding_spheres_data);
+        for(size_t i = 0; i < info.end_effector_indexes.size(); i++)
+            trace_frame(info.end_effector_indexes[i], ad_data, data, n_spheres_data + n_bounding_spheres_data + 12 *i);
     }
 
     // Create the AD function
@@ -592,13 +591,14 @@ int main(int argc, char **argv)
         srdf_path = parent_path / data["srdf"];
     }
 
-    std::optional<std::string> end_effector_name = {};
-    if (data.contains("end_effector"))
+    std::vector<std::string> end_effector_names;
+    if (data.contains("end_effectors"))
     {
-        end_effector_name = data["end_effector"];
+        for (const auto end_effector_name: data["end_effectors"])
+            end_effector_names.push_back(end_effector_name);
     }
 
-    RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_name);
+    RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_names);
 
     data.update(robot.json());
 

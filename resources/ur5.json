@@ -2,7 +2,7 @@
     "name": "UR5",
     "urdf": "ur5/ur5_spherized.urdf",
     "srdf": "ur5/ur5.srdf",
-    "end_effector": "robotiq_85_base_link",
+    "end_effectors": ["robotiq_85_base_link"],
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
