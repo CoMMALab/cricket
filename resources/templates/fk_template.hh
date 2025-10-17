@@ -18,7 +18,7 @@ struct {{name}}
     static constexpr std::size_t resolution = {{resolution}};
 
     static constexpr std::array<std::string_view, dimension> joint_names = {"{{join(joint_names, "\", \"")}}"};
-    static constexpr char* end_effectors[] ={ {% for eef in end_effectors %}'{{eef}}'{%endfor %} }
+    static constexpr char* end_effectors[] ={ {% for eef in end_effectors %}'{{eef}}'{%endfor %} };
 
     using Configuration = FloatVector<dimension>;
     using ConfigurationArray = std::array<FloatT, dimension>;
