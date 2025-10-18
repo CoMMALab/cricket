@@ -105,11 +105,16 @@ struct RobotInfo
 
         extract_spheres();
 
-        for(const auto end_effector: end_effectors) {
+        for (const auto end_effector : end_effectors)
+        {
             if (not model.existFrame(end_effector))
+            {
                 throw std::runtime_error(fmt::format("Invalid EE name {}", end_effector));
+            }
             else
+            {
                 end_effector_names.push_back(end_effector);
+            }
         }
         if (end_effector_names.size() == 0)
         {
@@ -117,8 +122,10 @@ struct RobotInfo
             fmt::print("No EE provided, using distal link `{}`.\n", end_effector_names[0]);
         }
 
-        for(const auto end_effector_name: end_effector_names)
+        for (const auto end_effector_name : end_effector_names)
+        {
             end_effector_indexes.push_back(model.getFrameId(end_effector_name));
+        }
     }
 
     auto json() -> nlohmann::json
@@ -185,7 +192,8 @@ struct RobotInfo
     {
         std::set<std::size_t> end_effector_allowed_collisions;
 
-        for(const auto end_effector_index: end_effector_indexes){
+        for (const auto end_effector_index : end_effector_indexes)
+        {
             std::size_t end_effector_joint = model.frames[end_effector_index].parentJoint;
 
             std::vector<std::size_t> frames;
@@ -514,8 +522,14 @@ auto trace_sphere_cc_fk(
 
     if (fk)
     {
-        for(size_t i = 0; i < info.end_effector_indexes.size(); i++)
-            trace_frame(info.end_effector_indexes[i], ad_data, data, n_spheres_data + n_bounding_spheres_data + 12 *i);
+        for (size_t i = 0; i < info.end_effector_indexes.size(); i++)
+        {
+            trace_frame(
+                info.end_effector_indexes[i],
+                ad_data,
+                data,
+                n_spheres_data + n_bounding_spheres_data + 12 * i);
+        }
     }
 
     // Create the AD function
@@ -599,8 +613,10 @@ int main(int argc, char **argv)
     std::vector<std::string> end_effector_names;
     if (data.contains("end_effectors"))
     {
-        for (const auto end_effector_name: data["end_effectors"])
+        for (const auto end_effector_name : data["end_effectors"])
+        {
             end_effector_names.push_back(end_effector_name);
+        }
     }
 
     RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_names);
