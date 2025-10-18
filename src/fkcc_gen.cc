@@ -111,6 +111,11 @@ struct RobotInfo
             else
                 end_effector_names.push_back(end_effector);
         }
+        if (end_effector_names.size() == 0)
+        {
+            end_effector_names.push_back(model.frames[model.nframes - 1].name);
+            fmt::print("No EE provided, using distal link `{}`.\n", end_effector_names[0]);
+        }
 
         for(const auto end_effector_name: end_effector_names)
             end_effector_indexes.push_back(model.getFrameId(end_effector_name));
@@ -131,8 +136,8 @@ struct RobotInfo
         json["bound_descale"] = std::vector<float>(bound_descale.data(), bound_descale.data() + model.nq);
         json["measure"] = bound_range.prod();
         json["end_effectors"] = end_effector_names;
-        std::cout << "Num eefs : " << end_effector_names.size() << std::endl;
         json["end_effector_indexes"] = end_effector_indexes;
+        json["num_end_effectors"] = end_effector_names.size();
         json["min_radius"] = min_radius;
         json["max_radius"] = max_radius;
         json["joint_names"] = dof_to_joint_names();

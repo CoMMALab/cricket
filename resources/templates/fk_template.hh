@@ -18,7 +18,7 @@ struct {{name}}
     static constexpr std::size_t resolution = {{resolution}};
 
     static constexpr std::array<std::string_view, dimension> joint_names = {"{{join(joint_names, "\", \"")}}"};
-    static constexpr char* end_effectors[] ={ {% for eef in end_effectors %}'{{eef}}'{%endfor %} };
+    static constexpr std::array<std::string_view, {{num_end_effectors}}> end_effectors ={"{{join(end_effectors, "\", \"")}}"};
 
     using Configuration = FloatVector<dimension>;
     using ConfigurationArray = std::array<FloatT, dimension>;
@@ -182,7 +182,8 @@ struct {{name}}
         {% include "ccfk" %}
 
         // attaching at {{ end_effectors }}
-        set_attachment_pose(environment, to_isometry(&y[{{ccfkee_code_output - 12}}]));
+        // provide the eef pose of all end effectors.
+        set_attachment_pose(environment, to_isometries<{{num_end_effectors}}>(&y[{{ccfkee_code_output - 12 * num_end_effectors}}]));
 
         //
         // attachment vs. environment collisions
@@ -225,14 +226,14 @@ struct {{name}}
         return true;
     }
 
-    static inline auto eefk(const std::array<float, {{n_q}}> &x) noexcept -> Eigen::Isometry3f
+    static inline auto eefk(const std::array<float, {{n_q}}> &x) noexcept -> std::array<Eigen::Isometry3f, {{num_end_effectors}}>
     {
         std::array<float, {{eefk_code_vars}}> v;
         std::array<float, {{eefk_code_output}}> y;
 
         {{eefk_code}}
 
-        return to_isometry(y.data());
+        return to_isometries<{{num_end_effectors}}>(y.data());
     }
 };
 }
