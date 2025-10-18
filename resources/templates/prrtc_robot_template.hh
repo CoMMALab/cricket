@@ -1,7 +1,6 @@
 {% set robot_template_name = capitalize(name) %}
 {% set name = lower(name) %}
 {% set name_upper = upper(name) %}
-{% set n_matrices_saved = n_joints_with_multiple_children + 1 %}
 
 struct {{robot_template_name}}{
 
