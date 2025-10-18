@@ -4,7 +4,7 @@
     "srdf": "fetch/fetch.srdf",
     "end_effector": "gripper_link",
     "resolution": 32,
-    "template": "templates/panda_approx_template.hh",
+    "template": "templates/prrtc_approx_template.hh",
     "subtemplates": [],
     "output": "fetch_prrtc_approx.hh"
 }

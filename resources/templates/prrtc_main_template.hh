@@ -66,7 +66,7 @@ __device__ __constant__ int {{name}}_dfs_order[{{length(dfs_order)}}] = {
 template <>
 __device__ void fk<ppln::robots::{{robot_template_name}}>(
     const float* q,
-    volatile float* sphere_pos, // {{length(spheres_array)}} spheres x 16 robots x 3 coordinates
+    volatile float* sphere_pos, // {{length(spheres_array)}} spheres x BATCH_SIZE robots x 3 coordinates
     float *T, // {{batch_size}} robots x {{n_matrices_saved}} x 4x4 transform matrix
     const int tid
 )
@@ -125,7 +125,7 @@ __device__ void fk<ppln::robots::{{robot_template_name}}>(
         while ({{name}}_flattened_joint_to_spheres[joint_to_sphere_ind] != -1) {
             int sphere_ind = {{name}}_flattened_joint_to_spheres[joint_to_sphere_ind];
             if (col_ind < 3) {
-                // sphere sphere_ind, robot batch_ind ({{batch_size}} robots), coord col_ind
+                // sphere sphere_ind, robot batch_ind (BATCH_SIZE robots), coord col_ind
                 sphere_pos[sphere_ind * BATCH_SIZE * 3 + batch_ind * 3 + col_ind] = 
                     T_base[col_ind] * {{name}}_spheres_array[sphere_ind].x +
                     T_base[col_ind + M] * {{name}}_spheres_array[sphere_ind].y +

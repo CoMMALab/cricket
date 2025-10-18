@@ -4,7 +4,7 @@
     "srdf": "panda/panda.srdf",
     "end_effector": "panda_grasptarget",
     "resolution": 32,
-    "template": "templates/panda_approx_template.hh",
+    "template": "templates/prrtc_approx_template.hh",
     "subtemplates": [],
     "output": "panda_prrtc_approx.hh"
 }

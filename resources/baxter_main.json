@@ -4,6 +4,6 @@
     "srdf": "baxter/baxter.srdf",
     "end_effector": "right_gripper",
     "batch_size": 32,
-    "template": "templates/panda_main_template.hh",
+    "template": "templates/prrtc_main_template.hh",
     "output": "baxter_prrtc_main.hh"
 }
