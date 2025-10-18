@@ -21,7 +21,6 @@
 
 using namespace pinocchio;
 
-
 struct SphereInfo
 {
     std::size_t geom_index;

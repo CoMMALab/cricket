@@ -11,7 +11,7 @@
 
 #include "robot_info.hh"
 #include "housekeeping.hh"
-
+#include "tracer_utils.hh"
 
 auto trace_sphere(const SphereInfo &sphere, const ADData &ad_data, ADVectorXs &data, std::size_t index)
 {
@@ -52,13 +52,6 @@ auto trace_frame(std::size_t ee_index, const ADData &ad_data, ADVectorXs &data, 
     data[index + 10] = R(1, 2);
     data[index + 11] = R(2, 2);
 }
-
-struct Traced
-{
-    std::string code;
-    std::size_t temp_variables;
-    std::size_t outputs;
-};
 
 auto trace_sphere_cc_fk(
     const RobotInfo &info,
@@ -213,25 +206,10 @@ int main(int argc, char **argv)
 
     data.update(robot.json());
 
-    auto traced_eefk_code = trace_sphere_cc_fk(robot, false, false, true);
-    data["eefk_code"] = traced_eefk_code.code;
-    data["eefk_code_vars"] = traced_eefk_code.temp_variables;
-    data["eefk_code_output"] = traced_eefk_code.outputs;
-
-    auto traced_spherefk_code = trace_sphere_cc_fk(robot, true, false, false);
-    data["spherefk_code"] = traced_spherefk_code.code;
-    data["spherefk_code_vars"] = traced_spherefk_code.temp_variables;
-    data["spherefk_code_output"] = traced_spherefk_code.outputs;
-
-    auto traced_ccfk_code = trace_sphere_cc_fk(robot, true, true, false);
-    data["ccfk_code"] = traced_ccfk_code.code;
-    data["ccfk_code_vars"] = traced_ccfk_code.temp_variables;
-    data["ccfk_code_output"] = traced_ccfk_code.outputs;
-
-    auto traced_ccfkee_code = trace_sphere_cc_fk(robot, true, true, true);
-    data["ccfkee_code"] = traced_ccfkee_code.code;
-    data["ccfkee_code_vars"] = traced_ccfkee_code.temp_variables;
-    data["ccfkee_code_output"] = traced_ccfkee_code.outputs;
+    add_to_trace(trace_sphere_cc_fk(robot, false, false, true), "eefk_code", data);
+    add_to_trace(trace_sphere_cc_fk(robot, true, false, false), "spherefk_code", data);
+    add_to_trace(trace_sphere_cc_fk(robot, true, true, false), "ccfk_code", data);
+    add_to_trace(trace_sphere_cc_fk(robot, true, true, true), "ccfkee_code", data);
 
     inja::Environment env;
 
