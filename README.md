@@ -2,7 +2,7 @@
 
 Cricket is a library to trace the forward kinematics of spherized robots (generated through, for example, [`foam`](github.com/CoMMALab/foam/)).
 It is built on [Pinocchio](https://github.com/stack-of-tasks/pinocchio) for forward kinematics, [CppAD](https://github.com/coin-or/CppAD) for tracing execution, [CppADCodeGen](https://github.com/joaoleal/CppADCodeGen) for generating code, and [CGAL](https://www.cgal.org/) for computing the bounding sphere of spheres.
-It was used to generate the collision checking kernels in [VAMP](https://github.com/kavrakiLab/vamp) and [pRRTC](https://github.com/CoMMALab/pRRTC).
+It was used to generate the collision checking kernels in [VAMP](https://github.com/kavrakiLab/vamp) and [pRRTC](https://github.com/CoMMALab/pRRTC). **This branch is used specifically for pRRTC.**
 
 ## Compilation Instructions
 
