@@ -12,3 +12,4 @@ using ADCG = AD<CGD>;
 using ADModel = ModelTpl<ADCG>;
 using ADData = DataTpl<ADCG>;
 using ADVectorXs = Eigen::Matrix<ADCG, Eigen::Dynamic, 1>;
+using ADMatrixXs = Eigen::Matrix<ADCG, Eigen::Dynamic, Eigen::Dynamic>;

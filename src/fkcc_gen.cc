@@ -12,6 +12,7 @@
 #include "robot_info.hh"
 #include "housekeeping.hh"
 #include "tracer_utils.hh"
+#include "tsr_constraints.hh"
 
 auto trace_sphere(const SphereInfo &sphere, const ADData &ad_data, ADVectorXs &data, std::size_t index)
 {
@@ -210,6 +211,10 @@ int main(int argc, char **argv)
     add_to_trace(trace_sphere_cc_fk(robot, true, false, false), "spherefk_code", data);
     add_to_trace(trace_sphere_cc_fk(robot, true, true, false), "ccfk_code", data);
     add_to_trace(trace_sphere_cc_fk(robot, true, true, true), "ccfkee_code", data);
+    add_to_trace(trace_tsr_error_function(robot), "tsr_error_code", data);
+    add_to_trace(trace_solve_tsr_function(robot, ProjMethod::InnerLM), "solve_tsr_error_lm_inner_code", data);
+    add_to_trace(trace_solve_tsr_function(robot, ProjMethod::OuterLM), "solve_tsr_error_lm_outer_code", data);
+    add_to_trace(trace_solve_tsr_function(robot, ProjMethod::GradDesc), "solve_tsr_error_gradient_descent_code", data);
 
     inja::Environment env;
 

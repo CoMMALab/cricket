@@ -1,3 +1,5 @@
+#pragma once 
+
 #include <fmt/core.h>
 #include <nlohmann/json.hpp>
 

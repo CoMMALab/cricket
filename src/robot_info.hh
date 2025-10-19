@@ -1,3 +1,4 @@
+#pragma once
 
 #include <pinocchio/parsers/urdf.hpp>
 #include <pinocchio/parsers/srdf.hpp>
