@@ -155,7 +155,7 @@ auto trace_tsr_error_function(const RobotInfo &info) -> Traced
 }
 
 
-auto trace_tsr_bimanual_error_function(const RobotInfo &info, const size_t eef1 = 0, const size_t eef2 = 0) -> Traced
+auto trace_tsr_bimanual_error_function(const RobotInfo &info, const size_t eef1 = 0, const size_t eef2 = 1) -> Traced
 {
     const double DT = 0.1;
     const double damp = 1e-6;
@@ -164,18 +164,18 @@ auto trace_tsr_bimanual_error_function(const RobotInfo &info, const size_t eef1 
     const size_t nt = 6;  // task space is se3
     const size_t n_eef = info.end_effector_indexes.size();
 
-    assert (n_eef > 1)
+    assert (n_eef > 1);
 
     ADModel ad_model = info.model.cast<ADCG>();
     ADData ad_data(ad_model);
 
     // Total inputs is:
-    // 2 * 4x4 matrices for constraint space
+    // 1 * 4x4 matrices for constraint space
     // 2 * 6 bounds for constraint space
     // It is repeated for all end effectors.
-    const size_t num_inp_eef = (7 * 2 + nt * 2);
+    const size_t num_inp_eef = (7 * 1 + nt * 2);
     // nq  for configuration space
-    const size_t num_inp = num_inp_eef * n_eef + nq;
+    const size_t num_inp = (7 * 1 + nt * 2) + nq;
 
     ADVectorXs ad_inp(num_inp);  // 3 4x4 matrices
     for (auto i = 0U; i < num_inp; ++i)
@@ -184,7 +184,7 @@ auto trace_tsr_bimanual_error_function(const RobotInfo &info, const size_t eef1 
     }
     Independent(ad_inp);
 
-    std::size_t n_out = nt * n_eef;
+    std::size_t n_out = nt;
     ADVectorXs data(n_out);
 
     // First copy over configs and run FK
