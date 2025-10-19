@@ -6,7 +6,7 @@ It was used to generate the collision checking kernels in [VAMP](https://github.
 
 ## Compilation Instructions
 
-See either the provided Dockerfile or follow the instructions for compilation in a Conda environment.
+Follow the instructions for compilation in a Conda environment.
 
 Set up the environment:
 ```bash
