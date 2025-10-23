@@ -796,19 +796,13 @@ int main(int argc, char **argv)
     std::ifstream f(json_path);
     nlohmann::json data = nlohmann::json::parse(f);
 
-    std::optional<std::filesystem::path> main_srdf_path = {};
-    if (data.contains("main_srdf"))
+    std::optional<std::filesystem::path> srdf_path = {};
+    if (data.contains("srdf"))
     {
-        main_srdf_path = parent_path / data["main_srdf"];
+        srdf_path = parent_path / data["srdf"];
     }
 
-    std::optional<std::filesystem::path> approx_srdf_path = {};
-    if (data.contains("approx_srdf"))
-    {
-        approx_srdf_path = parent_path / data["approx_srdf"];
-    }
-
-    RobotInfo robot(parent_path / data["urdf"], main_srdf_path, approx_srdf_path, data["end_effector"]);
+    RobotInfo robot(parent_path / data["urdf"], srdf_path, data["end_effector"]);
 
     // Print fixed transforms
     robot.print_fixed_transforms();
