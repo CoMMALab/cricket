@@ -3,7 +3,6 @@
     "urdf": "fetch/fetch_spherized.urdf",
     "srdf": "fetch/fetch.srdf",
     "end_effector": "gripper_link",
-    "resolution": 32,
     "batch_size": 16,
     "template": "templates/prrtc_main_template.hh",
     "subtemplates": [],

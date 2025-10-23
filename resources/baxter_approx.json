@@ -3,7 +3,7 @@
     "urdf": "baxter/baxter_spherized_1.urdf",
     "srdf": "baxter/baxter.srdf",
     "end_effector": "right_gripper",
-    "batch_size": 32,
+    "batch_size": 16,
     "template": "templates/prrtc_approx_template.hh",
     "output": "baxter_prrtc_approx.hh"
 }

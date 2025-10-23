@@ -4,7 +4,7 @@
     "srdf": "panda/panda.srdf",
     "end_effector": "panda_grasptarget",
     "batch_size": 16,
-    "template": "templates/prrtc_main_template.hh",
+    "template": "templates/prrtc_robot_template.hh",
     "subtemplates": [],
-    "output": "panda_prrtc_main.hh"
+    "output": "panda_struct.hh"
 }

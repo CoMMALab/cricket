@@ -62,12 +62,16 @@ __device__ __constant__ int {{name}}_dfs_order[{{length(dfs_order)}}] = {
     {% endif %}{% endfor %}
 };
 
+__device__ __constant__ int {{name}}_joint_id_to_dof[{{length(joint_id_to_dof)}}] = {
+    {% for i in range(length(joint_id_to_dof)) %}{{ at(joint_id_to_dof, i) }}{% if i < length(joint_id_to_dof) - 1 %},
+    {% endif %}{% endfor %}
+};
 
 template <>
 __device__ void fk<ppln::robots::{{robot_template_name}}>(
     const float* q,
-    volatile float* sphere_pos, // {{length(spheres_array)}} spheres x BATCH_SIZE robots x 3 coordinates
-    float *T, // {{batch_size}} robots x {{n_matrices_saved}} x 4x4 transform matrix
+    volatile float* sphere_pos, // {{length(spheres_array)}} spheres x {{batch_size}} robots x 3 coordinates (each column is a robot)
+    float *T, // {{batch_size}} robots x {{n_matrices_saved}} x 4x4 transform matrix , column major
     const int tid
 )
 {
@@ -76,43 +80,46 @@ __device__ void fk<ppln::robots::{{robot_template_name}}>(
     const int col_ind = tid % 4;
     const int batch_ind = tid / 4;
 
-    int T_offset = batch_ind * {{n_matrices_saved + 1}} * 16;
+    int T_offset = batch_ind * {{n_matrices_saved}} * 16;
     float T_step_col[4]; // 4x1 column of the joint transform matrix for this thread
     float *T_base = T + T_offset; // 4x4 transform matrix for the batch
-
+    
     #pragma unroll
-    for (int i = 0; i < {{n_matrices_saved + 1}}; ++i) {
-        float *T_col_i = T + i * 16 + col_ind * 4;
+    for (int i = 0; i < {{n_matrices_saved}}; ++i) {
+        float *T_col_i = T_base + i * 16 + col_ind * 4;
         for (int r=0; r<4; r++) {
             T_col_i[r] = 0.0f;
         }
         T_col_i[col_ind] = 1.0f;
     }
+    __syncthreads();
 
     int joint_to_sphere_ind = 0;
 
-    // loop through each joint, accumulate transformation matrix, and update sphere positions
     for (int j = 0; j < {{name_upper}}_JOINT_COUNT; ++j) {
         int i = {{name}}_dfs_order[j];
         float T_col_tmp[4];
         int parent_idx = {{name}}_joint_parents[i];
         int T_memory_idx_parent = {{name}}_T_memory_idx[parent_idx];
         int T_memory_idx = {{name}}_T_memory_idx[i];
-        if (i > 0) {
+        int q_idx = {{name}}_joint_id_to_dof[i];
+        if (j > 0) {
             int ft_addr_start = i * 16;
             int joint_type = {{name}}_joint_types[i];
+
             if (joint_type <= Z_PRISM) {
-                prism_fn(&{{name}}_fixed_transforms[ft_addr_start], q[i - 1], col_ind, T_step_col, joint_type);
+                prism_fn(&{{name}}_fixed_transforms[ft_addr_start], q[q_idx], col_ind, T_step_col, joint_type);
             }
             else if (joint_type == X_ROT) {
-                xrot_fn(&{{name}}_fixed_transforms[ft_addr_start], q[i - 1], col_ind, T_step_col);
+                xrot_fn(&{{name}}_fixed_transforms[ft_addr_start], q[q_idx], col_ind, T_step_col);
             }
-            else if (joint_type == Y_ROT) { 
-                yrot_fn(&{{name}}_fixed_transforms[ft_addr_start], q[i - 1], col_ind, T_step_col);
+            else if (joint_type == Y_ROT) {
+                yrot_fn(&{{name}}_fixed_transforms[ft_addr_start], q[q_idx], col_ind, T_step_col);
             }
             else if (joint_type == Z_ROT) {
-                zrot_fn(&{{name}}_fixed_transforms[ft_addr_start], q[i - 1], col_ind, T_step_col);
+                zrot_fn(&{{name}}_fixed_transforms[ft_addr_start], q[q_idx], col_ind, T_step_col);
             }
+            
             for (int r=0; r<4; r++){
                 T_col_tmp[r] = dot4_col(&T_base[T_memory_idx_parent*16 + r], T_step_col);
             }
@@ -121,20 +128,20 @@ __device__ void fk<ppln::robots::{{robot_template_name}}>(
             }
         }
         __syncwarp();
-
         while ({{name}}_flattened_joint_to_spheres[joint_to_sphere_ind] != -1) {
             int sphere_ind = {{name}}_flattened_joint_to_spheres[joint_to_sphere_ind];
             if (col_ind < 3) {
                 // sphere sphere_ind, robot batch_ind (BATCH_SIZE robots), coord col_ind
                 sphere_pos[sphere_ind * BATCH_SIZE * 3 + batch_ind * 3 + col_ind] = 
-                    T_base[col_ind] * {{name}}_spheres_array[sphere_ind].x +
-                    T_base[col_ind + M] * {{name}}_spheres_array[sphere_ind].y +
-                    T_base[col_ind + M*2] * {{name}}_spheres_array[sphere_ind].z +
-                    T_base[col_ind + M*3];
+                    T_base[T_memory_idx*16 + col_ind] * {{name}}_spheres_array[sphere_ind].x +
+                    T_base[T_memory_idx*16 + col_ind + M] * {{name}}_spheres_array[sphere_ind].y +
+                    T_base[T_memory_idx*16 + col_ind + M*2] * {{name}}_spheres_array[sphere_ind].z +
+                    T_base[T_memory_idx*16 + col_ind + M*3];
             }
             joint_to_sphere_ind++;
         }
         joint_to_sphere_ind++;
+        __syncthreads();
     }
 }
 
@@ -180,7 +187,7 @@ __device__ bool env_collision_check<ppln::robots::{{robot_template_name}}>(volat
     const int batch_ind = tid / 4;
     bool has_collision=false;
 
-    for (int i = {{name_upper}}_SPHERE_COUNT-1-thread_ind; i >={{name_upper}}_SPHERE_COUNT%4; i -= 4){
+    for (int i = thread_ind; i < {{name_upper}}_SPHERE_COUNT-{{name_upper}}_SPHERE_COUNT%4; i += 4){
         // sphere i, robot batch_ind ({{batch_size}} robots)
         if (joint_in_collision[20*batch_ind + {{name}}_sphere_to_joint[i]] > 0 && 
             sphere_environment_in_collision(
@@ -191,13 +198,12 @@ __device__ bool env_collision_check<ppln::robots::{{robot_template_name}}>(volat
                 {{name}}_spheres_array[i].w
             )
         ) {
-            has_collision=true;
             //return false;
+            has_collision=true;
         } 
         if (warp_any_full_mask(has_collision)) return false;
     }
-
-    int i=thread_ind;
+    int i={{name_upper}}_SPHERE_COUNT-1-thread_ind;
     if (joint_in_collision[20*batch_ind + {{name}}_sphere_to_joint[i]] > 0 && 
         sphere_environment_in_collision(
             env,
@@ -207,9 +213,7 @@ __device__ bool env_collision_check<ppln::robots::{{robot_template_name}}>(volat
             {{name}}_spheres_array[i].w
         )
     ) {
-        has_collision=true;
-        //return false;
+        return false;
     } 
-
-    return !has_collision;
+    return true;
 }
