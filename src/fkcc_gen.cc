@@ -260,6 +260,7 @@ struct RobotInfo
                 i++;
             }
         }
+        self_cc_ranges.emplace_back(std::array<int, 3>{cur_sphere1, range_start, range_end});
         json["self_cc_ranges"] = self_cc_ranges;
 
         auto joint_tree_info = analyze_joint_tree();
@@ -267,6 +268,28 @@ struct RobotInfo
         json["T_memory_idx"] = joint_tree_info.saved_joint_memory_idx;
         json["dfs_order"] = joint_tree_info.dfs_order;
         json["n_joints_with_multiple_children"] = joint_tree_info.n_joints_with_multiple_children;
+
+        // dof to joint id and joint id to dof
+        std::vector<std::size_t> joint_id_to_dof(model.joints.size(), -1);
+        for (auto joint_id = 1U; joint_id < model.joints.size(); ++joint_id)
+        {
+            const auto &joint = model.joints[joint_id];
+            auto start_idx = joint.idx_q();
+            auto nq = joint.nq();
+
+            for (auto i = 0U; i < nq; ++i)
+            {
+                // dof_to_joint_id[start_idx + i] = joint_id;
+                joint_id_to_dof[joint_id] = start_idx + i;
+            }
+        }
+        json["joint_id_to_dof"] = joint_id_to_dof;
+
+        auto joint_names = dof_to_joint_names();
+        // print joint names
+        for (auto i = 0U; i < joint_names.size(); ++i) {
+            fmt::print("Joint {}: {}\n", i, joint_names[i]);
+        }
 
 
         std::vector<std::array<float, 4>> spheres_array;
@@ -300,6 +323,7 @@ struct RobotInfo
     auto dof_to_joint_names() -> std::vector<std::string>
     {
         std::vector<std::size_t> dof_to_joint_id(model.nq);
+        std::vector<std::size_t> joint_id_to_dof(model.joints.size(), -1);
         for (auto joint_id = 1U; joint_id < model.joints.size(); ++joint_id)
         {
             const auto &joint = model.joints[joint_id];
@@ -309,6 +333,7 @@ struct RobotInfo
             for (auto i = 0U; i < nq; ++i)
             {
                 dof_to_joint_id[start_idx + i] = joint_id;
+                joint_id_to_dof[joint_id] = start_idx + i;
             }
         }
 
@@ -771,38 +796,24 @@ int main(int argc, char **argv)
     std::ifstream f(json_path);
     nlohmann::json data = nlohmann::json::parse(f);
 
-    std::optional<std::filesystem::path> srdf_path = {};
-    if (data.contains("srdf"))
+    std::optional<std::filesystem::path> main_srdf_path = {};
+    if (data.contains("main_srdf"))
     {
-        srdf_path = parent_path / data["srdf"];
+        main_srdf_path = parent_path / data["main_srdf"];
     }
 
-    RobotInfo robot(parent_path / data["urdf"], srdf_path, data["end_effector"]);
+    std::optional<std::filesystem::path> approx_srdf_path = {};
+    if (data.contains("approx_srdf"))
+    {
+        approx_srdf_path = parent_path / data["approx_srdf"];
+    }
+
+    RobotInfo robot(parent_path / data["urdf"], main_srdf_path, approx_srdf_path, data["end_effector"]);
 
     // Print fixed transforms
     robot.print_fixed_transforms();
 
     data.update(robot.json());
-
-    auto traced_eefk_code = trace_sphere_cc_fk(robot, false, false, true);
-    data["eefk_code"] = traced_eefk_code.code;
-    data["eefk_code_vars"] = traced_eefk_code.temp_variables;
-    data["eefk_code_output"] = traced_eefk_code.outputs;
-
-    auto traced_spherefk_code = trace_sphere_cc_fk(robot, true, false, false);
-    data["spherefk_code"] = traced_spherefk_code.code;
-    data["spherefk_code_vars"] = traced_spherefk_code.temp_variables;
-    data["spherefk_code_output"] = traced_spherefk_code.outputs;
-
-    auto traced_ccfk_code = trace_sphere_cc_fk(robot, true, true, false);
-    data["ccfk_code"] = traced_ccfk_code.code;
-    data["ccfk_code_vars"] = traced_ccfk_code.temp_variables;
-    data["ccfk_code_output"] = traced_ccfk_code.outputs;
-
-    auto traced_ccfkee_code = trace_sphere_cc_fk(robot, true, true, true);
-    data["ccfkee_code"] = traced_ccfkee_code.code;
-    data["ccfkee_code_vars"] = traced_ccfkee_code.temp_variables;
-    data["ccfkee_code_output"] = traced_ccfkee_code.outputs;
 
     inja::Environment env;
 
