@@ -158,7 +158,6 @@ auto trace_tsr_error_function(const RobotInfo &info) -> Traced
 auto trace_tsr_bimanual_error_function(const RobotInfo &info, const size_t eef1 = 0, const size_t eef2 = 1) -> Traced
 {
     const double DT = 0.1;
-    const double damp = 1e-6;
     auto nq = info.model.nq;
     auto nv = info.model.nv;
     const size_t nt = 6;  // task space is se3
@@ -173,7 +172,6 @@ auto trace_tsr_bimanual_error_function(const RobotInfo &info, const size_t eef1 
     // 1 * 4x4 matrices for constraint space
     // 2 * 6 bounds for constraint space
     // It is repeated for all end effectors.
-    const size_t num_inp_eef = (7 * 1 + nt * 2);
     // nq  for configuration space
     const size_t num_inp = (7 * 1 + nt * 2) + nq;
 
@@ -198,64 +196,48 @@ auto trace_tsr_bimanual_error_function(const RobotInfo &info, const size_t eef1 
     forwardKinematics(ad_model, ad_data, ad_q);
     updateFramePlacements(ad_model, ad_data);
 
-    for (auto eef_idx = 0U; eef_idx < n_eef; eef_idx++)
+
+    Eigen::Quaternion<ADCG> lTrq(ad_inp[nq + 0 + 0], ad_inp[nq + 0 + 1], ad_inp[nq + 0 + 2], ad_inp[nq + 0 + 3]);
+    Eigen::Vector3<ADCG> lTrp; // left joint in right joint frame
+    for (auto i=0U; i < 3; i++)
+        lTrp[i] = ad_inp[nq + 4 + i];
+    SE3Tpl<ADCG, 0> lTr (lTrq, lTrp); 
+
+    
+    ADVectorXs lb(nt);
+    ADVectorXs ub(nt);
+    for (auto i = 0U; i < nt; i++)
     {
-        const size_t eef_offset = num_inp_eef * eef_idx;
-        const size_t eef_out_offset = nt * eef_idx;
+        lb[i] = ad_inp[nq + 1 * 7 + i];
+        ub[i] = ad_inp[nq + 1 * 7 + nt + i];
+    }
+    
 
-        // Form the matrices
-        Eigen::Vector3<ADCG> rTep;
-        Eigen::Vector3<ADCG> wTrp;
-        Eigen::Quaternion<ADCG> rTeq(
-            ad_inp[eef_offset + nq + 0 + 0],
-            ad_inp[eef_offset + nq + 0 + 1],
-            ad_inp[eef_offset + nq + 0 + 2],
-            ad_inp[eef_offset + nq + 0 + 3]);  // Next 7 for rTe
-        Eigen::Quaternion<ADCG> wTrq(
-            ad_inp[eef_offset + nq + 7 + 0],
-            ad_inp[eef_offset + nq + 7 + 1],
-            ad_inp[eef_offset + nq + 7 + 2],
-            ad_inp[eef_offset + nq + 7 + 3]);  // 7 after that for wTr
-        for (auto i = 0U; i < 3; i++)
-        {
-            rTep[i] = ad_inp[eef_offset + nq + 4 + i];
-            wTrp[i] = ad_inp[eef_offset + nq + 7 + 4 + i];
-        }
-        SE3Tpl<ADCG, 0> rTe(rTeq, rTep);  // it is assumed that this err is expressed in the eef joint frame
-        SE3Tpl<ADCG, 0> wTr(wTrq, wTrp);
+        
+    // compute error term
+    const auto lTw = ad_data.oMf[info.end_effector_indexes[eef1]];
+    const auto rTw = ad_data.oMf[info.end_effector_indexes[eef2]];
 
-        // Form bounds
-        ADVectorXs lb(nt);
-        ADVectorXs ub(nt);
-        for (auto i = 0U; i < nt; i++)
-        {
-            lb[i] = ad_inp[eef_offset + nq + 2 * 7 + i];
-            ub[i] = ad_inp[eef_offset + nq + 2 * 7 + nt + i];
-        }
-        // input setup done
+    const auto lTr_rob = lTw.inverse() * rTw;
+    const auto errT = lTr_rob * lTr.inverse();
 
-        // compute error term
-        const auto wTobj = ad_data.oMf[info.end_effector_indexes[eef_idx]] * rTe.inverse();
-        const auto rTobj = wTr.inverse() * wTobj;
+    ADVectorXs displacement(nt);
+    displacement.setZero();
+    displacement << errT.translation_impl(), log3(errT.rotation_impl());
 
-        ADVectorXs displacement(nt);
-        displacement.setZero();
-        displacement << rTobj.translation_impl(), log3(rTobj.rotation_impl());
-
-        // TODO (siyer) -- we ignore the bounds here, since
-        // it would set some gradients to be zero by mistake while tracing.
-        // we want the tracing to be generic
-        // leaving this here, since we may try out some hinge loss to make it
-        // differentiable probably.
-        for (auto i = 0U; i < nt; i++)
-        {
-            // data[i] = CondExpLt(displacement[i], zero, displacement[i] - lb[i], displacement[i] - ub[i]);
-            // data[i] = data[i] + CondExpGt(displacement[i], ub[i], displacement[i] - ub[i], zero);
-            // data[eef_offset + i] = CondExpLt(displacement[i], lb[i], displacement[i] - lb[i],
-            // (displacement[i] - lb[i]) * 1e-6) + CondExpGt(displacement[i], ub[i], displacement[i] - ub[i],
-            // (displacement[i] - ub[i]) * 1e-6);
-            data[eef_out_offset + i] = displacement[i];
-        }
+    // TODO (siyer) -- we ignore the bounds here, since
+    // it would set some gradients to be zero by mistake while tracing.
+    // we want the tracing to be generic
+    // leaving this here, since we may try out some hinge loss to make it
+    // differentiable probably.
+    for (auto i = 0U; i < nt; i++)
+    {
+        // data[i] = CondExpLt(displacement[i], zero, displacement[i] - lb[i], displacement[i] - ub[i]);
+        // data[i] = data[i] + CondExpGt(displacement[i], ub[i], displacement[i] - ub[i], zero);
+        // data[eef_offset + i] = CondExpLt(displacement[i], lb[i], displacement[i] - lb[i],
+        // (displacement[i] - lb[i]) * 1e-6) + CondExpGt(displacement[i], ub[i], displacement[i] - ub[i],
+        // (displacement[i] - ub[i]) * 1e-6);
+        data[i] = displacement[i];
     }
 
     // Create the AD function
@@ -371,7 +353,8 @@ auto solve_error_function_wrt_joints(
 
 auto trace_solve_tsr_function(
     const RobotInfo &info,
-    ProjMethod projection_method
+    ProjMethod projection_method,
+    bool relative_eef_error = false
     ) -> Traced
 {
 
@@ -381,7 +364,7 @@ auto trace_solve_tsr_function(
     const size_t nt = 6; // task space is se3
     const size_t n_eef = info.end_effector_indexes.size();
 
-    const size_t err_vec_size = nt * n_eef;
+    const size_t err_vec_size = nt * (relative_eef_error ? 1 : n_eef);
     const size_t num_inp = err_vec_size + err_vec_size * nq;
 
     ADVectorXs ad_inp(num_inp); // 3 4x4 matrices

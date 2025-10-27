@@ -26,7 +26,6 @@ def fix_conditionals(file_content):
 
     for find, replace in find_replace_pairs:
         matches = re.findall(find, file_content)
-        print(find, matches)
         file_content = re.sub(find, replace, file_content)
 
     # print(file_content)
