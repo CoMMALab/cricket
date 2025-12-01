@@ -98,3 +98,29 @@ install(TARGETS fkcc_gen
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   COMPONENT Runtime
 )
+
+add_executable(test_robot src/test_robot.cc)
+
+# Set include directories
+target_include_directories(test_robot PRIVATE
+    ${cppad_INCLUDE_DIRS}
+    ${cppadcg_INCLUDE_DIRS}
+)
+
+
+# Link libraries
+target_link_libraries(test_robot
+    pinocchio::pinocchio
+    Eigen3::Eigen
+    ${cppad_LIBRARIES}
+    pantor::inja
+    nlohmann_json::nlohmann_json
+    CGAL::CGAL
+    fmt::fmt
+    cxxopts::cxxopts
+)
+
+# Add compiler definitions
+target_compile_definitions(test_robot PRIVATE
+    ${pinocchio_CFLAGS_OTHER}
+)

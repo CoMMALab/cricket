@@ -285,45 +285,111 @@ struct {{name}}
             out[i] = y[i];
     }
 
+
     template <std::size_t rake, typename InputVector, typename OutputVector>
-    static inline auto compute_and_project_tsr_error_lm_inner(const InputVector &x, OutputVector &out)
+    static inline auto compute_com(const InputVector &x, OutputVector &out)
     {
-        std::array<FloatVector<rake, 1>, {{compute_and_project_tsr_error_lm_inner_code_vars}}> v;
-        std::array<FloatVector<rake, 1>, {{compute_and_project_tsr_error_lm_inner_code_output}}> y;
+        std::array<FloatVector<rake, 1>, {{CoM_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{CoM_code_output}}> y;
 
-        {{compute_and_project_tsr_error_lm_inner_code}}
+        {{CoM_code}}
 
-        for(size_t i = 0; i < {{compute_and_project_tsr_error_lm_inner_code_output}}; i++)
+        for(size_t i = 0; i < {{CoM_code_output}}; i++)
             out[i] = y[i];
     }
 
     template <std::size_t rake, typename InputVector, typename OutputVector>
-    static inline auto compute_and_project_tsr_error_lm_outer(const InputVector &x, OutputVector &out)
+    static inline auto com_constraint_error(const InputVector &com_jac_polygons, size_t n, OutputVector &out)
     {
-        std::array<FloatVector<rake, 1>, {{compute_and_project_tsr_error_lm_outer_code_vars}}> v;
-        std::array<FloatVector<rake, 1>, {{compute_and_project_tsr_error_lm_outer_code_output}}> y;
-                    
-        {{compute_and_project_tsr_error_lm_outer_code}}
+        // input com_jac_polygons is a 3 + (3 * robot.nq) + (n * 2) where n is the number of polygons
 
-        for(size_t i = 0; i < {{compute_and_project_tsr_error_lm_outer_code_output}}; i++)
+        const size_t polygon_offset = 3 + 3 * dimension;
+        // initialize x, com_constraint_grad and out
+        FloatVector<rake, 4 + 3> x;
+        x[0] = com_jac_polygons[0];
+        x[1] = com_jac_polygons[1];
+        x[2] = com_jac_polygons[2];
+
+        FloatVector<rake, 2 * 3> com_constraint_grad;
+        com_constraint_grad[0] = 0.0;
+        com_constraint_grad[1] = 0.0;
+        com_constraint_grad[2] = 0.0;
+        com_constraint_grad[3] = 0.0;
+        com_constraint_grad[4] = 0.0;
+        com_constraint_grad[5] = 0.0;
+
+
+        // initialize the errors to be zero
+        out[2 * dimension + 0] = 0.0;
+        out[2 * dimension + 1] = 0.0;
+        
+        for(size_t polygon_idx = 0; polygon_idx < n; polygon_idx++){
+
+            const auto polygon_next_idx = (polygon_idx + 1) % 4;
+            x[3 + 0] = com_jac_polygons[polygon_offset + 2 * polygon_idx + 0];
+            x[3 + 1] = com_jac_polygons[polygon_offset + 2 * polygon_idx + 1];
+            x[3 + 2] = com_jac_polygons[polygon_offset + 2 * polygon_next_idx + 0];
+            x[3 + 3] = com_jac_polygons[polygon_offset + 2 * polygon_next_idx + 1];
+
+
+            std::array<FloatVector<rake, 1>, {{CoM_constraint_code_vars}}> v;
+            std::array<FloatVector<rake, 1>, {{CoM_constraint_code_output}}> y;
+            {{CoM_constraint_code}}
+
+            // initialize_error
+            out[2 * dimension + 0] = out[2 * dimension + 0] + y[0];
+            out[2 * dimension + 1] = out[2 * dimension + 1] + y[1];
+
+            for(size_t j = 0; j < 2 * 3; j++)
+                com_constraint_grad[j] = com_constraint_grad[j] + y[2 + j];
+        }
+
+        // do the actual matrix multiplication
+        for(size_t dim_idx = 0; dim_idx < dimension; dim_idx++){
+            out[dim_idx] = com_constraint_grad[0] * com_jac_polygons[3 + dim_idx] + com_constraint_grad[1] * com_jac_polygons[3 + dimension + dim_idx] + com_constraint_grad[2] * com_jac_polygons[3 + 2 * dimension + dim_idx];
+            out[dimension + dim_idx] = com_constraint_grad[3] * com_jac_polygons[3 + dim_idx] + com_constraint_grad[4] * com_jac_polygons[3 + dimension + dim_idx] + com_constraint_grad[5] * com_jac_polygons[3 + 2 * dimension + dim_idx];
+        }
+    }
+
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_com_function_lm_inner(const InputVector &x, OutputVector &out)
+    {
+        std::array<FloatVector<rake, 1>, {{solve_com_function_lm_inner_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{solve_com_function_lm_inner_code_output}}> y;
+
+        {{solve_com_function_lm_inner_code}}
+
+        for(size_t i = 0; i < {{solve_com_function_lm_inner_code_output}}; i++)
             out[i] = y[i];
     }
 
     template <std::size_t rake, typename InputVector, typename OutputVector>
-    static inline auto compute_and_project_tsr_error_gradient_descent(const InputVector &x, OutputVector &out)
+    static inline auto solve_com_function_lm_outer(const InputVector &x, OutputVector &out)
     {
-        std::array<FloatVector<rake, 1>, {{compute_and_project_tsr_error_gradient_descent_code_vars}}> v;
-        std::array<FloatVector<rake, 1>, {{compute_and_project_tsr_error_gradient_descent_code_output}}> y;
+        std::array<FloatVector<rake, 1>, {{solve_com_function_lm_outer_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{solve_com_function_lm_outer_code_output}}> y;
 
-        {{compute_and_project_tsr_error_gradient_descent_code}}
+        {{solve_com_function_lm_outer_code}}
 
-        for(size_t i = 0; i < {{compute_and_project_tsr_error_gradient_descent_code_output}}; i++)
+        for(size_t i = 0; i < {{solve_com_function_lm_outer_code_output}}; i++)
+            out[i] = y[i];
+    }
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_com_function_gradient_descent(const InputVector &x, OutputVector &out)
+    {
+        std::array<FloatVector<rake, 1>, {{solve_com_function_gradient_descent_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{solve_com_function_gradient_descent_code_output}}> y;
+
+        {{solve_com_function_gradient_descent_code}}
+
+        for(size_t i = 0; i < {{solve_com_function_gradient_descent_code_output}}; i++)
             out[i] = y[i];
     }
 
 
     {% if num_end_effectors > 1 %}
-    hellothere
     template <std::size_t rake, typename InputVector, typename OutputVector>
     static inline auto tsr_bimanual_error(const InputVector &x, OutputVector &out)
     {
@@ -373,6 +439,43 @@ struct {{name}}
     }
     {% endif %}
     
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_bimanual_com_function_lm_inner(const InputVector &x, OutputVector &out)
+    {
+        std::array<FloatVector<rake, 1>, {{solve_bimanual_com_function_lm_inner_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{solve_bimanual_com_function_lm_inner_code_output}}> y;
+
+        {{solve_bimanual_com_function_lm_inner_code}}
+
+        for(size_t i = 0; i < {{solve_bimanual_com_function_lm_inner_code_output}}; i++)
+            out[i] = y[i];
+    }
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_bimanual_com_function_lm_outer(const InputVector &x, OutputVector &out)
+    {
+        std::array<FloatVector<rake, 1>, {{solve_bimanual_com_function_lm_outer_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{solve_bimanual_com_function_lm_outer_code_output}}> y;
+
+        {{solve_bimanual_com_function_lm_outer_code}}
+
+        for(size_t i = 0; i < {{solve_bimanual_com_function_lm_outer_code_output}}; i++)
+            out[i] = y[i];
+    }
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_bimanual_com_function_gradient_descent(const InputVector &x, OutputVector &out)
+    {
+        std::array<FloatVector<rake, 1>, {{solve_bimanual_com_function_gradient_descent_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{solve_bimanual_com_function_gradient_descent_code_output}}> y;
+
+        {{solve_bimanual_com_function_gradient_descent_code}}
+
+        for(size_t i = 0; i < {{solve_bimanual_com_function_gradient_descent_code_output}}; i++)
+            out[i] = y[i];
+    }
+
+
 
 };
 }

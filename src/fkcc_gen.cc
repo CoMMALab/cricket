@@ -217,9 +217,16 @@ int main(int argc, char **argv)
     add_to_trace(trace_solve_tsr_function(robot, ProjMethod::OuterLM), "solve_tsr_error_lm_outer_code", data);
     add_to_trace(trace_solve_tsr_function(robot, ProjMethod::GradDesc), "solve_tsr_error_gradient_descent_code", data);
 
-    add_to_trace(trace_and_project_tsr_error_function(robot, ProjMethod::InnerLM), "compute_and_project_tsr_error_lm_inner_code", data);
-    add_to_trace(trace_and_project_tsr_error_function(robot, ProjMethod::OuterLM), "compute_and_project_tsr_error_lm_outer_code", data);
-    add_to_trace(trace_and_project_tsr_error_function(robot, ProjMethod::GradDesc), "compute_and_project_tsr_error_gradient_descent_code", data);
+    add_to_trace(trace_com_function(robot), "CoM_code", data);
+    add_to_trace(trace_com_constraint_function(), "CoM_constraint_code", data);
+
+    add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::InnerLM, 2), "solve_com_function_lm_inner_code", data);
+    add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::OuterLM, 2), "solve_com_function_lm_outer_code", data);
+    add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::GradDesc, 2), "solve_com_function_gradient_descent_code", data);
+
+    // add_to_trace(trace_and_project_tsr_error_function(robot, ProjMethod::InnerLM), "compute_and_project_tsr_error_lm_inner_code", data);
+    // add_to_trace(trace_and_project_tsr_error_function(robot, ProjMethod::OuterLM), "compute_and_project_tsr_error_lm_outer_code", data);
+    // add_to_trace(trace_and_project_tsr_error_function(robot, ProjMethod::GradDesc), "compute_and_project_tsr_error_gradient_descent_code", data);
 
 
     if(robot.end_effector_indexes.size() > 1) {
@@ -227,6 +234,11 @@ int main(int argc, char **argv)
         add_to_trace(trace_solve_tsr_function(robot, ProjMethod::InnerLM, true), "solve_relative_tsr_error_lm_inner_code", data);
         add_to_trace(trace_solve_tsr_function(robot, ProjMethod::OuterLM, true), "solve_relative_tsr_error_lm_outer_code", data);
         add_to_trace(trace_solve_tsr_function(robot, ProjMethod::GradDesc, true), "solve_relative_tsr_error_gradient_descent_code", data);
+
+        add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::InnerLM, 2 + 6, true), "solve_bimanual_com_function_lm_inner_code", data);
+        add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::OuterLM, 2 + 6, true), "solve_bimanual_com_function_lm_outer_code", data);
+        add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::GradDesc, 2 + 6, true), "solve_bimanual_com_function_gradient_descent_code", data);
+
     }
     
 

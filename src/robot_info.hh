@@ -9,6 +9,13 @@
 #include <pinocchio/multibody/geometry.hpp>
 #include <pinocchio/collision/collision.hpp>
 
+
+// #include "pinocchio/multibody/model.hpp"
+// #include "pinocchio/multibody/data.hpp"
+// #include "pinocchio/algorithm/compute-all-terms.hpp"
+#include "pinocchio/algorithm/center-of-mass.hpp"
+
+
 #include <coal/shape/geometric_shapes.h>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
