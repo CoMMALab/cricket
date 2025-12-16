@@ -105,7 +105,7 @@ struct RobotInfo
 
         extract_spheres();
 
-        for (const auto end_effector : end_effectors)
+        for (const auto &end_effector : end_effectors)
         {
             if (not model.existFrame(end_effector))
             {
@@ -113,18 +113,18 @@ struct RobotInfo
             }
             else
             {
-                end_effector_names.push_back(end_effector);
+                end_effector_names.emplace_back(end_effector);
             }
         }
-        if (end_effector_names.size() == 0)
+        if (end_effector_names.empty())
         {
-            end_effector_names.push_back(model.frames[model.nframes - 1].name);
+            end_effector_names.emplace_back(model.frames[model.nframes - 1].name);
             fmt::print("No EE provided, using distal link `{}`.\n", end_effector_names[0]);
         }
 
-        for (const auto end_effector_name : end_effector_names)
+        for (const auto &end_effector_name : end_effector_names)
         {
-            end_effector_indexes.push_back(model.getFrameId(end_effector_name));
+            end_effector_indexes.emplace_back(model.getFrameId(end_effector_name));
         }
     }
 
