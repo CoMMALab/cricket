@@ -66,7 +66,7 @@ An example for the Franka Panda is given below:
     "name": "Panda",
     "urdf": "panda/panda_spherized.urdf",
     "srdf": "panda/panda.srdf",
-    "end_effector": "panda_grasptarget",
+    "end_effectors": ["panda_grasptarget"],
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
@@ -74,7 +74,7 @@ An example for the Franka Panda is given below:
 }
 ```
 
-For a custom robot, you only need to change the `name`, `urdf`, `srdf`, and `end_effector` fields.
+For a custom robot, you only need to change the `name`, `urdf`, `srdf`, and `end_effectors` fields.
 Some notes:
 - If your robot does not have an SRDF, then the script will attempt to guess the self-collisions of the robot by randomly sampling one million configurations and seeing what is always in collision and what never collides. However, this is unreliable and probably should just be done by hand.
 - If you do not provide an end-effector, the last frame in the robot will be used. For serial link manipulators, this is probably the tool frame, but you should set this yourself.
@@ -130,7 +130,7 @@ In addition to the specified input fields from the configuration file, the scrip
 - `bound_lower`: lower bound of joint ranges.
 - `bound_range`: range between lower and upper bound of joint ranges.
 - `measure`: total measure of robot joint space.
-- `end_effector_index`: frame index of end-effector.
+- `end_effector_indexes`: frame index of end-effector.
 - `min_radius`: minimum sphere radius on robot.
 - `max_radius`: maximum sphere radius on robot.
 - `joint_names`: name of joint corresponding to each DoF.

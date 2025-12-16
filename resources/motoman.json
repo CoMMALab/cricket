@@ -2,7 +2,7 @@
     "name": "Motoman",
     "urdf": "motoman/motoman_sda10f_spherized.urdf",
     "srdf": "motoman/motoman_sda10f.srdf",
-    "end_effector": "arm_right_link_tool0",
+    "end_effectors": ["arm_right_link_tool0"],
     "resolution": 64,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],

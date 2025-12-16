@@ -1,0 +1,10 @@
+{
+    "name": "BimanualPanda",
+    "urdf": "panda/bipanda_spherized.urdf",
+    "srdf": "panda/bipanda.srdf",
+    "end_effectors":["left_panda_grasptarget", "right_panda_grasptarget"],
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "bimanual_panda_fk.hh"
+}

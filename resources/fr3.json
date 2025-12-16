@@ -2,7 +2,7 @@
     "name": "FR3",
     "urdf": "fr3/fr3_spherized.urdf",
     "srdf": "fr3/fr3.srdf",
-    "end_effector": "fr3_hand_tcp",
+    "end_effectors": ["fr3_hand_tcp"],
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],

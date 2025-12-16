@@ -2,7 +2,7 @@
     "name": "Fetch",
     "urdf": "fetch/fetch_spherized.urdf",
     "srdf": "fetch/fetch.srdf",
-    "end_effector": "gripper_link",
+    "end_effectors": ["gripper_link"],
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],

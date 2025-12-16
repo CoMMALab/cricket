@@ -2,7 +2,7 @@
     "name": "Baxter",
     "urdf": "baxter/baxter_spherized.urdf",
     "srdf": "baxter/baxter.srdf",
-    "end_effector": "right_gripper",
+    "end_effectors": ["right_gripper"],
     "resolution": 64,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
