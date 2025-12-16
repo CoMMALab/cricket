@@ -50,6 +50,7 @@ auto compute_com(
     ) -> CppAD::vector<CGD>
 {
 
+    std::cout << info.spheres.size() << std::endl;
     auto nq = info.model.nq;
     ADModel ad_model = info.model.cast<ADCG>();
     ADData ad_data(ad_model);
@@ -259,7 +260,7 @@ auto trace_full_tsr_project(
 
     const auto CoM = centerOfMass(ad_model, ad_data, ad_q, true);
 
-    std::cout << "\nCOM is : " << CoM.x() << ", " << CoM.y() << ", " << CoM.z() << std::endl;
+    std::cout << "\nCOM is : " << CoM.x() << ", " << CoM.y() << ", " << CoM.z() << ", " << info.spheres.size() << std::endl;
 
     for (auto i = 0U; i < info.spheres.size(); ++i)
     {
@@ -565,10 +566,10 @@ int main(int argc, char **argv)
     // std::array<float, 14> q_init = {
     //    -0.816, -0.203, 0.716, -0.961, 0.770, 2.055, -0.360
     // };
-    std::array<float, 14> q_init = {
+    std::array<float, 29> q_init = {
     //    -1.3238,  1.358 ,  1.0783, -2.4974,  0.5572,  2.5477, -1.4485, 1.2848,  1.2911, -1.0714, -2.4884, -0.6705,  2.5082,  0.7243
     // -1.997 ,  0.385 ,  2.1832, -2.0013,  1.3083,  1.8498, -0.7243, 1.2835,  1.3097, -2.0683, -2.1051, -0.1333,  2.4786, -0.7243
-    -1.45844, 1.1634, 1.29928, -2.39818, 0.70742, 2.40812, -1.30366, 1.28454, 1.29482, -1.27078, -2.41174, -0.56306, 2.50228, 0.43458
+    0.003,0.0,-0.231,1.3962664999999999,0.0,0.0,0.0,0.0,0.0,1.3962664999999999,0.0,0.0,-1.02,0.476,0.412,-0.744,0.641,-1.34,0.937,0.0,0.0,-0.036,0.0,-2.018,0.0,0.0,0.0,0.0,0.0
     };
 
 
@@ -603,10 +604,10 @@ int main(int argc, char **argv)
 
 
     ADMatrixXs polygon(4, 2);
-    // polygon << ADCG(0.001), ADCG(1.0), ADCG(-0.001), ADCG(-1.0), ADCG(1.0), ADCG(-1.0), ADCG(1.0), ADCG(1.0) ;
+    polygon << ADCG(0.001), ADCG(1.0), ADCG(-0.001), ADCG(-1.0), ADCG(1.0), ADCG(-1.0), ADCG(1.0), ADCG(1.0) ;
     // polygon << ADCG(0.0), ADCG(0.2), ADCG(0.0), ADCG(1.0), ADCG(1.0), ADCG(1.0), ADCG(1.0), ADCG(0.2) ;
     // polygon << ADCG(1.0), ADCG(-0.3), ADCG(1.0), ADCG(0.3),  ADCG(0.0), ADCG(0.3), ADCG(0.0), ADCG(-0.3);
-    polygon << ADCG(0.0), ADCG(0.2), ADCG(1.0), ADCG(0.2), ADCG(1.0), ADCG(1.0), ADCG(0.0), ADCG(1.0) ;
+    // polygon << ADCG(0.0), ADCG(0.2), ADCG(1.0), ADCG(0.2), ADCG(1.0), ADCG(1.0), ADCG(0.0), ADCG(1.0) ;
 
 
     ADVectorXs ad_q(robot.model.nq);
@@ -668,6 +669,7 @@ int main(int argc, char **argv)
             std::cout << CppAD::Value(ad_q[j]) << " ";
         std::cout << std::endl;
         auto com_jac = compute_com(robot, ad_q);
+        std::cout << "Computed COM" << std::endl;
         ADVectorXs com_constraint_inp(4 + 3);
         std::cout << com_jac << std::endl;
 
