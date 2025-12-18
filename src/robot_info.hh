@@ -74,8 +74,11 @@ struct RobotInfo
             throw std::runtime_error(fmt::format("URDF file {} does not exist!", urdf_file.string()));
         }
 
-        pinocchio::urdf::buildModel(urdf_file, model);
+        pinocchio::urdf::buildModel(urdf_file, JointModelFreeFlyer(), model);
         pinocchio::urdf::buildGeom(model, urdf_file, COLLISION, collision_model);
+
+        model.lowerPositionLimit.head(7).setConstant(-3.14);
+        model.upperPositionLimit.head(7).setConstant(3.14);
 
         if (srdf_file and not std::filesystem::exists(*srdf_file))
         {

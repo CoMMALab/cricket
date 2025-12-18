@@ -70,6 +70,19 @@ auto compute_com(
 
     const auto CoM = centerOfMass(ad_model, ad_data, ad_q, true);
 
+
+    std::cout << "->" << info.end_effector_indexes[0] << ", " << info.end_effector_indexes[1] << " -- " << info.end_effector_indexes.size() << std::endl;
+    const auto lTw = ad_data.oMf[info.end_effector_indexes[0]];
+    const auto rTw = ad_data.oMf[info.end_effector_indexes[1]];
+
+    const auto lTr_rob = lTw.inverse() * rTw;
+    // const auto errT = lTr_rob * lTr.inverse();
+
+
+    std::cout << "lTw = \n" << lTw << std::endl;
+    std::cout << "rTw = \n" << rTw << std::endl;
+    std::cout << "rTobj = \n" << lTr_rob << std::endl;
+
     std::size_t n_out = 3;
     ADVectorXs data(n_out);
     for (auto i = 0U; i < n_out; i++){
@@ -354,17 +367,17 @@ auto trace_full_tsr_project(
     // auto direction = n.transpose() * (com - A);
     // std::cout << "dir is " << direction[0] << ", " << direction[1] << ", " <<  direction.size() << std::endl;
 
-    // std::cout << "->" << info.end_effector_indexes[0] << ", " << info.end_effector_indexes[1] << " -- " << info.end_effector_indexes.size() << std::endl;
-    // const auto lTw = ad_data.oMf[info.end_effector_indexes[0]];
-    // const auto rTw = ad_data.oMf[info.end_effector_indexes[1]];
+    std::cout << "->" << info.end_effector_indexes[0] << ", " << info.end_effector_indexes[1] << " -- " << info.end_effector_indexes.size() << std::endl;
+    const auto lTw = ad_data.oMf[info.end_effector_indexes[0]];
+    const auto rTw = ad_data.oMf[info.end_effector_indexes[1]];
 
-    // const auto lTr_rob = lTw.inverse() * rTw;
+    const auto lTr_rob = lTw.inverse() * rTw;
     // const auto errT = lTr_rob * lTr.inverse();
 
 
-    // std::cout << "lTw = \n" << lTw << std::endl;
-    // std::cout << "rTw = \n" << rTw << std::endl;
-    // std::cout << "rTobj = \n" << lTr_rob << std::endl;
+    std::cout << "lTw = \n" << lTw << std::endl;
+    std::cout << "rTw = \n" << rTw << std::endl;
+    std::cout << "rTobj = \n" << lTr_rob << std::endl;
     // std::cout << "errT = \n" << errT << std::endl;
 
     // ADVectorXs displacement(nt);
@@ -569,7 +582,7 @@ int main(int argc, char **argv)
     std::array<float, 29> q_init = {
     //    -1.3238,  1.358 ,  1.0783, -2.4974,  0.5572,  2.5477, -1.4485, 1.2848,  1.2911, -1.0714, -2.4884, -0.6705,  2.5082,  0.7243
     // -1.997 ,  0.385 ,  2.1832, -2.0013,  1.3083,  1.8498, -0.7243, 1.2835,  1.3097, -2.0683, -2.1051, -0.1333,  2.4786, -0.7243
-    0.003,0.0,-0.231,1.3962664999999999,0.0,0.0,0.0,0.0,0.0,1.3962664999999999,0.0,0.0,-1.02,0.476,0.412,-0.744,0.641,-1.34,0.937,0.0,0.0,-0.036,0.0,-2.018,0.0,0.0,0.0,0.0,0.0
+    0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-1.767,-0.16,0.52,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
     };
 
 

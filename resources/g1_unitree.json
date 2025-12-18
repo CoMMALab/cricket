@@ -2,7 +2,7 @@
     "name": "G1Unitree",
     "urdf": "g1_description/spherized.urdf",
     "srdf": "g1_description/g1_29dof.srdf",
-    "end_effectors":["left_rubber_hand", "right_rubber_hand"],
+    "end_effectors":["left_rubber_hand", "right_rubber_hand", "left_foot", "right_foot"],
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],

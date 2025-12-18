@@ -290,28 +290,35 @@
 		</visual>
 		<collision>
 			<geometry>
-				<sphere radius="0.005"></sphere>
+				<sphere radius="0.025"></sphere>
 			</geometry>
 			<origin xyz="0.0 0.0 0.0" rpy="0 0 0"></origin>
 		</collision>
 		<collision>
 			<geometry>
-				<sphere radius="0.005"></sphere>
+				<sphere radius="0.025"></sphere>
 			</geometry>
-			<origin xyz="0.0 0.0 0.0" rpy="0 0 0"></origin>
+			<origin xyz="0.03 0.0 0.0" rpy="0 0 0"></origin>
 		</collision>
 		<collision>
 			<geometry>
-				<sphere radius="0.005"></sphere>
+				<sphere radius="0.025"></sphere>
 			</geometry>
-			<origin xyz="0.0 0.0 0.0" rpy="0 0 0"></origin>
+			<origin xyz="0.06 0.0 0.0" rpy="0 0 0"></origin>
 		</collision>
 		<collision>
 			<geometry>
-				<sphere radius="0.005"></sphere>
+				<sphere radius="0.025"></sphere>
 			</geometry>
-			<origin xyz="0.0 0.0 0.0" rpy="0 0 0"></origin>
+			<origin xyz="0.09 0.0 0.0" rpy="0 0 0"></origin>
 		</collision>
+	</link>
+	<link name="left_foot">
+	 <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value="0.0"/>
+       <inertia ixx="0.1" ixy="0" ixz="0" iyy="0.1" iyz="0" izz="0.1"/>
+    </inertial>
 	</link>
 	<link name="right_hip_pitch_link">
 		<inertial>
@@ -518,29 +525,37 @@
 		</visual>
 		<collision>
 			<geometry>
-				<sphere radius="0.005"></sphere>
+				<sphere radius="0.025"></sphere>
 			</geometry>
 			<origin xyz="0.0 0.0 0.0" rpy="0 0 0"></origin>
 		</collision>
 		<collision>
 			<geometry>
-				<sphere radius="0.005"></sphere>
+				<sphere radius="0.025"></sphere>
 			</geometry>
-			<origin xyz="0.0 0.0 0.0" rpy="0 0 0"></origin>
+			<origin xyz="0.03 0.0 0.0" rpy="0 0 0"></origin>
 		</collision>
 		<collision>
 			<geometry>
-				<sphere radius="0.005"></sphere>
+				<sphere radius="0.025"></sphere>
 			</geometry>
-			<origin xyz="0.0 0.0 0.0" rpy="0 0 0"></origin>
+			<origin xyz="0.06 0.0 0.0" rpy="0 0 0"></origin>
 		</collision>
 		<collision>
 			<geometry>
-				<sphere radius="0.005"></sphere>
+				<sphere radius="0.025"></sphere>
 			</geometry>
-			<origin xyz="0.0 0.0 0.0" rpy="0 0 0"></origin>
+			<origin xyz="0.09 0.0 0.0" rpy="0 0 0"></origin>
 		</collision>
 	</link>
+	<link name="right_foot">
+	 <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value="0.0"/>
+       <inertia ixx="0.1" ixy="0" ixz="0" iyy="0.1" iyz="0" izz="0.1"/>
+    </inertial>
+	</link>
+
 	<link name="waist_yaw_link">
 		<inertial>
 			<origin xyz="0.003964 0 0.018769" rpy="0 0 0"></origin>
@@ -1567,4 +1582,14 @@
 		<parent link="right_wrist_yaw_link"></parent>
 		<child link="right_rubber_hand"></child>
 	</joint>
+   <joint name="right_foot_joint" type="fixed">
+    <parent link="right_ankle_roll_link"/>
+    <child link="right_foot"/>
+    <origin rpy="0 0 0" xyz="0.1 0 0"/>
+  </joint>
+   <joint name="left_foot_joint" type="fixed">
+    <parent link="left_ankle_roll_link"/>
+    <child link="left_foot"/>
+    <origin rpy="0 0 0" xyz="0.1 0 0"/>
+  </joint>
 </robot>
