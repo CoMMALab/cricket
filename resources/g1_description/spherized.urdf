@@ -1330,6 +1330,62 @@
 			<material name="white"></material>
 		</visual>
 	</link>
+
+
+	<link name="world"/>
+
+	<link name="floating_x"/>
+	<link name="floating_y"/>
+	<link name="floating_z"/>
+	<link name="floating_roll"/>
+	<link name="floating_pitch"/>
+	<link name="floating_yaw"/>
+	<joint name="world_to_x" type="prismatic">
+	<parent link="world"/>
+	<child link="floating_x"/>
+	<axis xyz="1 0 0"/>
+	<limit lower="-2.0" upper="2.0" effort="0" velocity="0"/>
+	</joint>
+
+	<joint name="x_to_y" type="prismatic">
+	<parent link="floating_x"/>
+	<child link="floating_y"/>
+	<axis xyz="0 1 0"/>
+	<limit lower="-2.0" upper="2.0" effort="0" velocity="0"/>
+	</joint>
+
+	<joint name="y_to_z" type="prismatic">
+	<parent link="floating_y"/>
+	<child link="floating_z"/>
+	<axis xyz="0 0 1"/>
+	<limit lower="-2.0" upper="2.0" effort="0" velocity="0"/>
+	</joint>
+	<joint name="z_to_roll" type="revolute">
+	<parent link="floating_z"/>
+	<child link="floating_roll"/>
+	<axis xyz="1 0 0"/>
+	<limit lower="-3.14159" upper="3.14159" effort="0" velocity="0"/>
+	</joint>
+
+	<joint name="roll_to_pitch" type="revolute">
+	<parent link="floating_roll"/>
+	<child link="floating_pitch"/>
+	<axis xyz="0 1 0"/>
+	<limit lower="-3.14159" upper="3.14159" effort="0" velocity="0"/>
+	</joint>
+
+	<joint name="pitch_to_yaw" type="revolute">
+	<parent link="floating_pitch"/>
+	<child link="floating_yaw"/>
+	<axis xyz="0 0 1"/>
+	<limit lower="-3.14159" upper="3.14159" effort="0" velocity="0"/>
+	</joint>
+	<joint name="yaw_to_pelvis" type="fixed">
+	<parent link="floating_yaw"/>
+	<child link="pelvis"/>
+	</joint>
+
+
 	<joint name="pelvis_contour_joint" type="fixed">
 		<parent link="pelvis"></parent>
 		<child link="pelvis_contour_link"></child>

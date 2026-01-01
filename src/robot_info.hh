@@ -74,11 +74,11 @@ struct RobotInfo
             throw std::runtime_error(fmt::format("URDF file {} does not exist!", urdf_file.string()));
         }
 
-        pinocchio::urdf::buildModel(urdf_file, JointModelFreeFlyer(), model);
+        pinocchio::urdf::buildModel(urdf_file, model);
         pinocchio::urdf::buildGeom(model, urdf_file, COLLISION, collision_model);
 
-        model.lowerPositionLimit.head(7).setConstant(-3.14);
-        model.upperPositionLimit.head(7).setConstant(3.14);
+        // model.lowerPositionLimit.head(7).setConstant(-3.14);
+        // model.upperPositionLimit.head(7).setConstant(3.14);
 
         if (srdf_file and not std::filesystem::exists(*srdf_file))
         {
@@ -142,6 +142,7 @@ struct RobotInfo
         json["max_radius"] = max_radius;
         json["joint_names"] = dof_to_joint_names();
         json["allowed_link_pairs"] = allowed_link_pairs;
+        json["num_bounding_spheres"] = num_valid_bounding_spheres;
         json["per_link_spheres"] = per_link_spheres;
         json["links_with_geometry"] = links_with_geometry;
         json["bounding_sphere_index"] = bounding_sphere_index;
@@ -286,6 +287,7 @@ struct RobotInfo
                 bounding_sphere_index.emplace_back(0);
             }
         }
+        num_valid_bounding_spheres = bs;
     }
 
     auto collision_pair_to_frame_pair(const CollisionPair &cp) -> std::pair<std::size_t, std::size_t>
@@ -414,4 +416,5 @@ struct RobotInfo
     std::vector<std::vector<std::size_t>> per_link_spheres;
     std::set<std::pair<std::size_t, std::size_t>> allowed_link_pairs;
     std::vector<std::size_t> bounding_sphere_index;
+    std::size_t num_valid_bounding_spheres;
 };

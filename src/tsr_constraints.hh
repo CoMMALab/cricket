@@ -2,8 +2,7 @@
 #include "robot_info.hh"
 #include "tracer_utils.hh"
 #include "cholesky_decomp.hh"
-
-#include <vector>
+#include "se3_ops.hh"
 
 auto trace_tsr_error_function(const RobotInfo &info) -> Traced
 {
@@ -30,6 +29,18 @@ auto trace_tsr_error_function(const RobotInfo &info) -> Traced
     {
         ad_inp[i] = ADCG(0.0);
     }
+    // make the first few floating joints 6 slightly nonzero
+    for (auto i = 0U; i < 6; ++i)
+    {
+        ad_inp[i] = ADCG(1e-6);
+    }
+
+    // set the w value of each quaternion to be 1.0 for stability
+    for (auto eef_idx = 0U; eef_idx < n_eef; eef_idx++){
+        ad_inp[num_inp_eef * eef_idx + nq] = ADCG(1.0);
+        ad_inp[num_inp_eef * eef_idx + 7 + nq] = ADCG(1.0);
+    }
+
     Independent(ad_inp);
 
     std::size_t n_out = nt * n_eef;
@@ -88,7 +99,8 @@ auto trace_tsr_error_function(const RobotInfo &info) -> Traced
 
         ADVectorXs displacement(nt);
         displacement.setZero();
-        displacement << rTobj.translation_impl(), log3(rTobj.rotation_impl());
+        // displacement << rTobj.translation_impl(), log3(rTobj.rotation_impl());
+        displacement << rTobj.translation_impl(), so3_log_smooth<ADMatrixXs, ADCG>(rTobj.rotation_impl());
 
         // TODO (siyer) -- we ignore the bounds here, since
         // it would set some gradients to be zero by mistake while tracing.
@@ -142,6 +154,122 @@ auto trace_tsr_error_function(const RobotInfo &info) -> Traced
     //             CondExpGt(error_vec[eef_out_offset + i], ub, error_vec[eef_out_offset + i] - ub, zero_cgd);
     //     }
     // }
+
+    std::move(error_vec.begin(), error_vec.end(), std::back_inserter(jac_e_q));
+
+    LanguageCCustom<double> langC("double");
+    LangCDefaultVariableNameGenerator<double> nameGen;
+
+    std::ostringstream function_code;
+    handler.generateCode(function_code, langC, jac_e_q, nameGen);
+
+    return Traced{function_code.str(), handler.getTemporaryVariableCount(), jac_e_q.size()};
+}
+
+auto get_bounding_sphere_info(const RobotInfo &info, const ADData &ad_data, int bounding_sphere_index, double *radius)
+{
+    // auto link_bs = info.bounding_sphere_index[bounding_sphere_index];
+    auto sphere_it = info.bounding_spheres.find(bounding_sphere_index);
+    if (sphere_it == info.bounding_spheres.end())
+    {
+        std::cout << "Looking for bounding sphere with index " << bounding_sphere_index << " but found none " << std::endl;
+        throw std::runtime_error("Bounding sphere not found");
+    }
+    auto sph_info = sphere_it->second;
+    const auto &joint_placement = ad_data.oMi[sph_info.parent_joint];
+
+    Eigen::Matrix<ADCG, 3, 1> local_translation;
+    local_translation[0] = sph_info.relative.translation()[0];
+    local_translation[1] = sph_info.relative.translation()[1];
+    local_translation[2] = sph_info.relative.translation()[2];
+
+    Eigen::Matrix<ADCG, 3, 1> world_position =
+        joint_placement.rotation() * local_translation + joint_placement.translation();
+
+    std::vector<ADCG> sphere_info;
+    sphere_info.push_back(world_position[0]);
+    sphere_info.push_back(world_position[1]);
+    sphere_info.push_back(world_position[2]);
+    *radius = sph_info.radius;
+    return sphere_info;
+}
+
+auto trace_bounding_spheres_self_collision_error(const RobotInfo &info) -> Traced
+{
+    auto nq = info.model.nq;
+    auto nv = info.model.nv;
+
+    ADModel ad_model = info.model.cast<ADCG>();
+    ADData ad_data(ad_model);
+
+    const size_t num_inp = nq;
+
+    ADVectorXs ad_inp(num_inp);  // 3 4x4 matrices
+    for (auto i = 0U; i < num_inp; ++i)
+    {
+        ad_inp[i] = ADCG(0.0);
+    }
+    Independent(ad_inp);
+
+    std::size_t n_out = info.num_valid_bounding_spheres;
+    ADVectorXs data(n_out);
+    for (auto i = 0U; i < n_out; ++i)
+        data[i] = ADCG(0.0);
+
+    // First copy over configs and run FK
+    ADVectorXs ad_q(nq);
+
+    for (auto i = 0U; i < nq; i++)
+    {
+        ad_q[i] = ad_inp[i];  // This is the first 7 vars for nq
+    }
+
+    forwardKinematics(ad_model, ad_data, ad_q);
+    updateFramePlacements(ad_model, ad_data);
+
+    for (auto &pair : info.allowed_link_pairs)
+    {
+        double sphere_1_radius = 0.0;
+        double sphere_2_radius = 0.0;
+
+        auto sphere_link_1_info = get_bounding_sphere_info(info, ad_data, pair.first, &sphere_1_radius);
+        auto sphere_link_2_info = get_bounding_sphere_info(info, ad_data, pair.second, &sphere_2_radius);
+
+
+        // now calculate the penetration between the two spheres
+        auto sum = (sphere_link_1_info[0] - sphere_link_2_info[0]) * (sphere_link_1_info[0] - sphere_link_2_info[0]) +
+                   (sphere_link_1_info[1] - sphere_link_2_info[1]) * (sphere_link_1_info[1] - sphere_link_2_info[1]) +
+                   (sphere_link_1_info[2] - sphere_link_2_info[2]) * (sphere_link_1_info[2] - sphere_link_2_info[2]);
+        auto rs = sphere_1_radius + sphere_2_radius;
+        auto penetration = rs * rs - sum;
+        auto penetration_soft_hinge = 0.5 * (penetration + sqrt(penetration * penetration + 1e-6));
+        // std::cout << "Inserting at " << pair.first << " " << info.bounding_sphere_index[pair.first] << " -- " << info.bounding_spheres.size() << std::endl;
+        data[info.bounding_sphere_index[pair.first]] = data[info.bounding_sphere_index[pair.first]] + penetration_soft_hinge;
+    }
+    std::cout << "Total number of bounding spheres: " << info.bounding_spheres.size() << std::endl;
+
+    // Create the AD function
+    ADFun<CGD> jacobian_error_func(ad_inp, data);
+    CodeHandler<double> handler;
+    CppAD::vector<CGD> ind_vars(num_inp);
+    handler.makeVariables(ind_vars);
+
+    CppAD::vector<CGD> error_vec = jacobian_error_func.Forward(0, ind_vars);
+
+    // this is the full jacobian
+    CppAD::vector<CGD> jac = jacobian_error_func.Jacobian(ind_vars);
+    CppAD::vector<CGD> jac_e_q(n_out * nq);  // this is jacobian with respect to joint configs only.
+
+    for (auto i = 0U; i < n_out; i++)
+    {
+        for (auto j = 0U; j < nq; j++)
+        {
+            jac_e_q[i * nq + j] = jac[i * num_inp + j];
+        }
+    }
+    // downsample error by 100x
+    for (auto i = 0U; i < n_out; i++)
+        error_vec[i] = error_vec[i] * 0.01;
 
     std::move(error_vec.begin(), error_vec.end(), std::back_inserter(jac_e_q));
 
@@ -374,7 +502,15 @@ auto trace_tsr_bimanual_error_function(const RobotInfo &info, const size_t eef1 
         ad_inp[i] = ADCG(0.0);
     }
     Independent(ad_inp);
+    for (auto i = 0U; i < 6; ++i)
+    {
+        ad_inp[i] = ADCG(1e-6);
+    }
 
+    // set the w value of each quaternion to be 1.0 for stability
+    for (auto eef_idx = 0U; eef_idx < n_eef; eef_idx++){
+        ad_inp[nq] = ADCG(1.0);
+    }
     std::size_t n_out = nt;
     ADVectorXs data(n_out);
 
@@ -394,9 +530,9 @@ auto trace_tsr_bimanual_error_function(const RobotInfo &info, const size_t eef1 
     Eigen::Vector3<ADCG> lTrp; // left joint in right joint frame
     for (auto i=0U; i < 3; i++)
         lTrp[i] = ad_inp[nq + 4 + i];
-    SE3Tpl<ADCG, 0> lTr (lTrq, lTrp); 
+    SE3Tpl<ADCG, 0> lTr (lTrq, lTrp);
 
-    
+
     ADVectorXs lb(nt);
     ADVectorXs ub(nt);
     for (auto i = 0U; i < nt; i++)
@@ -404,9 +540,9 @@ auto trace_tsr_bimanual_error_function(const RobotInfo &info, const size_t eef1 
         lb[i] = ad_inp[nq + 1 * 7 + i];
         ub[i] = ad_inp[nq + 1 * 7 + nt + i];
     }
-    
 
-        
+
+
     // compute error term
     const auto lTw = ad_data.oMf[info.end_effector_indexes[eef1]];
     const auto rTw = ad_data.oMf[info.end_effector_indexes[eef2]];
@@ -416,7 +552,8 @@ auto trace_tsr_bimanual_error_function(const RobotInfo &info, const size_t eef1 
 
     ADVectorXs displacement(nt);
     displacement.setZero();
-    displacement << errT.translation_impl(), log3(errT.rotation_impl());
+    // displacement << errT.translation_impl(), log3(errT.rotation_impl());
+    displacement << errT.translation_impl(), so3_log_smooth<ADMatrixXs, ADCG>(errT.rotation_impl());
 
     // TODO (siyer) -- we ignore the bounds here, since
     // it would set some gradients to be zero by mistake while tracing.
@@ -796,7 +933,7 @@ auto trace_solve_generic_constraint_function(
 //     for (auto i = 0U; i < nt * n_eef; i++)
 //         for (auto j = 0U; j < nq; j++)
 //             ad_J(i, j) = jac[i * num_inp + j];
-    
+
 
 //     CGDVectorXs ad_e(nt);
 //     CGDVectorXs grad(nq);
