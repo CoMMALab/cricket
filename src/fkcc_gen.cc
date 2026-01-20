@@ -230,9 +230,6 @@ int main(int argc, char **argv)
     add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::OuterLM, robot.num_valid_bounding_spheres), "solve_self_collision_error_lm_outer_code", data);
     add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::GradDesc, robot.num_valid_bounding_spheres), "solve_self_collision_error_gradient_descent_code", data);
 
-    add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::InnerLM, 6 * 2), "solve_2_eef_tsr_error_lm_inner_code", data);
-    add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::OuterLM, 6 * 2), "solve_2_eef_tsr_error_lm_outer_code", data);
-    add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::GradDesc, 6 * 2), "solve_2_eef_tsr_error_gradient_descent_code", data);
 
 
     if(robot.end_effector_indexes.size() > 1) {
@@ -248,6 +245,12 @@ int main(int argc, char **argv)
         add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::InnerLM, 2 + 6 + 6 * (robot.end_effector_indexes.size() - 2), true), "solve_bimanual_com_tsr_function_lm_inner_code", data);
         add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::OuterLM, 2 + 6 + 6 * (robot.end_effector_indexes.size() - 2), true), "solve_bimanual_com_tsr_function_lm_outer_code", data);
         add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::GradDesc, 2 + 6 + 6 * (robot.end_effector_indexes.size() - 2), true), "solve_bimanual_com_tsr_function_gradient_descent_code", data);
+
+
+        add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::InnerLM, 6 * 2), "solve_2_eef_tsr_error_lm_inner_code", data);
+        add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::OuterLM, 6 * 2), "solve_2_eef_tsr_error_lm_outer_code", data);
+        add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::GradDesc, 6 * 2), "solve_2_eef_tsr_error_gradient_descent_code", data);
+
 
     }
 

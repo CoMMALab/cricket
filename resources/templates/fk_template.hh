@@ -288,44 +288,6 @@ struct {{name}}
 
 
     template <std::size_t rake, typename InputVector, typename OutputVector>
-    static inline auto solve_2_eef_tsr_error_lm_inner(const InputVector &x, OutputVector &out)
-    {
-        std::array<FloatVector<rake, 1>, {{solve_2_eef_tsr_error_lm_inner_code_vars}}> v;
-        std::array<FloatVector<rake, 1>, {{solve_2_eef_tsr_error_lm_inner_code_output}}> y;
-
-        {{solve_2_eef_tsr_error_lm_inner_code}}
-
-        for(size_t i = 0; i < {{solve_2_eef_tsr_error_lm_inner_code_output}}; i++)
-            out[i] = y[i];
-    }
-
-    template <std::size_t rake, typename InputVector, typename OutputVector>
-    static inline auto solve_2_eef_tsr_error_lm_outer(const InputVector &x, OutputVector &out)
-    {
-        std::array<FloatVector<rake, 1>, {{solve_2_eef_tsr_error_lm_outer_code_vars}}> v;
-        std::array<FloatVector<rake, 1>, {{solve_2_eef_tsr_error_lm_outer_code_output}}> y;
-
-        {{solve_2_eef_tsr_error_lm_outer_code}}
-
-        for(size_t i = 0; i < {{solve_2_eef_tsr_error_lm_outer_code_output}}; i++)
-            out[i] = y[i];
-    }
-
-    template <std::size_t rake, typename InputVector, typename OutputVector>
-    static inline auto solve_2_eef_tsr_error_gradient_descent(const InputVector &x, OutputVector &out)
-    {
-        std::array<FloatVector<rake, 1>, {{solve_2_eef_tsr_error_gradient_descent_code_vars}}> v;
-        std::array<FloatVector<rake, 1>, {{solve_2_eef_tsr_error_gradient_descent_code_output}}> y;
-
-        {{solve_2_eef_tsr_error_gradient_descent_code}}
-
-        for(size_t i = 0; i < {{solve_2_eef_tsr_error_gradient_descent_code_output}}; i++)
-            out[i] = y[i];
-    }
-
-
-
-    template <std::size_t rake, typename InputVector, typename OutputVector>
     static inline auto compute_com(const InputVector &x, OutputVector &out)
     {
         std::array<FloatVector<rake, 1>, {{CoM_code_vars}}> v;
@@ -524,6 +486,44 @@ struct {{name}}
         for(size_t i = 0; i < {{solve_relative_tsr_error_gradient_descent_code_output}}; i++)
             out[i] = y[i];
     }
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_2_eef_tsr_error_lm_inner(const InputVector &x, OutputVector &out)
+    {
+        std::array<FloatVector<rake, 1>, {{solve_2_eef_tsr_error_lm_inner_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{solve_2_eef_tsr_error_lm_inner_code_output}}> y;
+
+        {{solve_2_eef_tsr_error_lm_inner_code}}
+
+        for(size_t i = 0; i < {{solve_2_eef_tsr_error_lm_inner_code_output}}; i++)
+            out[i] = y[i];
+    }
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_2_eef_tsr_error_lm_outer(const InputVector &x, OutputVector &out)
+    {
+        std::array<FloatVector<rake, 1>, {{solve_2_eef_tsr_error_lm_outer_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{solve_2_eef_tsr_error_lm_outer_code_output}}> y;
+
+        {{solve_2_eef_tsr_error_lm_outer_code}}
+
+        for(size_t i = 0; i < {{solve_2_eef_tsr_error_lm_outer_code_output}}; i++)
+            out[i] = y[i];
+    }
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_2_eef_tsr_error_gradient_descent(const InputVector &x, OutputVector &out)
+    {
+        std::array<FloatVector<rake, 1>, {{solve_2_eef_tsr_error_gradient_descent_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{solve_2_eef_tsr_error_gradient_descent_code_output}}> y;
+
+        {{solve_2_eef_tsr_error_gradient_descent_code}}
+
+        for(size_t i = 0; i < {{solve_2_eef_tsr_error_gradient_descent_code_output}}; i++)
+            out[i] = y[i];
+    }
+
+
     {% endif %}
 
 

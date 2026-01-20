@@ -30,16 +30,16 @@ auto trace_tsr_error_function(const RobotInfo &info) -> Traced
         ad_inp[i] = ADCG(0.0);
     }
     // make the first few floating joints 6 slightly nonzero
-    for (auto i = 0U; i < 6; ++i)
-    {
-        ad_inp[i] = ADCG(1e-6);
-    }
+    // for (auto i = 0U; i < 6; ++i)
+    // {
+    //     ad_inp[i] = ADCG(1e-6);
+    // }
 
     // set the w value of each quaternion to be 1.0 for stability
-    for (auto eef_idx = 0U; eef_idx < n_eef; eef_idx++){
-        ad_inp[num_inp_eef * eef_idx + nq] = ADCG(1.0);
-        ad_inp[num_inp_eef * eef_idx + 7 + nq] = ADCG(1.0);
-    }
+    // for (auto eef_idx = 0U; eef_idx < n_eef; eef_idx++){
+    //     ad_inp[num_inp_eef * eef_idx + nq] = ADCG(1.0);
+    //     ad_inp[num_inp_eef * eef_idx + 7 + nq] = ADCG(1.0);
+    // }
 
     Independent(ad_inp);
 
@@ -502,15 +502,15 @@ auto trace_tsr_bimanual_error_function(const RobotInfo &info, const size_t eef1 
         ad_inp[i] = ADCG(0.0);
     }
     Independent(ad_inp);
-    for (auto i = 0U; i < 6; ++i)
-    {
-        ad_inp[i] = ADCG(1e-6);
-    }
+    // for (auto i = 0U; i < 6; ++i)
+    // {
+    //     ad_inp[i] = ADCG(1e-6);
+    // }
 
     // set the w value of each quaternion to be 1.0 for stability
-    for (auto eef_idx = 0U; eef_idx < n_eef; eef_idx++){
-        ad_inp[nq] = ADCG(1.0);
-    }
+    // for (auto eef_idx = 0U; eef_idx < n_eef; eef_idx++){
+    //     ad_inp[nq] = ADCG(1.0);
+    // }
     std::size_t n_out = nt;
     ADVectorXs data(n_out);
 
