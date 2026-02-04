@@ -25,7 +25,8 @@
 #include <vector>
 #include <optional>
 
-#include "lang_gen.hh"
+#include "lang_cpp.hh"
+#include "lang_rust.hh"
 
 using namespace pinocchio;
 using namespace CppAD;
@@ -461,6 +462,7 @@ struct Traced
 
 auto trace_sphere_cc_fk(
     const RobotInfo &info,
+    const std::string &language,
     bool spheres = true,
     bool bounding_spheres = true,
     bool fk = true) -> Traced
@@ -523,11 +525,19 @@ auto trace_sphere_cc_fk(
 
     CppAD::vector<CGD> result = collision_sphere_func.Forward(0, ind_vars);
 
-    LanguageCCustom<double> langC("double");
     LangCDefaultVariableNameGenerator<double> nameGen;
-
     std::ostringstream function_code;
-    handler.generateCode(function_code, langC, result, nameGen);
+
+    if (language == "c++")
+    {
+        LanguageCCustom<double> langC("double");
+        handler.generateCode(function_code, langC, result, nameGen);
+    }
+    else if (language == "rust")
+    {
+        LanguageRust<double> langRust("double");
+        handler.generateCode(function_code, langRust, result, nameGen);
+    }
 
     return Traced{function_code.str(), handler.getTemporaryVariableCount(), n_out};
 }
@@ -598,26 +608,36 @@ int main(int argc, char **argv)
         end_effector_name = data["end_effector"];
     }
 
+    std::string language = "c++";
+    if (data.contains("language"))
+    {
+        language = data["language"];
+    }
+    if (not(language == "rust" or language == "c++"))
+    {
+        throw std::runtime_error(fmt::format("unsupported language {}", language));
+    }
+
     RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_name);
 
     data.update(robot.json());
 
-    auto traced_eefk_code = trace_sphere_cc_fk(robot, false, false, true);
+    auto traced_eefk_code = trace_sphere_cc_fk(robot, language, false, false, true);
     data["eefk_code"] = traced_eefk_code.code;
     data["eefk_code_vars"] = traced_eefk_code.temp_variables;
     data["eefk_code_output"] = traced_eefk_code.outputs;
 
-    auto traced_spherefk_code = trace_sphere_cc_fk(robot, true, false, false);
+    auto traced_spherefk_code = trace_sphere_cc_fk(robot, language, true, false, false);
     data["spherefk_code"] = traced_spherefk_code.code;
     data["spherefk_code_vars"] = traced_spherefk_code.temp_variables;
     data["spherefk_code_output"] = traced_spherefk_code.outputs;
 
-    auto traced_ccfk_code = trace_sphere_cc_fk(robot, true, true, false);
+    auto traced_ccfk_code = trace_sphere_cc_fk(robot, language, true, true, false);
     data["ccfk_code"] = traced_ccfk_code.code;
     data["ccfk_code_vars"] = traced_ccfk_code.temp_variables;
     data["ccfk_code_output"] = traced_ccfk_code.outputs;
 
-    auto traced_ccfkee_code = trace_sphere_cc_fk(robot, true, true, true);
+    auto traced_ccfkee_code = trace_sphere_cc_fk(robot, language, true, true, true);
     data["ccfkee_code"] = traced_ccfkee_code.code;
     data["ccfkee_code_vars"] = traced_ccfkee_code.temp_variables;
     data["ccfkee_code_output"] = traced_ccfkee_code.outputs;

@@ -8,4 +8,5 @@
 /output.data
 /output.json
 /*.hh
+/*.rs
 /.cpm-cache/
