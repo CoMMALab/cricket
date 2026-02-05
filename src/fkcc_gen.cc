@@ -538,6 +538,10 @@ auto trace_sphere_cc_fk(
         LanguageRust<double> langRust("double");
         handler.generateCode(function_code, langRust, result, nameGen);
     }
+    else
+    {
+        throw std::runtime_error(fmt::format("unsupported language {}", language));
+    }
 
     return Traced{function_code.str(), handler.getTemporaryVariableCount(), n_out};
 }
@@ -612,10 +616,6 @@ int main(int argc, char **argv)
     if (data.contains("language"))
     {
         language = data["language"];
-    }
-    if (not(language == "rust" or language == "c++"))
-    {
-        throw std::runtime_error(fmt::format("unsupported language {}", language));
     }
 
     RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_name);
