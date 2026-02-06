@@ -2221,9 +2221,14 @@
     <axis xyz="1. 0. 0." />
     <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
   </joint>
-  <joint name="r_forearm_roll_joint" type="continuous">
+  <joint name="r_forearm_roll_joint" type="revolute">
     <dynamics damping="0.1" />
-    <limit effort="30.0" velocity="3.5999999999999996" />
+    <limit
+            effort="30.0"
+            velocity="3.5999999999999996"
+            lower="-3.14159"
+            upper="3.14159"
+        />
     <safety_controller
             k_velocity="1.0"
             k_position="0.0"
@@ -2272,9 +2277,14 @@
     <axis xyz="0. 1. 0." />
     <origin xyz="0.321 0.0 0.0" rpy="0.0 0.0 0.0" />
   </joint>
-  <joint name="r_wrist_roll_joint" type="continuous">
+  <joint name="r_wrist_roll_joint" type="revolute">
     <dynamics damping="0.1" />
-    <limit effort="10.0" velocity="3.5999999999999996" />
+    <limit
+            effort="10.0"
+            velocity="3.5999999999999996"
+            lower="-3.14159"
+            upper="3.14159"
+        />
     <safety_controller
             k_velocity="2.0"
             k_position="0.0"
@@ -2435,9 +2445,14 @@
     <axis xyz="1. 0. 0." />
     <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
   </joint>
-  <joint name="l_forearm_roll_joint" type="continuous">
+  <joint name="l_forearm_roll_joint" type="revolute">
     <dynamics damping="0.1" />
-    <limit effort="30.0" velocity="3.5999999999999996" />
+    <limit
+            effort="30.0"
+            velocity="3.5999999999999996"
+            lower="-3.14159"
+            upper="3.14159"
+        />
     <safety_controller
             k_velocity="1.0"
             k_position="0.0"
@@ -2486,9 +2501,14 @@
     <axis xyz="0. 1. 0." />
     <origin xyz="0.321 0.0 0.0" rpy="0.0 0.0 0.0" />
   </joint>
-  <joint name="l_wrist_roll_joint" type="continuous">
+  <joint name="l_wrist_roll_joint" type="revolute">
     <dynamics damping="0.1" />
-    <limit effort="10.0" velocity="3.5999999999999996" />
+    <limit
+            effort="10.0"
+            velocity="3.5999999999999996"
+            lower="-3.14159"
+            upper="3.14159"
+        />
     <safety_controller
             k_velocity="2.0"
             k_position="0.0"

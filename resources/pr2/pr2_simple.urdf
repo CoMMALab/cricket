@@ -350,7 +350,7 @@
       </collision>
       -->
   </link>
-  <joint name="torso_lift_motor_screw_joint" type="continuous">
+  <joint name="torso_lift_motor_screw_joint" type="fixed">
     <origin xyz="-0.15 0.0 0.7" />
     <axis xyz="0 0 1" />
     <parent link="base_link" />
@@ -1450,9 +1450,14 @@
   <!-- Has upperarm link -->
   <!-- No transmission, since this a fixed joint w/o actuator -->
   <!-- forearm_roll_link is a fictitious link internal to elbow_flex_link, provides an attachment point for the actual forearm -->
-  <joint name="r_forearm_roll_joint" type="continuous">
+  <joint name="r_forearm_roll_joint" type="revolute">
     <axis xyz="1 0 0" />
-    <limit effort="30" velocity="3.5999999999999996" />
+    <limit
+            effort="30"
+            velocity="3.5999999999999996"
+            lower="-3.14159"
+            upper="3.14159"
+        />
     <!-- alpha tested velocity and effort limits -->
     <safety_controller k_velocity="1" />
     <calibration rising="0.0" />
@@ -1650,9 +1655,14 @@
     </collision>
   </link>
   <!-- Wrist roll -->
-  <joint name="r_wrist_roll_joint" type="continuous">
+  <joint name="r_wrist_roll_joint" type="revolute">
     <axis xyz="1 0 0" />
-    <limit effort="10" velocity="3.5999999999999996" />
+    <limit
+            effort="10"
+            velocity="3.5999999999999996"
+            lower="-3.14159"
+            upper="3.14159"
+        />
     <!-- alpha tested velocity and effort limits -->
     <safety_controller k_velocity="2" />
     <dynamics damping="0.1" />
@@ -1842,7 +1852,7 @@
       </collision>
       -->
   </link>
-  <joint name="r_gripper_motor_screw_joint" type="continuous">
+  <joint name="r_gripper_motor_screw_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.0 0 0" />
     <axis xyz="0 1 0" />
     <parent link="r_gripper_motor_slider_link" />
@@ -2561,9 +2571,14 @@
   <!-- Has upperarm link -->
   <!-- No transmission, since this a fixed joint w/o actuator -->
   <!-- forearm_roll_link is a fictitious link internal to elbow_flex_link, provides an attachment point for the actual forearm -->
-  <joint name="l_forearm_roll_joint" type="continuous">
+  <joint name="l_forearm_roll_joint" type="revolute">
     <axis xyz="1 0 0" />
-    <limit effort="30" velocity="3.5999999999999996" />
+    <limit
+            effort="30"
+            velocity="3.5999999999999996"
+            lower="-3.14159"
+            upper="3.14159"
+        />
     <!-- alpha tested velocity and effort limits -->
     <safety_controller k_velocity="1" />
     <calibration rising="0.0" />
@@ -2761,9 +2776,14 @@
     </collision>
   </link>
   <!-- Wrist roll -->
-  <joint name="l_wrist_roll_joint" type="continuous">
+  <joint name="l_wrist_roll_joint" type="revolute">
     <axis xyz="1 0 0" />
-    <limit effort="10" velocity="3.5999999999999996" />
+    <limit
+            effort="10"
+            velocity="3.5999999999999996"
+            lower="-3.14159"
+            upper="3.14159"
+        />
     <!-- alpha tested velocity and effort limits -->
     <safety_controller k_velocity="2" />
     <dynamics damping="0.1" />
@@ -2953,7 +2973,7 @@
       </collision>
       -->
   </link>
-  <joint name="l_gripper_motor_screw_joint" type="continuous">
+  <joint name="l_gripper_motor_screw_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.0 0 0" />
     <axis xyz="0 1 0" />
     <parent link="l_gripper_motor_slider_link" />
