@@ -146,8 +146,8 @@ auto get_bounding_sphere_info(
     sphere_info.push_back(world_position[0]);
     sphere_info.push_back(world_position[1]);
     sphere_info.push_back(world_position[2]);
-    std::cout << "Sphere info: " << sphere_info[0] << ", " << sphere_info[1] << ", " << sphere_info[2] << " "
-              << sph_info.radius << std::endl;
+    // std::cout << "Sphere info: " << sphere_info[0] << ", " << sphere_info[1] << ", " << sphere_info[2] << " "
+    //           << sph_info.radius << std::endl;
     *radius = sph_info.radius;
     return sphere_info;
 }
@@ -174,6 +174,25 @@ auto compute_self_collision(const RobotInfo &info, ADVectorXs ad_inp) -> CppAD::
     forwardKinematics(ad_model, ad_data, ad_q);
     updateFramePlacements(ad_model, ad_data);
 
+    for (auto i = 0U; i < info.spheres.size(); ++i)
+    {
+        const auto &sphere = info.spheres[i];
+
+        const auto &joint_placement = ad_data.oMi[sphere.parent_joint];
+
+        Eigen::Matrix<ADCG, 3, 1> local_translation;
+        local_translation[0] = sphere.relative.translation()[0];
+        local_translation[1] = sphere.relative.translation()[1];
+        local_translation[2] = sphere.relative.translation()[2];
+
+        Eigen::Matrix<ADCG, 3, 1> world_position =
+            joint_placement.rotation() * local_translation + joint_placement.translation();
+
+        std::cout << "Sphere " << i << " with geom index : " << sphere.geom_index << ": " << world_position.transpose() << " : " << sphere.radius << std::endl;
+    }
+
+
+
     std::size_t n_out = info.num_valid_bounding_spheres;
     ADVectorXs data(n_out);
 
@@ -197,12 +216,12 @@ auto compute_self_collision(const RobotInfo &info, ADVectorXs ad_inp) -> CppAD::
         auto penetration_soft_hinge = 0.5 * (penetration + sqrt(penetration * penetration + 1e-6));
         data[info.bounding_sphere_index[pair.first]] =
             data[info.bounding_sphere_index[pair.first]] + penetration_soft_hinge;
-        std::cout << "Penetration between " << pair.first << " and " << pair.second << ": " << penetration
-                  << " " << penetration_soft_hinge << " inserted at "
-                  << info.bounding_sphere_index[pair.first] << " - " << info.model.frames[pair.first].name
-                  << " and " << info.bounding_sphere_index[pair.second] << " - "
-                  << info.model.frames[pair.second].name << " with radius : " << sphere_1_radius << " and "
-                  << sphere_2_radius << std::endl;
+        // std::cout << "Penetration between " << pair.first << " and " << pair.second << ": " << penetration
+        //           << " " << penetration_soft_hinge << " inserted at "
+        //           << info.bounding_sphere_index[pair.first] << " - " << info.model.frames[pair.first].name
+        //           << " and " << info.bounding_sphere_index[pair.second] << " - "
+        //           << info.model.frames[pair.second].name << " with radius : " << sphere_1_radius << " and "
+        //           << sphere_2_radius << std::endl;
     }
     // Create the AD function
     ADFun<CGD> jacobian_error_func(ad_inp, data);
@@ -843,7 +862,7 @@ int main(int argc, char **argv)
     // std::array<float, 14> q_init = {
     //    -0.816, -0.203, 0.716, -0.961, 0.770, 2.055, -0.360
     // };
-    std::array<float, 35> q_init = {0.035,0.0,0.031,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
+    std::array<float, 30> q_init = {0.0, 0.00183744, -0.0051594, -0.000955897, 0.00227391, -0.000489775, 0.365469, -0.00524933, 0.291269, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     Eigen::Matrix<float, 4, 4> T;
     T << -0.71933, 0.69467, -6.9968e-07, 3.01e-06, 0.69467, 0.71933, 4.8424e-06, -0.00015324, 3.8415e-06,
@@ -931,29 +950,29 @@ int main(int argc, char **argv)
         ad_inp[i] = ADCG(q_init[i]);
     }
 
-    auto tsr_err_jac = tsr_error_function(robot, ad_inp);
-    // first 6 * 4 * robot.model.nq are jacobians
-    // Next 6 * 4 are the errors
-    //
-    std::cout << "Jacobian matrix : " << std::endl;
-    for(auto i = 0; i < 6 * 4; ++i)
-    {
-        for(auto j = 0; j < robot.model.nq; ++j)
-        {
-            std::cout << tsr_err_jac[i * robot.model.nq + j] << " ";
-        }
-        std::cout << std::endl;
-    }
-    std::cout << "Error vector : " << std::endl;
-    for(auto i = 0; i < 4; ++i)
-    {
-        for(auto j = 0; j < 6; ++j)
-        {
-            std::cout << tsr_err_jac[robot.model.nq * 6 * 4 + i * 6 + j] << " ";
-        }
-        std::cout << std::endl;
-    }
-    std::cout << std::endl;
+    // auto tsr_err_jac = tsr_error_function(robot, ad_inp);
+    // // first 6 * 4 * robot.model.nq are jacobians
+    // // Next 6 * 4 are the errors
+    // //
+    // std::cout << "Jacobian matrix : " << std::endl;
+    // for(auto i = 0; i < 6 * 4; ++i)
+    // {
+    //     for(auto j = 0; j < robot.model.nq; ++j)
+    //     {
+    //         std::cout << tsr_err_jac[i * robot.model.nq + j] << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
+    // std::cout << "Error vector : " << std::endl;
+    // for(auto i = 0; i < 4; ++i)
+    // {
+    //     for(auto j = 0; j < 6; ++j)
+    //     {
+    //         std::cout << tsr_err_jac[robot.model.nq * 6 * 4 + i * 6 + j] << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
+    // std::cout << std::endl;
 
 
     // ADMatrixXs polygon(4, 2);
@@ -962,12 +981,12 @@ int main(int argc, char **argv)
     // // polygon << ADCG(1.0), ADCG(-0.3), ADCG(1.0), ADCG(0.3),  ADCG(0.0), ADCG(0.3), ADCG(0.0), ADCG(-0.3);
     // // polygon << ADCG(0.0), ADCG(0.2), ADCG(1.0), ADCG(0.2), ADCG(1.0), ADCG(1.0), ADCG(0.0), ADCG(1.0) ;
 
-    // ADVectorXs ad_q(robot.model.nq);
-    // for (auto i = 0U; i < robot.model.nq; ++i)
-    // {
-    //     ad_q[i] = ADCG(q_init[i]);
-    // }
-    // auto selfcoll_jac = compute_self_collision(robot, ad_q);
+    ADVectorXs ad_q(robot.model.nq);
+    for (auto i = 0U; i < robot.model.nq; ++i)
+    {
+        ad_q[i] = ADCG(q_init[i]);
+    }
+    auto selfcoll_jac = compute_self_collision(robot, ad_q);
     // std::cout << selfcoll_jac.size() << std::endl;
     // for (auto i = 0U; i < robot.num_valid_bounding_spheres; ++i)
     // {

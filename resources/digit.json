@@ -1,0 +1,10 @@
+{
+    "name": "Digit",
+    "urdf": "digit_description/digit_model_spherized.urdf",
+    "srdf": "digit_description/digit_spherized.srdf",
+    "end_effectors":["left_hand_eef", "right_hand_eef", "left_toe_roll", "right_toe_roll"],
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "digit.hh"
+}

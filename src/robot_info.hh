@@ -263,6 +263,13 @@ struct RobotInfo
             }
 
             per_link_spheres.emplace_back(sphere_indices);
+            std::cout << "Link " << model.frames[i].name << " has ";
+            for(const auto &sphere : per_link_spheres[i])
+            {
+                std::cout << sphere << " ";
+            }
+            std::cout << std::endl;
+
 
             if (not link_info.empty())
             {
