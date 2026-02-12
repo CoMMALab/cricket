@@ -115,10 +115,13 @@ struct RobotInfo
             fmt::print("No EE provided, using distal link `{}`.\n", end_effector_names[0]);
         }
 
+        std::cout << "Getting the eefs" << std::endl;
         for (const auto end_effector_name : end_effector_names)
         {
-            end_effector_indexes.push_back(model.getFrameId(end_effector_name));
+            std::cout << "Getting the index of " << end_effector_name << std::endl;
+            end_effector_indexes.push_back(model.getFrameId(end_effector_name, BODY));
         }
+        std::cout << "Finished loading robot info" << std::endl;
     }
 
     auto json() -> nlohmann::json

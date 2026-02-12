@@ -700,9 +700,9 @@ auto tsr_error_function(const RobotInfo &info, ADVectorXs ad_inp) -> CppAD::vect
         // compute error term
         const auto wTobj = ad_data.oMf[info.end_effector_indexes[eef_idx]] * rTe.inverse();
         const auto rTobj = wTr.inverse() * wTobj;
-        // std::cout << "wTobj : " << eef_idx << std::endl;
-        // std::cout << rTobj.translation_impl().transpose() << std::endl;
-        // std::cout << rTobj.rotation_impl() << std::endl;
+        std::cout << "wTobj : " << eef_idx << wTobj << wTr << std::endl;
+        std::cout << rTobj.translation_impl().transpose() << std::endl;
+        std::cout << rTobj.rotation_impl() << std::endl;
 
         ADVectorXs displacement(nt);
         displacement.setZero();
@@ -856,56 +856,67 @@ int main(int argc, char **argv)
     std::array<float, 6> lower_bound = {-0.00002, -0.00002, -0.00002, -0.00002, -0.00002, -0.00002};
     std::array<float, 6> upper_bound = {0.00002, 0.00002, 0.00002, 0.00002, 0.00002, 0.00002};
 
+    std::array<std::array<float, 7>, 4> eef_transforms = {{{1, 0,0,0,   0, 0, 0}, {1, 0,0,0,   0.0, 0.0, 0.0}, {0.603, 0.36, 0.36, 0.603, -0.04302,  0.10080, -0.96013}, {0.603, -0.36, 0.36, -0.603 , -0.04288, -0.09895, -0.96033}}};
+    std::array<std::array<float, 7>, 4> eef_transforms_ref_frame_w_world = {{{1, 0, 0, 0, 0, 0, 0}, {1, 0, 0, 0, 0, 0, 0}, {1, 0, 0, 0, 0, 0, 0}, {1, 0, 0, 0, 0, 0, 0}}};
+    std::array<float, 6 * 4> tsr_lower_bound = {
+        -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -0.01, -0.01, -0.01, -0.05, -0.05, -0.05, -0.01, -0.01, -0.01, -0.05, -0.05, -0.05
+    };
+
+    std::array<float, 6 * 4> tsr_upper_bound = {
+        10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 0.01, 0.01, 0.01, 0.05, 0.05, 0.05, 0.01, 0.01, 0.01, 0.05, 0.05, 0.05
+    };
+
+
     // std::array<float, 14> q_init = {
     //    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     // };
     // std::array<float, 14> q_init = {
     //    -0.816, -0.203, 0.716, -0.961, 0.770, 2.055, -0.360
     // };
-    std::array<float, 30> q_init = {0.0, 0.00183744, -0.0051594, -0.000955897, 0.00227391, -0.000489775, 0.365469, -0.00524933, 0.291269, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    std::array<float, 30> q_init = {0.00000,0.00184,-0.00516,-0.00096,0.00227,-0.00049,0.36547,-0.00525,0.29127,0.31631,-0.01347,-0.28807,0.11635,-0.00983,-0.36544,0.00508,-0.29158,-0.31758,0.01345,0.28939,-0.11670,0.01291,0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
-    Eigen::Matrix<float, 4, 4> T;
-    T << -0.71933, 0.69467, -6.9968e-07, 3.01e-06, 0.69467, 0.71933, 4.8424e-06, -0.00015324, 3.8415e-06,
-        3.0337e-06, -1, 0.41, 0, 0, 0, 1;
+    // Eigen::Matrix<float, 4, 4> T;
+    // T << -0.71933, 0.69467, -6.9968e-07, 3.01e-06, 0.69467, 0.71933, 4.8424e-06, -0.00015324, 3.8415e-06,
+    //     3.0337e-06, -1, 0.41, 0, 0, 0, 1;
 
-    const Eigen::Transform<float, 3, Eigen::Isometry> target_pose(T);
-    std::cout << "Target pose is : " << target_pose.matrix() << std::endl;
+    // const Eigen::Transform<float, 3, Eigen::Isometry> target_pose(T);
+    // std::cout << "Target pose is : " << target_pose.matrix() << std::endl;
 
-    Eigen::Quaternion<float> q2(target_pose.linear());
-    std::array<float, 7> target_pose_7 = {
-        q2.w(),
-        q2.x(),
-        q2.y(),
-        q2.z(),
-        target_pose.translation().x(),
-        target_pose.translation().y(),
-        target_pose.translation().z()};
+    // Eigen::Quaternion<float> q2(target_pose.linear());
+    // std::array<float, 7> target_pose_7 = {
+    //     q2.w(),
+    //     q2.x(),
+    //     q2.y(),
+    //     q2.z(),
+    //     target_pose.translation().x(),
+    //     target_pose.translation().y(),
+    //     target_pose.translation().z()};
 
     // compose a new input of ADVectorXs ad_inp of q_init, target_pose, in_hand_pose, lower_bound, upper_bound
     ADVectorXs ad_inp((7 * 2 + 6 * 2) * 4 + robot.model.nq);  // 3 4x4 matrices + 3 6D vectors + nq
 
-    std::array<Eigen::Transform<float, 3, Eigen::Isometry>, 4> eef_transforms;
+    // std::array<Eigen::Transform<float, 3, Eigen::Isometry>, 4> eef_transforms;
 
-    T << 1, 0, 0, 0.13, 0, 1, 0, 0.11, 0, 0, 1, -0.725, 0, 0, 0, 1;
-    eef_transforms[0] = Eigen::Transform<float, 3, Eigen::Isometry>(T);
-    T << 1, 0, 0, 0.13, 0, 1, 0, 0.11, 0, 0, 1, -0.725, 0, 0, 0, 1;
-    eef_transforms[1] = Eigen::Transform<float, 3, Eigen::Isometry>(T);
-    T << 1, 0, 0, 0.13, 0, 1, 0, 0.11, 0, 0, 1, -0.725, 0, 0, 0, 1;
-    eef_transforms[2] = Eigen::Transform<float, 3, Eigen::Isometry>(T);
-    T << 1, 0, 0, 0.13, 0, 1, 0, -0.11, 0, 0, 1, -0.725, 0, 0, 0, 1;
-    eef_transforms[3] = Eigen::Transform<float, 3, Eigen::Isometry>(T);
-    std::array<float, 6 * 4> tsr_lower_bound = {
-        -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -0.01, -0.01, -0.01, -10.0, -10.0, -10.0, -0.01, -0.01, -0.01, -10.0, -10.0, -10.0
-    };
+    // T << 1, 0, 0, 0.13, 0, 1, 0, 0.11, 0, 0, 1, -0.725, 0, 0, 0, 1;
+    // eef_transforms[0] = Eigen::Transform<float, 3, Eigen::Isometry>(T);
+    // T << 1, 0, 0, 0.13, 0, 1, 0, 0.11, 0, 0, 1, -0.725, 0, 0, 0, 1;
+    // eef_transforms[1] = Eigen::Transform<float, 3, Eigen::Isometry>(T);
+    // T << 1, 0, 0, 0.13, 0, 1, 0, 0.11, 0, 0, 1, -0.725, 0, 0, 0, 1;
+    // eef_transforms[2] = Eigen::Transform<float, 3, Eigen::Isometry>(T);
+    // T << 1, 0, 0, 0.13, 0, 1, 0, -0.11, 0, 0, 1, -0.725, 0, 0, 0, 1;
+    // eef_transforms[3] = Eigen::Transform<float, 3, Eigen::Isometry>(T);
+    // std::array<float, 6 * 4> tsr_lower_bound = {
+    //     -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -0.01, -0.01, -0.01, -10.0, -10.0, -10.0, -0.01, -0.01, -0.01, -10.0, -10.0, -10.0
+    // };
 
-    std::array<float, 6 * 4> tsr_upper_bound = {
-        10.0, 10.0, 10.0, 10.0, 10.0, 10.0,
-        10.0, 10.0, 10.0, 10.0, 10.0, 10.0,
-        0.01, 0.01, 0.01,
-        10.0, 10.0, 10.0,
-        0.01, 0.01, 0.01,
-        10.0, 10.0, 10.0
-    };
+    // std::array<float, 6 * 4> tsr_upper_bound = {
+    //     10.0, 10.0, 10.0, 10.0, 10.0, 10.0,
+    //     10.0, 10.0, 10.0, 10.0, 10.0, 10.0,
+    //     0.01, 0.01, 0.01,
+    //     10.0, 10.0, 10.0,
+    //     0.01, 0.01, 0.01,
+    //     10.0, 10.0, 10.0
+    // };
     for (auto eef_idx = 0U; eef_idx < 4; ++eef_idx)
     {
         const size_t eef_offset = (7 * 2 + 6 * 2) * eef_idx + robot.model.nq;
@@ -919,15 +930,15 @@ int main(int argc, char **argv)
         ad_inp[eef_offset + (0 + 5)] = 0.0;
         ad_inp[eef_offset + (0 + 6)] = 0.0;
 
-        Eigen::Quaternion<float> q2(eef_transforms[eef_idx].linear());
-        std::cout << "Quaternion: " << q2.w() << ", " << q2.x() << ", " << q2.y() << ", " << q2.z() <<  " -- " << eef_offset << ", " << eef_idx <<std::endl;
-        ad_inp[eef_offset + (7 + 0)] = q2.w();
-        ad_inp[eef_offset + (7 + 1)] = q2.x();
-        ad_inp[eef_offset + (7 + 2)] = q2.y();
-        ad_inp[eef_offset + (7 + 3)] = q2.z();
-        ad_inp[eef_offset + (7 + 4)] = eef_transforms[eef_idx].translation().x();
-        ad_inp[eef_offset + (7 + 5)] = eef_transforms[eef_idx].translation().y();
-        ad_inp[eef_offset + (7 + 6)] = eef_transforms[eef_idx].translation().z();
+        // Eigen::Quaternion<float> q2(eef_transforms[eef_idx].linear());
+        // std::cout << "Quaternion: " << q2.w() << ", " << q2.x() << ", " << q2.y() << ", " << q2.z() <<  " -- " << eef_offset << ", " << eef_idx <<std::endl;
+        ad_inp[eef_offset + (7 + 0)] = eef_transforms[eef_idx][0];
+        ad_inp[eef_offset + (7 + 1)] = eef_transforms[eef_idx][1];
+        ad_inp[eef_offset + (7 + 2)] = eef_transforms[eef_idx][2];
+        ad_inp[eef_offset + (7 + 3)] = eef_transforms[eef_idx][3];
+        ad_inp[eef_offset + (7 + 4)] = eef_transforms[eef_idx][4];
+        ad_inp[eef_offset + (7 + 5)] = eef_transforms[eef_idx][5];
+        ad_inp[eef_offset + (7 + 6)] = eef_transforms[eef_idx][6];
 
         ad_inp[eef_offset + (14 + 0)] = tsr_lower_bound[eef_idx * 6 + 0];
         ad_inp[eef_offset + (14 + 1)] = tsr_lower_bound[eef_idx * 6 + 1];
@@ -950,29 +961,29 @@ int main(int argc, char **argv)
         ad_inp[i] = ADCG(q_init[i]);
     }
 
-    // auto tsr_err_jac = tsr_error_function(robot, ad_inp);
+    auto tsr_err_jac = tsr_error_function(robot, ad_inp);
     // // first 6 * 4 * robot.model.nq are jacobians
     // // Next 6 * 4 are the errors
     // //
-    // std::cout << "Jacobian matrix : " << std::endl;
-    // for(auto i = 0; i < 6 * 4; ++i)
-    // {
-    //     for(auto j = 0; j < robot.model.nq; ++j)
-    //     {
-    //         std::cout << tsr_err_jac[i * robot.model.nq + j] << " ";
-    //     }
-    //     std::cout << std::endl;
-    // }
-    // std::cout << "Error vector : " << std::endl;
-    // for(auto i = 0; i < 4; ++i)
-    // {
-    //     for(auto j = 0; j < 6; ++j)
-    //     {
-    //         std::cout << tsr_err_jac[robot.model.nq * 6 * 4 + i * 6 + j] << " ";
-    //     }
-    //     std::cout << std::endl;
-    // }
-    // std::cout << std::endl;
+    std::cout << "Jacobian matrix : " << std::endl;
+    for(auto i = 0; i < 6 * 4; ++i)
+    {
+        for(auto j = 0; j < robot.model.nq; ++j)
+        {
+            std::cout << tsr_err_jac[i * robot.model.nq + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "Error vector : " << std::endl;
+    for(auto i = 0; i < 4; ++i)
+    {
+        for(auto j = 0; j < 6; ++j)
+        {
+            std::cout << tsr_err_jac[robot.model.nq * 6 * 4 + i * 6 + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
 
 
     // ADMatrixXs polygon(4, 2);
@@ -981,12 +992,12 @@ int main(int argc, char **argv)
     // // polygon << ADCG(1.0), ADCG(-0.3), ADCG(1.0), ADCG(0.3),  ADCG(0.0), ADCG(0.3), ADCG(0.0), ADCG(-0.3);
     // // polygon << ADCG(0.0), ADCG(0.2), ADCG(1.0), ADCG(0.2), ADCG(1.0), ADCG(1.0), ADCG(0.0), ADCG(1.0) ;
 
-    ADVectorXs ad_q(robot.model.nq);
-    for (auto i = 0U; i < robot.model.nq; ++i)
-    {
-        ad_q[i] = ADCG(q_init[i]);
-    }
-    auto selfcoll_jac = compute_self_collision(robot, ad_q);
+    // ADVectorXs ad_q(robot.model.nq);
+    // for (auto i = 0U; i < robot.model.nq; ++i)
+    // {
+    //     ad_q[i] = ADCG(q_init[i]);
+    // }
+    // auto selfcoll_jac = compute_self_collision(robot, ad_q);
     // std::cout << selfcoll_jac.size() << std::endl;
     // for (auto i = 0U; i < robot.num_valid_bounding_spheres; ++i)
     // {
