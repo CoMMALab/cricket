@@ -1,0 +1,13 @@
+{
+    "name": "Fetch",
+    "urdf": "fetch/fetch_spherized.urdf",
+    "srdf": "fetch/fetch.srdf",
+    "end_effector": "gripper_link",
+    "resolution": 32,
+    "template": "templates/fk_template.rs",
+    "subtemplates": [
+        { "name": "ccfk", "template": "templates/ccfk_template.rs" }
+    ],
+    "output": "fetch_fk.rs",
+    "language": "rust"
+}

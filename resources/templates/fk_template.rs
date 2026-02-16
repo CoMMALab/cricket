@@ -10,7 +10,7 @@
 use core::simd::Simd;
 
 use carom_core::{
-    Attach, Ball, Block, Collide3, PosedAttachment, Robot, SimdArithmetic, cos, sin,
+    Attach, AttachValidate, Ball, Block, BlockValidate, Collide3, PosedAttachment, Robot, SimdArithmetic, cos, sin,
     sphere_environment_in_collision, sphere_sphere_self_collision,
 };
 
@@ -36,7 +36,11 @@ impl {{name}} {
     const BOUND_LOWER: [f32; DIM] = [{{join(bound_lower, ", ")}}];
     const BOUND_SCALE: [f32; DIM] = [{{join(bound_range, ", ")}}];
 
+<<<<<<< HEAD
     const RESOLUTION: usize = {{resolution}};
+=======
+    const BOUND_SCALE: [f32; DIM] = [{{join(bound_range, ", ")}}];
+>>>>>>> 0ae0b0e (feat: add EEFK and extra rust robots)
 
     pub const MIN_RADIUS: f32 = {{min_radius}};
     pub const MAX_RADIUS: f32 = {{max_radius}};
@@ -54,23 +58,18 @@ const fn make_upper(lower: [f32; DIM], scale: [f32; DIM]) -> [f32; DIM] {
 
 type ConfigurationBlock<const L: usize> = [Simd<f32, L>; {{name}}::DIM];
 
-impl<W> Robot<DIM, f32, W> for {{name}}
-where
-    W: Collide3<f32>,
+impl Robot<DIM, f32> for {{name}}
 {
-    fn is_valid<const L: usize>(&self, cfgs: &Block<{ Self::DIM }, L, f32>, world: &W) -> bool
-    where
-        Simd<f32, L>: SimdArithmetic<f32, L>,
-    {
-        fkcc(&cfgs.0, world)
-    }
-
     fn bounds(&self) -> [[f32; DIM]; 2] {
         Self::BOUNDS
     }
 
     fn name(&self) -> &'static str {
         "{{lower(name)}}"
+    }
+
+    fn joint_names(&self) -> &[&str; DIM] {
+        &Self::JOINT_NAMES
     }
 
     fn sphere_fk<const L: usize>(
@@ -82,8 +81,26 @@ where
     }
 }
 
+impl<W> BlockValidate<DIM, f32, W> for {{name}}
+where
+    W: Collide3<f32>,
+{
+    fn is_valid<const L: usize>(&self, cfgs: &Block<{ Self::DIM }, L, f32>, world: &W) -> bool
+    where
+        Simd<f32, L>: SimdArithmetic<f32, L>,
+    {
+        fkcc(&cfgs.0, world)
+    }
+}
 
-impl<W> Attach<DIM, f32, W> for {{name}}
+impl Attach<DIM, f32> for {{name}}
+{
+    fn eefk<const L: usize>(&self, cfgs: &Block<DIM, L, f32>) -> [Simd<f32, L>; 12] {
+        eefk(&cfgs.0)
+    }
+}
+
+impl<W> AttachValidate<DIM, f32, W> for {{name}}
 where
     W: Collide3<f32>,
 {
@@ -182,4 +199,15 @@ fn sphere_fk<const L: usize>(x: &ConfigurationBlock<L>, spheres: &mut Vec<Ball<3
             r,
         });
     }
+}
+
+
+fn eefk<const L: usize>(x: &ConfigurationBlock<L>) -> [Simd<f32, L>; 12]
+{
+    let mut v = [Simd::splat(0.0); {{eefk_code_vars}}];
+    let mut y = [Simd::splat(0.0); {{eefk_code_output}}];
+
+    {{eefk_code}}
+
+    y
 }

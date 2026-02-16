@@ -1,0 +1,12 @@
+{
+    "name": "Ur10e",
+    "urdf": "ur10e/ur_10e_spherized.urdf",
+    "end_effector": "robotiq_85_base_link",
+    "resolution": 32,
+    "template": "templates/fk_template.rs",
+    "subtemplates": [
+        { "name": "ccfk", "template": "templates/ccfk_template.rs" }
+    ],
+    "output": "ur10e_fk.rs",
+    "language": "rust"
+}
