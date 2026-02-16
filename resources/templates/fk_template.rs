@@ -36,11 +36,7 @@ impl {{name}} {
     const BOUND_LOWER: [f32; DIM] = [{{join(bound_lower, ", ")}}];
     const BOUND_SCALE: [f32; DIM] = [{{join(bound_range, ", ")}}];
 
-<<<<<<< HEAD
     const RESOLUTION: usize = {{resolution}};
-=======
-    const BOUND_SCALE: [f32; DIM] = [{{join(bound_range, ", ")}}];
->>>>>>> 0ae0b0e (feat: add EEFK and extra rust robots)
 
     pub const MIN_RADIUS: f32 = {{min_radius}};
     pub const MAX_RADIUS: f32 = {{max_radius}};
