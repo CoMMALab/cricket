@@ -5,13 +5,14 @@
     clippy::collapsible_if,
     clippy::excessive_precision,
 )]
+#![allow(clippy::assign_op_pattern)]
 #![feature(portable_simd)]
 
 use core::simd::Simd;
 
 use carom_core::{
     Attach, AttachValidate, Ball, Block, BlockValidate, Collide3, PosedAttachment, Robot, SimdArithmetic, cos, sin,
-    sphere_environment_in_collision, sphere_sphere_self_collision,
+    sphere_environment_in_collision, sphere_sphere_self_collision, Isometry,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -35,8 +36,6 @@ impl {{name}} {
 
     const BOUND_LOWER: [f32; DIM] = [{{join(bound_lower, ", ")}}];
     const BOUND_SCALE: [f32; DIM] = [{{join(bound_range, ", ")}}];
-
-    const RESOLUTION: usize = {{resolution}};
 
     pub const MIN_RADIUS: f32 = {{min_radius}};
     pub const MAX_RADIUS: f32 = {{max_radius}};
@@ -91,7 +90,7 @@ where
 
 impl Attach<DIM, f32> for {{name}}
 {
-    fn eefk<const L: usize>(&self, cfgs: &Block<DIM, L, f32>) -> [Simd<f32, L>; 12] {
+    fn eefk<const L: usize>(&self, cfgs: &Block<DIM, L, f32>) -> Isometry<Simd<f32, L>, 3> {
         eefk(&cfgs.0)
     }
 }
@@ -136,10 +135,9 @@ fn attach_fkcc<const L: usize>(
     {% include "ccfk" %}
 
     // attaching at {{ end_effector }}
-    attachment.set_pose_pr(
-        y[{{ccfkee_code_output - 12}}..{{ccfkee_code_output - 9}}].as_array().unwrap(),
-        y[{{ccfkee_code_output - 9}}..{{ccfkee_code_output}}].as_array().unwrap()
-    );
+    attachment.set_pose(&Isometry::from_carom_buf(
+        *y[{{ccfkee_code_output - 12}}..{{ccfkee_code_output}}].as_array().unwrap()
+    ));
 
     //
     // attachment vs. environment collisions
@@ -198,12 +196,12 @@ fn sphere_fk<const L: usize>(x: &ConfigurationBlock<L>, spheres: &mut Vec<Ball<3
 }
 
 
-fn eefk<const L: usize>(x: &ConfigurationBlock<L>) -> [Simd<f32, L>; 12]
+fn eefk<const L: usize>(x: &ConfigurationBlock<L>) -> Isometry<Simd<f32, L>, 3>
 {
     let mut v = [Simd::splat(0.0); {{eefk_code_vars}}];
     let mut y = [Simd::splat(0.0); {{eefk_code_output}}];
 
     {{eefk_code}}
 
-    y
+    Isometry::from_carom_buf(y)
 }
