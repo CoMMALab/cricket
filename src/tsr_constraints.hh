@@ -283,7 +283,7 @@ auto trace_bounding_spheres_self_collision_error(const RobotInfo &info) -> Trace
 }
 
 
-auto trace_com_function(const RobotInfo &info) -> Traced
+auto trace_com_function(const RobotInfo &info, bool wrt_world = true) -> Traced
 {
     auto nq = info.model.nq;
 
@@ -315,8 +315,23 @@ auto trace_com_function(const RobotInfo &info) -> Traced
     updateFramePlacements(ad_model, ad_data);
     const auto CoM = centerOfMass(ad_model, ad_data, ad_q, true);
 
+    // if we have eef indices provided, we should calculate 
+    // com wrt the the mean of the eef positions instead of the world frame.
+    
+    ADVectorXs eef_positions(3);
+    eef_positions.setZero();
+    if(!wrt_world){
+        for (auto eef_idx = 2U; eef_idx < 4; eef_idx++){
+            const auto eef_pos = ad_data.oMf[info.end_effector_indexes[eef_idx]].translation_impl();
+            eef_positions[0] += eef_pos[0];
+            eef_positions[1] += eef_pos[1];
+            eef_positions[2] += eef_pos[2];
+        }
+        eef_positions = eef_positions / static_cast<double>(2);
+    }
+
     for (auto i = 0U; i < n_out; i++){
-        data[i] = CoM[i];
+        data[i] = CoM[i] - eef_positions[i]; // This is the CoM value, expressed in the world frame. We can also express it in the mean eef frame by subtracting the mean eef position.
     }
 
 
@@ -393,12 +408,17 @@ auto trace_com_constraint_function() -> Traced
     auto r = (n.dot(com - A));
     auto error = r * n;
 
-    std::cout << "Error is " << error.size() << ", " << n.size() << std::endl;
+    // scale the error by the height of the com,
+    // i.e. if we are higher up, we want to penalize more for the same horizontal error since it is more likely to cause tipping.
+    // but we still want the constraint to be active even when the com is low, so we add a small constant to the height to avoid it being zero.
+    // ad_com[2] is the height of the com, and is anywhere between 0.2 to 1.0 typically
+    // we should not go more than half the error magnitude in scaling, since we still want the constraint to be active when the com is low.
+    auto height_scaling = ADCG(0.5) + ADCG(0.5) * ad_com[2]; // i.e. when fully erect, we scale the error by 1.0, when fully crouched, we scale the error by 0.5
 
     std::size_t n_out = 2 + 2;
     ADVectorXs data(n_out);
     for (auto i = 0U; i < 2; i++){
-        data[i] = error[i];
+        data[i] = error[i]; // * height_scaling;
     }
     for (auto i = 0U; i < 2; i++){
         data[i+2] = n[i];
@@ -617,6 +637,150 @@ auto trace_tsr_bimanual_error_function(const RobotInfo &info, const size_t eef1 
 
     return Traced{function_code.str(), handler.getTemporaryVariableCount(), jac_e_q.size()};
 }
+
+auto trace_tsr_bimanual_norm_error_function(const RobotInfo &info, const size_t eef1 = 0, const size_t eef2 = 1) -> Traced
+{
+    auto nq = info.model.nq;
+    auto nv = info.model.nv;
+    const size_t nt = 6;  // task space is se3
+    const size_t n_eef = info.end_effector_indexes.size();
+
+    assert (n_eef > 1);
+
+    ADModel ad_model = info.model.cast<ADCG>();
+    ADData ad_data(ad_model);
+
+    // Total inputs is:
+    // 1 * 4x4 matrices for constraint space
+    // 2 * 6 bounds for constraint space
+    // It is repeated for all end effectors.
+    // nq  for configuration space
+    const size_t num_inp = (7 * 1 + nt * 2) + nq;
+
+    ADVectorXs ad_inp(num_inp);  // 3 4x4 matrices
+    for (auto i = 0U; i < num_inp; ++i)
+    {
+        ad_inp[i] = ADCG(0.0);
+    }
+    Independent(ad_inp);
+    // for (auto i = 0U; i < 6; ++i)
+    // {
+    //     ad_inp[i] = ADCG(1e-6);
+    // }
+
+    // set the w value of each quaternion to be 1.0 for stability
+    // for (auto eef_idx = 0U; eef_idx < n_eef; eef_idx++){
+    //     ad_inp[nq] = ADCG(1.0);
+    // }
+    std::size_t n_out = nt;
+    ADVectorXs data(n_out);
+
+    // First copy over configs and run FK
+    ADVectorXs ad_q(nq);
+
+    for (auto i = 0U; i < nq; i++)
+    {
+        ad_q[i] = ad_inp[i];  // This is the first 7 vars for nq
+    }
+
+    forwardKinematics(ad_model, ad_data, ad_q);
+    updateFramePlacements(ad_model, ad_data);
+
+
+    Eigen::Quaternion<ADCG> lTrq(ad_inp[nq + 0 + 0], ad_inp[nq + 0 + 1], ad_inp[nq + 0 + 2], ad_inp[nq + 0 + 3]);
+    Eigen::Vector3<ADCG> lTrp; // left joint in right joint frame
+    for (auto i=0U; i < 3; i++)
+        lTrp[i] = ad_inp[nq + 4 + i];
+    SE3Tpl<ADCG, 0> lTr (lTrq, lTrp);
+
+
+    ADVectorXs lb(nt);
+    ADVectorXs ub(nt);
+    for (auto i = 0U; i < nt; i++)
+    {
+        lb[i] = ad_inp[nq + 1 * 7 + i];
+        ub[i] = ad_inp[nq + 1 * 7 + nt + i];
+    }
+
+
+
+    // compute error term
+    const auto lTw = ad_data.oMf[info.end_effector_indexes[eef1]];
+    const auto rTw = ad_data.oMf[info.end_effector_indexes[eef2]];
+
+    const auto lTr_rob = lTw.inverse() * rTw;
+    const auto errT = lTr_rob * lTr.inverse();
+
+    ADVectorXs displacement(nt);
+    displacement.setZero();
+    // displacement << errT.translation_impl(), log3(errT.rotation_impl());
+    displacement << errT.translation_impl(), so3_log_smooth<ADMatrixXs, ADCG>(errT.rotation_impl());
+
+    // TODO (siyer) -- we ignore the bounds here, since
+    // it would set some gradients to be zero by mistake while tracing.
+    // we want the tracing to be generic
+    // leaving this here, since we may try out some hinge loss to make it
+    // differentiable probably.
+    for (auto i = 0U; i < nt; i++)
+    {
+        // data[i] = CondExpLt(displacement[i], zero, displacement[i] - lb[i], displacement[i] - ub[i]);
+        // data[i] = data[i] + CondExpGt(displacement[i], ub[i], displacement[i] - ub[i], zero);
+        // data[eef_offset + i] = CondExpLt(displacement[i], lb[i], displacement[i] - lb[i],
+        // (displacement[i] - lb[i]) * 1e-6) + CondExpGt(displacement[i], ub[i], displacement[i] - ub[i],
+        // (displacement[i] - ub[i]) * 1e-6);
+        data[i] = displacement[i];
+    }
+    data[0] = lTr_rob.translation().norm() - lTr.translation().norm();
+
+    // Create the AD function
+    ADFun<CGD> jacobian_error_func(ad_inp, data);
+    CodeHandler<double> handler;
+    CppAD::vector<CGD> ind_vars(num_inp);
+    handler.makeVariables(ind_vars);
+
+    CppAD::vector<CGD> error_vec = jacobian_error_func.Forward(0, ind_vars);
+
+    // this is the full jacobian
+    CppAD::vector<CGD> jac = jacobian_error_func.Jacobian(ind_vars);
+    CppAD::vector<CGD> jac_e_q(n_out * nq);  // this is jacobian with respect to joint configs only.
+
+    for (auto i = 0U; i < n_out; i++)
+    {
+        for (auto j = 0U; j < nq; j++)
+        {
+            jac_e_q[i * nq + j] = jac[i * num_inp + j];
+        }
+    }
+
+    // now correct the error vector with the lower and upper bounds.
+
+    // CGD zero_cgd(0.0);
+    // for (auto eef_idx = 0U; eef_idx < n_eef; eef_idx++)
+    // {
+    //     const size_t eef_inp_offset = num_inp_eef * eef_idx;
+    //     const size_t eef_out_offset = nt * eef_idx;
+    //     for (auto i = 0U; i < nt; i++)
+    //     {
+    //         CGD lb = ad_inp[eef_inp_offset + nq + 2 * 7 + i];
+    //         CGD ub = ad_inp[eef_inp_offset + nq + 2 * 7 + nt + i];
+    //         error_vec[eef_out_offset + i] =
+    //             CondExpLt(error_vec[eef_out_offset + i], lb, error_vec[eef_out_offset + i] - lb, zero_cgd) +
+    //             CondExpGt(error_vec[eef_out_offset + i], ub, error_vec[eef_out_offset + i] - ub, zero_cgd);
+    //     }
+    // }
+
+    std::move(error_vec.begin(), error_vec.end(), std::back_inserter(jac_e_q));
+
+    LanguageCCustom<double> langC("double");
+    LangCDefaultVariableNameGenerator<double> nameGen;
+
+    std::ostringstream function_code;
+    handler.generateCode(function_code, langC, jac_e_q, nameGen);
+
+    return Traced{function_code.str(), handler.getTemporaryVariableCount(), jac_e_q.size()};
+
+}
+
 
 
 enum ProjMethod {

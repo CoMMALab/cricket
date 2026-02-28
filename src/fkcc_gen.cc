@@ -13,6 +13,7 @@
 #include "housekeeping.hh"
 #include "tracer_utils.hh"
 #include "tsr_constraints.hh"
+#include "digit_closed_link_constraint.hh"
 
 auto trace_sphere(const SphereInfo &sphere, const ADData &ad_data, ADVectorXs &data, std::size_t index)
 {
@@ -217,7 +218,7 @@ int main(int argc, char **argv)
     add_to_trace(trace_solve_tsr_function(robot, ProjMethod::OuterLM), "solve_tsr_error_lm_outer_code", data);
     add_to_trace(trace_solve_tsr_function(robot, ProjMethod::GradDesc), "solve_tsr_error_gradient_descent_code", data);
 
-    add_to_trace(trace_com_function(robot), "CoM_code", data);
+    add_to_trace(trace_com_function(robot, data["name"]!="Digit"), "CoM_code", data);
     add_to_trace(trace_com_constraint_function(), "CoM_constraint_code", data);
 
     add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::InnerLM, 2), "solve_com_function_lm_inner_code", data);
@@ -230,7 +231,12 @@ int main(int argc, char **argv)
     add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::OuterLM, robot.num_valid_bounding_spheres), "solve_self_collision_error_lm_outer_code", data);
     add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::GradDesc, robot.num_valid_bounding_spheres), "solve_self_collision_error_gradient_descent_code", data);
 
-
+    if (data["name"] == "Digit"){
+        add_to_trace(trace_closed_link_system(robot), "digit_closed_link_error_code", data);
+        add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::InnerLM, 2), "solve_digit_closed_link_error_lm_inner_code", data);
+        add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::OuterLM, 2), "solve_digit_closed_link_error_lm_outer_code", data);
+        add_to_trace(trace_solve_generic_constraint_function(robot, ProjMethod::GradDesc, 2), "solve_digit_closed_link_error_gradient_descent_code", data);
+    }
 
     if(robot.end_effector_indexes.size() > 1) {
         add_to_trace(trace_tsr_bimanual_error_function(robot), "tsr_bimanual_error_code", data);

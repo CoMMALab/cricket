@@ -1,0 +1,10 @@
+{
+    "name": "Panda",
+    "urdf": "panda/panda_spherized_curobo.urdf",
+    "srdf": "panda/panda.srdf",
+    "end_effectors": ["panda_grasptarget"],
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "panda_fk_curobo.hh"
+}

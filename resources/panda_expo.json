@@ -1,0 +1,10 @@
+{
+    "name": "Panda",
+    "urdf": "panda_marker/panda_expo_spherized.urdf",
+    "srdf": "panda_marker/panda.srdf",
+    "end_effectors": ["panda_tip"],
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "panda_fk_marker.hh"
+}

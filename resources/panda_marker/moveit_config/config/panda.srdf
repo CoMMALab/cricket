@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--This does not replace URDF, and is not an extension of URDF.
+    This is a format for representing semantic information about the robot structure.
+    A URDF file must exist for this robot as well, where the joints and the links that are referenced are defined
+-->
+<robot name="panda">
+    <!--DISABLE COLLISIONS: By default it is assumed that any link of the robot could potentially come into collision with any other link in the robot. This tag disables collision checking between a specified pair of links. -->
+    <disable_collisions link1="panda_hand" link2="panda_link3" reason="Never"/>
+    <disable_collisions link1="panda_hand" link2="panda_link4" reason="Never"/>
+    <disable_collisions link1="panda_hand" link2="panda_link5" reason="Default"/>
+    <disable_collisions link1="panda_hand" link2="panda_link6" reason="Never"/>
+    <disable_collisions link1="panda_hand" link2="panda_link7" reason="Adjacent"/>
+    <disable_collisions link1="panda_hand" link2="panda_marker" reason="Never"/>
+    <disable_collisions link1="panda_hand" link2="panda_marker_holder" reason="Adjacent"/>
+    <disable_collisions link1="panda_hand" link2="panda_tip" reason="Never"/>
+    <disable_collisions link1="panda_link0" link2="panda_link1" reason="Adjacent"/>
+    <disable_collisions link1="panda_link0" link2="panda_link2" reason="Never"/>
+    <disable_collisions link1="panda_link0" link2="panda_link3" reason="Never"/>
+    <disable_collisions link1="panda_link1" link2="panda_link2" reason="Adjacent"/>
+    <disable_collisions link1="panda_link1" link2="panda_link3" reason="Never"/>
+    <disable_collisions link1="panda_link1" link2="panda_link4" reason="Never"/>
+    <disable_collisions link1="panda_link2" link2="panda_link3" reason="Adjacent"/>
+    <disable_collisions link1="panda_link3" link2="panda_link4" reason="Adjacent"/>
+    <disable_collisions link1="panda_link3" link2="panda_link6" reason="Never"/>
+    <disable_collisions link1="panda_link3" link2="panda_link7" reason="Never"/>
+    <disable_collisions link1="panda_link4" link2="panda_link5" reason="Adjacent"/>
+    <disable_collisions link1="panda_link4" link2="panda_link6" reason="Never"/>
+    <disable_collisions link1="panda_link4" link2="panda_link7" reason="Never"/>
+    <disable_collisions link1="panda_link4" link2="panda_marker" reason="Default"/>
+    <disable_collisions link1="panda_link4" link2="panda_tip" reason="Default"/>
+    <disable_collisions link1="panda_link5" link2="panda_link6" reason="Adjacent"/>
+    <disable_collisions link1="panda_link5" link2="panda_link7" reason="Default"/>
+    <disable_collisions link1="panda_link5" link2="panda_marker" reason="Never"/>
+    <disable_collisions link1="panda_link5" link2="panda_marker_holder" reason="Default"/>
+    <disable_collisions link1="panda_link5" link2="panda_tip" reason="Never"/>
+    <disable_collisions link1="panda_link6" link2="panda_link7" reason="Adjacent"/>
+    <disable_collisions link1="panda_link6" link2="panda_marker" reason="Never"/>
+    <disable_collisions link1="panda_link6" link2="panda_marker_holder" reason="Never"/>
+    <disable_collisions link1="panda_link6" link2="panda_tip" reason="Never"/>
+    <disable_collisions link1="panda_link7" link2="panda_marker" reason="Never"/>
+    <disable_collisions link1="panda_link7" link2="panda_marker_holder" reason="Never"/>
+    <disable_collisions link1="panda_link7" link2="panda_tip" reason="Never"/>
+    <disable_collisions link1="panda_marker" link2="panda_marker_holder" reason="Adjacent"/>
+    <disable_collisions link1="panda_marker" link2="panda_tip" reason="Adjacent"/>
+    <disable_collisions link1="panda_marker_holder" link2="panda_tip" reason="Never"/>
+</robot>
