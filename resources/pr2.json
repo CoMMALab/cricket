@@ -2,7 +2,7 @@
     "name": "Pr2",
     "urdf": "pr2/pr2_spherized.urdf",
     "srdf": "pr2/pr2.srdf",
-    "end_effector": "r_gripper_palm_link",
+    "end_effector": "r_gripper_tool_frame",
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [

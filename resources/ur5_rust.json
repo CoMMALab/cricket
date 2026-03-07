@@ -1,0 +1,13 @@
+{
+    "name": "Ur5",
+    "urdf": "ur5/ur5_spherized_no_offset.urdf",
+    "srdf": "ur5/ur5.srdf",
+    "end_effector": "robotiq_85_base_link",
+    "resolution": 32,
+    "template": "templates/fk_template.rs",
+    "subtemplates": [
+        { "name": "ccfk", "template": "templates/ccfk_template.rs" }
+    ],
+    "output": "ur5_fk.rs",
+    "language": "rust"
+}

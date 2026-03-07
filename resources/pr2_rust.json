@@ -1,0 +1,13 @@
+{
+    "name": "Pr2",
+    "urdf": "pr2/pr2_spherized.urdf",
+    "srdf": "pr2/pr2_simple.srdf",
+    "end_effector": "r_gripper_tool_frame",
+    "resolution": 32,
+    "template": "templates/fk_template.rs",
+    "subtemplates": [
+        { "name": "ccfk", "template": "templates/ccfk_template.rs" }
+    ],
+    "output": "pr2_fk.rs",
+    "language": "rust"
+}

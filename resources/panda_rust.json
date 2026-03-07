@@ -1,0 +1,13 @@
+{
+    "name": "Panda",
+    "urdf": "panda/panda_spherized.urdf",
+    "srdf": "panda/panda.srdf",
+    "end_effector": "panda_grasptarget",
+    "resolution": 32,
+    "template": "templates/fk_template.rs",
+    "subtemplates": [
+        { "name": "ccfk", "template": "templates/ccfk_template.rs" }
+    ],
+    "output": "panda_fk.rs",
+    "language": "rust"
+}
