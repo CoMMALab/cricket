@@ -53,6 +53,7 @@ CPMAddPackage(
 find_package(cppad QUIET)
 if(NOT cppad_FOUND)
   pkg_check_modules(cppad REQUIRED cppad)
+  link_directories(${cppad_LIBRARY_DIRS})
 endif()
 
 # Setup CppADCG

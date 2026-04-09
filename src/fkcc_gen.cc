@@ -49,6 +49,160 @@ struct SphereInfo
     SE3 relative;
 };
 
+// Joint type classification for mapToConfiguration
+enum class JointType
+{
+    Bounded,           // Revolute/Prismatic with limits: nq=1, nu=1
+    UnboundedRevolute, // Unbounded revolute (cos,sin): nq=2, nu=1
+    SO3,               // Spherical quaternion: nq=4, nu=3
+    SE3,               // FreeFlyer: nq=7, nu=6
+    Unsupported
+};
+
+struct JointMapping
+{
+    JointType type;
+    std::size_t joint_id;
+    std::size_t idx_q;  // Start index in configuration vector
+    std::size_t idx_u;  // Start index in [0,1] input vector
+    std::size_t nq;     // Configuration DOFs
+    std::size_t nu;     // Number of [0,1] inputs needed
+};
+
+struct FreeflyerBounds
+{
+    Eigen::Vector3d position_lower;
+    Eigen::Vector3d position_upper;
+};
+
+// Classify a joint by its shortname
+auto classify_joint_type(const std::string &shortname, int nq) -> JointType
+{
+    // Pinocchio joint shortnames:
+    // JointModelRX, JointModelRY, JointModelRZ - bounded revolute (nq=1)
+    // JointModelPX, JointModelPY, JointModelPZ - prismatic (nq=1)
+    // JointModelRevoluteUnaligned - bounded revolute (nq=1)
+    // JointModelRevoluteUnboundedUnaligned - unbounded (nq=2)
+    // JointModelSpherical, JointModelSphericalZYX - SO3 (nq=4 or nq=3)
+    // JointModelFreeFlyer - SE3 (nq=7)
+
+    if (shortname.find("FreeFlyer") != std::string::npos)
+    {
+        return JointType::SE3;
+    }
+    if (shortname.find("Spherical") != std::string::npos && nq == 4)
+    {
+        return JointType::SO3;
+    }
+    if (shortname.find("Unbounded") != std::string::npos && nq == 2)
+    {
+        return JointType::UnboundedRevolute;
+    }
+    if (nq == 1)
+    {
+        return JointType::Bounded;
+    }
+
+    return JointType::Unsupported;
+}
+
+// Get number of [0,1] inputs needed for a joint type
+auto get_nu_for_type(JointType type) -> std::size_t
+{
+    switch (type)
+    {
+        case JointType::Bounded:
+            return 1;
+        case JointType::UnboundedRevolute:
+            return 1;
+        case JointType::SO3:
+            return 3;
+        case JointType::SE3:
+            return 6;
+        default:
+            return 0;
+    }
+}
+
+// Classify all joints in a model, returns (total_nu, joint_mappings)
+auto classify_joints(const Model &model) -> std::pair<std::size_t, std::vector<JointMapping>>
+{
+    std::vector<JointMapping> mappings;
+    std::size_t total_nu = 0;
+
+    // Joint 0 is universe/root, skip it
+    for (auto joint_id = 1U; joint_id < model.joints.size(); ++joint_id)
+    {
+        const auto &joint = model.joints[joint_id];
+        std::string shortname = joint.shortname();
+        auto nq = joint.nq();
+
+        if (nq == 0)
+        {
+            continue;  // Fixed joint
+        }
+
+        JointType type = classify_joint_type(shortname, nq);
+        std::size_t nu = get_nu_for_type(type);
+
+        if (type == JointType::Unsupported)
+        {
+            throw std::runtime_error(
+                fmt::format("Unsupported joint type: {} (shortname: {}, nq: {})",
+                            model.names[joint_id], shortname, nq));
+        }
+
+        JointMapping mapping;
+        mapping.type = type;
+        mapping.joint_id = joint_id;
+        mapping.idx_q = joint.idx_q();
+        mapping.idx_u = total_nu;
+        mapping.nq = nq;
+        mapping.nu = nu;
+
+        mappings.push_back(mapping);
+        total_nu += nu;
+    }
+
+    return {total_nu, mappings};
+}
+
+// Maps [0,1] to bounded range: q = lower + u * (upper - lower)
+template <typename Scalar>
+auto map_bounded(Scalar u, double lower, double upper) -> Scalar
+{
+    return Scalar(lower) + u * Scalar(upper - lower);
+}
+
+// Maps [0,1] to (cos, sin) for unbounded revolute
+template <typename Scalar>
+void map_unbounded_revolute(Scalar u, Scalar &cos_out, Scalar &sin_out)
+{
+    constexpr double two_pi = 2.0 * M_PI;
+    Scalar theta = u * Scalar(two_pi);
+    cos_out = cos(theta);
+    sin_out = sin(theta);
+}
+
+// Shoemake's algorithm for uniform quaternion sampling from 3 uniform [0,1] inputs
+// Returns quaternion as (x, y, z, w) - Pinocchio convention
+template <typename Scalar>
+void map_so3_shoemake(Scalar u1, Scalar u2, Scalar u3, Scalar &x, Scalar &y, Scalar &z, Scalar &w)
+{
+    constexpr double two_pi = 2.0 * M_PI;
+
+    Scalar sqrt1_minus_u1 = sqrt(Scalar(1.0) - u1);
+    Scalar sqrt_u1 = sqrt(u1);
+    Scalar theta1 = u2 * Scalar(two_pi);
+    Scalar theta2 = u3 * Scalar(two_pi);
+
+    // Pinocchio uses (x, y, z, w) quaternion order
+    x = sqrt1_minus_u1 * sin(theta1);
+    y = sqrt1_minus_u1 * cos(theta1);
+    z = sqrt_u1 * sin(theta2);
+    w = sqrt_u1 * cos(theta2);
+}
+
 auto min_sphere_of_spheres(const std::vector<SphereInfo> &info) -> std::array<float, 4>
 {
     using K = CGAL::Exact_predicates_inexact_constructions_kernel;
@@ -546,6 +700,132 @@ auto trace_sphere_cc_fk(
     return Traced{function_code.str(), handler.getTemporaryVariableCount(), n_out};
 }
 
+// Trace a function that maps [0,1]^nu inputs to valid robot configurations
+auto trace_map_to_configuration(
+    const Model &model,
+    const std::string &language,
+    const std::optional<FreeflyerBounds> &freeflyer_bounds = std::nullopt) -> Traced
+{
+    auto [nu, joint_mappings] = classify_joints(model);
+    auto nq = model.nq;
+
+    // Check if FreeFlyer bounds are required
+    for (const auto &jm : joint_mappings)
+    {
+        if (jm.type == JointType::SE3 && !freeflyer_bounds)
+        {
+            throw std::runtime_error(
+                "FreeFlyer joint detected but no freeflyer_bounds provided. "
+                "Please specify position_lower and position_upper in the configuration.");
+        }
+    }
+
+    ADVectorXs ad_u(nu);   // [0,1] inputs
+    ADVectorXs ad_q(nq);   // Configuration output
+
+    // Initialize inputs
+    for (auto i = 0U; i < nu; ++i)
+    {
+        ad_u[i] = ADCG(0.0);
+    }
+
+    Independent(ad_u);
+
+    // Apply joint-specific mappings
+    for (const auto &jm : joint_mappings)
+    {
+        switch (jm.type)
+        {
+            case JointType::Bounded:
+            {
+                // Linear mapping: q = lower + u * (upper - lower)
+                double lower = model.lowerPositionLimit[jm.idx_q];
+                double upper = model.upperPositionLimit[jm.idx_q];
+                ad_q[jm.idx_q] = map_bounded(ad_u[jm.idx_u], lower, upper);
+                break;
+            }
+            case JointType::UnboundedRevolute:
+            {
+                // Maps [0,1] to (cos, sin)
+                ADCG cos_val, sin_val;
+                map_unbounded_revolute(ad_u[jm.idx_u], cos_val, sin_val);
+                ad_q[jm.idx_q] = cos_val;
+                ad_q[jm.idx_q + 1] = sin_val;
+                break;
+            }
+            case JointType::SO3:
+            {
+                // Shoemake's algorithm for uniform quaternion
+                ADCG x, y, z, w;
+                map_so3_shoemake(ad_u[jm.idx_u], ad_u[jm.idx_u + 1], ad_u[jm.idx_u + 2], x, y, z, w);
+                // Pinocchio quaternion order: (x, y, z, w)
+                ad_q[jm.idx_q] = x;
+                ad_q[jm.idx_q + 1] = y;
+                ad_q[jm.idx_q + 2] = z;
+                ad_q[jm.idx_q + 3] = w;
+                break;
+            }
+            case JointType::SE3:
+            {
+                // FreeFlyer: position (3 inputs) + orientation (3 inputs)
+                // Position mapping
+                for (int i = 0; i < 3; ++i)
+                {
+                    double lower = freeflyer_bounds->position_lower[i];
+                    double upper = freeflyer_bounds->position_upper[i];
+                    ad_q[jm.idx_q + i] = map_bounded(ad_u[jm.idx_u + i], lower, upper);
+                }
+                // Orientation mapping (Shoemake)
+                ADCG x, y, z, w;
+                map_so3_shoemake(ad_u[jm.idx_u + 3], ad_u[jm.idx_u + 4], ad_u[jm.idx_u + 5], x, y, z, w);
+                ad_q[jm.idx_q + 3] = x;
+                ad_q[jm.idx_q + 4] = y;
+                ad_q[jm.idx_q + 5] = z;
+                ad_q[jm.idx_q + 6] = w;
+                break;
+            }
+            default:
+                throw std::runtime_error("Unsupported joint type in trace_map_to_configuration");
+        }
+    }
+
+    // Create the AD function
+    ADFun<CGD> map_func(ad_u, ad_q);
+
+    CodeHandler<double> handler;
+    CppAD::vector<CGD> ind_vars(nu);
+    handler.makeVariables(ind_vars);
+
+    CppAD::vector<CGD> result = map_func.Forward(0, ind_vars);
+
+    LangCDefaultVariableNameGenerator<double> nameGen;
+    std::ostringstream function_code;
+
+    if (language == "c++")
+    {
+        LanguageCCustom<double> langC("double");
+        handler.generateCode(function_code, langC, result, nameGen);
+    }
+    else if (language == "rust")
+    {
+        LanguageRust<double> langRust("double");
+        handler.generateCode(function_code, langRust, result, nameGen);
+    }
+    else
+    {
+        throw std::runtime_error(fmt::format("unsupported language {}", language));
+    }
+
+    return Traced{function_code.str(), handler.getTemporaryVariableCount(), static_cast<std::size_t>(nq)};
+}
+
+// Get the randomness dimension (nu) for a model
+auto get_randomness_dimension(const Model &model) -> std::size_t
+{
+    auto [nu, _] = classify_joints(model);
+    return nu;
+}
+
 int main(int argc, char **argv)
 {
     cxxopts::Options options(argv[0], "Tracing compiler for forward kinematics and collision checking");
@@ -618,6 +898,28 @@ int main(int argc, char **argv)
         language = data["language"];
     }
 
+    // Parse freeflyer_bounds if provided
+    std::optional<FreeflyerBounds> freeflyer_bounds = std::nullopt;
+    if (data.contains("freeflyer_bounds"))
+    {
+        FreeflyerBounds bounds;
+        auto &fb = data["freeflyer_bounds"];
+        if (!fb.contains("position_lower") || !fb.contains("position_upper"))
+        {
+            throw std::runtime_error(
+                "freeflyer_bounds must contain both 'position_lower' and 'position_upper' arrays");
+        }
+        auto lower = fb["position_lower"].get<std::vector<double>>();
+        auto upper = fb["position_upper"].get<std::vector<double>>();
+        if (lower.size() != 3 || upper.size() != 3)
+        {
+            throw std::runtime_error("freeflyer_bounds position arrays must have exactly 3 elements");
+        }
+        bounds.position_lower = Eigen::Vector3d(lower[0], lower[1], lower[2]);
+        bounds.position_upper = Eigen::Vector3d(upper[0], upper[1], upper[2]);
+        freeflyer_bounds = bounds;
+    }
+
     RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_name);
 
     data.update(robot.json());
@@ -641,6 +943,13 @@ int main(int argc, char **argv)
     data["ccfkee_code"] = traced_ccfkee_code.code;
     data["ccfkee_code_vars"] = traced_ccfkee_code.temp_variables;
     data["ccfkee_code_output"] = traced_ccfkee_code.outputs;
+
+    // Trace mapToConfiguration function
+    auto traced_mapconfig_code = trace_map_to_configuration(robot.model, language, freeflyer_bounds);
+    data["mapconfig_code"] = traced_mapconfig_code.code;
+    data["mapconfig_code_vars"] = traced_mapconfig_code.temp_variables;
+    data["mapconfig_code_output"] = traced_mapconfig_code.outputs;
+    data["n_u"] = get_randomness_dimension(robot.model);
 
     inja::Environment env;
 
