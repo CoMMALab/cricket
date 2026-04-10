@@ -77,14 +77,6 @@ struct {{name}}
         std::array<FloatVector<rake, 1>, {{spherefk_code_output}}> y;
 
         {{spherefk_code}}
-
-        for (auto i = 0U; i < {{n_spheres}}; ++i)
-        {
-            out.x[i] = y[i * 4 + 0];
-            out.y[i] = y[i * 4 + 1];
-            out.z[i] = y[i * 4 + 2];
-            out.r[i] = y[i * 4 + 3];
-        }
     }
 
     using Debug = std::pair<std::vector<std::vector<std::string>>, std::vector<std::pair<std::size_t, std::size_t>>>;

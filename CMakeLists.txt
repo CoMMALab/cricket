@@ -71,11 +71,15 @@ list(APPEND cppadcg_INCLUDE_DIRS
 add_executable(fkcc_gen
     src/fkcc_gen.cc
     src/robot_info.cc
-    src/tracing.cc
+    src/tracing/sphere.cc
+    src/tracing/mapping.cc
+    src/tracing/bounds.cc
+    src/tracing/interpolate.cc
 )
 
 # Set include directories
 target_include_directories(fkcc_gen PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${cppad_INCLUDE_DIRS}
     ${cppadcg_INCLUDE_DIRS}
 )

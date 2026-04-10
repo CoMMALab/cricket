@@ -16,7 +16,8 @@ auto trace_sphere_cc_fk(
     const std::string &language,
     bool spheres = true,
     bool bounding_spheres = true,
-    bool fk = true) -> Traced;
+    bool fk = true,
+    bool use_soa_output = false) -> Traced;
 
 auto trace_map_to_configuration(
     const pinocchio::Model &model,

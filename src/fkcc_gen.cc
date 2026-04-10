@@ -124,7 +124,7 @@ int main(int argc, char **argv)
     data["eefk_code_vars"] = traced_eefk_code.temp_variables;
     data["eefk_code_output"] = traced_eefk_code.outputs;
 
-    auto traced_spherefk_code = trace_sphere_cc_fk(robot, language, true, false, false);
+    auto traced_spherefk_code = trace_sphere_cc_fk(robot, language, true, false, false, true);
     data["spherefk_code"] = traced_spherefk_code.code;
     data["spherefk_code_vars"] = traced_spherefk_code.temp_variables;
     data["spherefk_code_output"] = traced_spherefk_code.outputs;
