@@ -1,0 +1,151 @@
+#pragma once
+
+#include "types.hh"
+
+#include <pinocchio/multibody/model.hpp>
+
+#include <fmt/core.h>
+
+#include <cmath>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace cricket
+{
+
+inline auto classify_joint_type(const std::string &shortname, int nq) -> JointType
+{
+    if (shortname.find("FreeFlyer") != std::string::npos)
+    {
+        return JointType::SE3;
+    }
+    if (shortname.find("Planar") != std::string::npos && nq == 4)
+    {
+        return JointType::SE2;
+    }
+    if (shortname.find("Spherical") != std::string::npos && nq == 4)
+    {
+        return JointType::SO3;
+    }
+    if (shortname.find("Unbounded") != std::string::npos && nq == 2)
+    {
+        return JointType::UnboundedRevolute;
+    }
+    if (nq == 1)
+    {
+        return JointType::Bounded;
+    }
+
+    return JointType::Unsupported;
+}
+
+// Get number of [0,1] inputs needed for a joint type
+inline auto get_nu_for_type(JointType type) -> std::size_t
+{
+    switch (type)
+    {
+        case JointType::Bounded:
+            return 1;
+        case JointType::UnboundedRevolute:
+            return 1;
+        case JointType::SO3:
+            return 3;
+        case JointType::SE3:
+            return 6;
+        case JointType::SE2:
+            return 3;
+        default:
+            return 0;
+    }
+}
+
+// Classify all joints in a model, returns (total_nu, joint_mappings)
+inline auto classify_joints(const pinocchio::Model &model)
+    -> std::pair<std::size_t, std::vector<JointMapping>>
+{
+    std::vector<JointMapping> mappings;
+    std::size_t total_nu = 0;
+
+    // Joint 0 is universe/root, skip it
+    for (auto joint_id = 1U; joint_id < model.joints.size(); ++joint_id)
+    {
+        const auto &joint = model.joints[joint_id];
+        std::string shortname = joint.shortname();
+        auto nq = joint.nq();
+
+        if (nq == 0)
+        {
+            continue;  // Fixed joint
+        }
+
+        JointType type = classify_joint_type(shortname, nq);
+        std::size_t nu = get_nu_for_type(type);
+
+        if (type == JointType::Unsupported)
+        {
+            throw std::runtime_error(
+                fmt::format("Unsupported joint type: {} (shortname: {}, nq: {})",
+                            model.names[joint_id], shortname, nq));
+        }
+
+        JointMapping mapping;
+        mapping.type = type;
+        mapping.joint_id = joint_id;
+        mapping.idx_q = joint.idx_q();
+        mapping.idx_u = total_nu;
+        mapping.nq = nq;
+        mapping.nu = nu;
+
+        mappings.push_back(mapping);
+        total_nu += nu;
+    }
+
+    return {total_nu, mappings};
+}
+
+// Get the randomness dimension (nu) for a model
+inline auto get_randomness_dimension(const pinocchio::Model &model) -> std::size_t
+{
+    auto [nu, _] = classify_joints(model);
+    return nu;
+}
+
+// Maps [0,1] to bounded range: q = lower + u * (upper - lower)
+template <typename Scalar>
+auto map_bounded(Scalar u, double lower, double upper) -> Scalar
+{
+    return Scalar(lower) + u * Scalar(upper - lower);
+}
+
+// Maps [0,1] to (cos, sin) for unbounded revolute
+template <typename Scalar>
+void map_unbounded_revolute(Scalar u, Scalar &cos_out, Scalar &sin_out)
+{
+    constexpr double two_pi = 2.0 * M_PI;
+    Scalar theta = u * Scalar(two_pi);
+    cos_out = cos(theta);
+    sin_out = sin(theta);
+}
+
+// Shoemake's algorithm for uniform quaternion sampling from 3 uniform [0,1] inputs
+// Returns quaternion as (x, y, z, w) - Pinocchio convention
+template <typename Scalar>
+void map_so3_shoemake(Scalar u1, Scalar u2, Scalar u3, Scalar &x, Scalar &y, Scalar &z, Scalar &w)
+{
+    constexpr double two_pi = 2.0 * M_PI;
+
+    Scalar sqrt1_minus_u1 = sqrt(Scalar(1.0) - u1);
+    Scalar sqrt_u1 = sqrt(u1);
+    Scalar theta1 = u2 * Scalar(two_pi);
+    Scalar theta2 = u3 * Scalar(two_pi);
+
+    // Pinocchio uses (x, y, z, w) quaternion order
+    x = sqrt1_minus_u1 * sin(theta1);
+    y = sqrt1_minus_u1 * cos(theta1);
+    z = sqrt_u1 * sin(theta2);
+    w = sqrt_u1 * cos(theta2);
+}
+
+}  // namespace cricket

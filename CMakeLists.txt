@@ -68,7 +68,11 @@ list(APPEND cppadcg_INCLUDE_DIRS
   "${cppadcg_BINARY_DIR}/include")
 
 # Create the executable
-add_executable(fkcc_gen src/fkcc_gen.cc)
+add_executable(fkcc_gen
+    src/fkcc_gen.cc
+    src/robot_info.cc
+    src/tracing.cc
+)
 
 # Set include directories
 target_include_directories(fkcc_gen PRIVATE
