@@ -1,5 +1,13 @@
 <?xml version='1.0' encoding='UTF-8' ?>
 <robot name="pr2">
+  <!-- World link for planar base joint -->
+  <link name="world"/>
+  <joint name="world_joint" type="planar">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="world"/>
+    <child link="base_footprint"/>
+    <axis xyz="0 0 1"/>
+  </joint>
   <link name="base_link">
     <inertial>
       <origin xyz="-0.061 0.0 0.1465" rpy="0.0 -0.0 0.0" />

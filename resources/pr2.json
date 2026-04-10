@@ -4,6 +4,10 @@
     "srdf": "pr2/pr2.srdf",
     "end_effector": "r_gripper_tool_frame",
     "resolution": 32,
+    "bounds": {
+        "upper": [10, 10],
+        "lower": [-10, -10]
+    },
     "template": "templates/fk_template.hh",
     "subtemplates": [
         { "name": "ccfk", "template": "templates/ccfk_template.hh" }

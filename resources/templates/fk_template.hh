@@ -12,6 +12,7 @@ struct {{name}}
 {
     static constexpr char* name = "{{lower(name)}}";
     static constexpr std::size_t dimension = {{n_q}};
+    static constexpr std::size_t sample_dimension = {{n_u}};
     static constexpr std::size_t n_spheres = {{n_spheres}};
     static constexpr float min_radius = {{min_radius}};
     static constexpr float max_radius = {{max_radius}};
@@ -22,6 +23,7 @@ struct {{name}}
 
     using Configuration = FloatVector<dimension>;
     using ConfigurationArray = std::array<FloatT, dimension>;
+    using Configuration = FloatVector<sample_dimension>;
 
     struct alignas(FloatVectorAlignment) ConfigurationBuffer
         : std::array<float, Configuration::num_scalars_rounded>
@@ -40,47 +42,32 @@ struct {{name}}
         FloatVector<rake, n_spheres> r;
     };
 
-    alignas(Configuration::S::Alignment) static constexpr std::array<float, dimension> s_m{
-        {{join(bound_range, ", ")}}
-    };
-
-    alignas(Configuration::S::Alignment) static constexpr std::array<float, dimension> s_a{
-        {{join(bound_lower, ", ")}}
-    };
-
-    alignas(Configuration::S::Alignment) static constexpr std::array<float, dimension> d_m{
-        {{join(bound_descale, ", ")}}
-    };
-
-    static inline void scale_configuration(Configuration& q) noexcept
-    {
-        q = q * Configuration(s_m) + Configuration(s_a);
-    }
-
-    static inline void descale_configuration(Configuration& q) noexcept
-    {
-        q = (q - Configuration(s_a)) * Configuration(d_m);
-    }
-
-    template <std::size_t rake>
-    static inline void scale_configuration_block(ConfigurationBlock<rake> &q) noexcept
-    {
-        {% for index in range(n_q) -%}
-        q[{{index}}] = {{ at(bound_lower, index) }} + (q[{{index}}] * {{ at(bound_range, index) }});
-        {%- endfor %}
-    }
-
-    template <std::size_t rake>
-    static inline void descale_configuration_block(ConfigurationBlock<rake> & q) noexcept
-    {
-        {% for index in range(n_q) -%}
-        q[{{index}}] = {{ at(bound_descale, index) }} * (q[{{index}}] - {{ at(bound_lower, index) }});
-        {%- endfor %}
-    }
-
     inline static auto space_measure() noexcept -> float
     {
         return {{measure}};
+    }
+
+    inline static auto sample(const Sample &x_in) -> Configuration
+    {
+        std::array<FloatVector<rake, 1>, {{mapconfig_code_vars}}> v;
+        std::array<float, {{mapconfig_code_output}}> y;
+        const auto x = x_in.to_array();
+        {{mapconfig_code}}
+        return Configuration(y);
+    }
+
+    inline static auto in_bounds(const Configuration &x_in) -> bool
+    {
+        std::array<float, {{checkbounds_code_vars}}> v;
+        std::array<float, 1> y;
+        const auto x = x_in.to_array();
+        {{checkbounds_code}}
+        return y[0] == 1.;
+    }
+
+    inline static auto interpolate(const Configuration &a, const Configuration &b, float t)
+    {
+        {{interpolate_code}}
     }
 
     template <std::size_t rake>

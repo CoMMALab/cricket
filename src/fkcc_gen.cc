@@ -56,6 +56,7 @@ enum class JointType
     UnboundedRevolute, // Unbounded revolute (cos,sin): nq=2, nu=1
     SO3,               // Spherical quaternion: nq=4, nu=3
     SE3,               // FreeFlyer: nq=7, nu=6
+    SE2,               // Planar: nq=4, nu=3
     Unsupported
 };
 
@@ -69,26 +70,21 @@ struct JointMapping
     std::size_t nu;     // Number of [0,1] inputs needed
 };
 
-struct FreeflyerBounds
+struct Bounds
 {
-    Eigen::Vector3d position_lower;
-    Eigen::Vector3d position_upper;
+    Eigen::Vector3d lower;
+    Eigen::Vector3d upper;
 };
 
-// Classify a joint by its shortname
 auto classify_joint_type(const std::string &shortname, int nq) -> JointType
 {
-    // Pinocchio joint shortnames:
-    // JointModelRX, JointModelRY, JointModelRZ - bounded revolute (nq=1)
-    // JointModelPX, JointModelPY, JointModelPZ - prismatic (nq=1)
-    // JointModelRevoluteUnaligned - bounded revolute (nq=1)
-    // JointModelRevoluteUnboundedUnaligned - unbounded (nq=2)
-    // JointModelSpherical, JointModelSphericalZYX - SO3 (nq=4 or nq=3)
-    // JointModelFreeFlyer - SE3 (nq=7)
-
     if (shortname.find("FreeFlyer") != std::string::npos)
     {
         return JointType::SE3;
+    }
+    if (shortname.find("Planar") != std::string::npos && nq == 4)
+    {
+        return JointType::SE2;
     }
     if (shortname.find("Spherical") != std::string::npos && nq == 4)
     {
@@ -119,6 +115,8 @@ auto get_nu_for_type(JointType type) -> std::size_t
             return 3;
         case JointType::SE3:
             return 6;
+        case JointType::SE2:
+            return 3;
         default:
             return 0;
     }
@@ -282,15 +280,22 @@ struct RobotInfo
         const Eigen::VectorXd lower_bound = model.lowerPositionLimit;
         const Eigen::VectorXd upper_bound = model.upperPositionLimit;
         const Eigen::VectorXd bound_range = upper_bound - lower_bound;
-        const Eigen::VectorXd bound_descale = bound_range.cwiseInverse();
+
+        float measure = 1.0;
+        for (auto i = 0U; i < bound_range.size(); ++i)
+        {
+            if (std::isfinite(bound_range[i]))
+            {
+                measure *= bound_range[i];
+            }
+        }
 
         nlohmann::json json;
         json["n_q"] = model.nq;
         json["n_spheres"] = spheres.size();
-        json["bound_lower"] = std::vector<float>(lower_bound.data(), lower_bound.data() + model.nq);
-        json["bound_range"] = std::vector<float>(bound_range.data(), bound_range.data() + model.nq);
-        json["bound_descale"] = std::vector<float>(bound_descale.data(), bound_descale.data() + model.nq);
-        json["measure"] = bound_range.prod();
+        json["measure"] = measure;
+        json["upper"] = std::vector<float>(upper_bound.data(), upper_bound.data() + model.nq);
+        json["lower"] = std::vector<float>(lower_bound.data(), lower_bound.data() + model.nq);;
         json["end_effector"] = end_effector_name;
         json["end_effector_index"] = end_effector_index;
         json["min_radius"] = min_radius;
@@ -704,19 +709,25 @@ auto trace_sphere_cc_fk(
 auto trace_map_to_configuration(
     const Model &model,
     const std::string &language,
-    const std::optional<FreeflyerBounds> &freeflyer_bounds = std::nullopt) -> Traced
+    const std::optional<Bounds> &bounds = std::nullopt) -> Traced
 {
     auto [nu, joint_mappings] = classify_joints(model);
     auto nq = model.nq;
 
-    // Check if FreeFlyer bounds are required
+    // Check if bounds are required
     for (const auto &jm : joint_mappings)
     {
-        if (jm.type == JointType::SE3 && !freeflyer_bounds)
+        if (jm.type == JointType::SE3 && !bounds)
         {
             throw std::runtime_error(
-                "FreeFlyer joint detected but no freeflyer_bounds provided. "
-                "Please specify position_lower and position_upper in the configuration.");
+                "FreeFlyer joint detected but no bounds provided. "
+                "Please specify lower and upper in the configuration.");
+        }
+        if (jm.type == JointType::SE2 && !bounds)
+        {
+            throw std::runtime_error(
+                "Planar joint detected but no bounds provided. "
+                "Please specify lower and upper in the configuration.");
         }
     }
 
@@ -771,9 +782,9 @@ auto trace_map_to_configuration(
                 // Position mapping
                 for (int i = 0; i < 3; ++i)
                 {
-                    double lower = freeflyer_bounds->position_lower[i];
-                    double upper = freeflyer_bounds->position_upper[i];
-                    ad_q[jm.idx_q + i] = map_bounded(ad_u[jm.idx_u + i], lower, upper);
+                    double lo = bounds->lower[i];
+                    double hi = bounds->upper[i];
+                    ad_q[jm.idx_q + i] = map_bounded(ad_u[jm.idx_u + i], lo, hi);
                 }
                 // Orientation mapping (Shoemake)
                 ADCG x, y, z, w;
@@ -782,6 +793,23 @@ auto trace_map_to_configuration(
                 ad_q[jm.idx_q + 4] = y;
                 ad_q[jm.idx_q + 5] = z;
                 ad_q[jm.idx_q + 6] = w;
+                break;
+            }
+            case JointType::SE2:
+            {
+                // Planar: position (2 inputs) + orientation (1 input)
+                // Position mapping (x, y)
+                for (int i = 0; i < 2; ++i)
+                {
+                    double lo = bounds->lower[i];
+                    double hi = bounds->upper[i];
+                    ad_q[jm.idx_q + i] = map_bounded(ad_u[jm.idx_u + i], lo, hi);
+                }
+                // Orientation mapping (cos(θ), sin(θ))
+                ADCG cos_val, sin_val;
+                map_unbounded_revolute(ad_u[jm.idx_u + 2], cos_val, sin_val);
+                ad_q[jm.idx_q + 2] = cos_val;
+                ad_q[jm.idx_q + 3] = sin_val;
                 break;
             }
             default:
@@ -824,6 +852,184 @@ auto get_randomness_dimension(const Model &model) -> std::size_t
 {
     auto [nu, _] = classify_joints(model);
     return nu;
+}
+
+// Trace a function that checks if a configuration is within bounds
+// Returns 1.0 if all joints are within bounds, 0.0 otherwise
+auto trace_check_bounds(
+    const Model &model,
+    const std::string &language,
+    const std::optional<Bounds> &bounds = std::nullopt) -> Traced
+{
+    auto [nu, joint_mappings] = classify_joints(model);
+    auto nq = model.nq;
+
+    // Check if bounds are required
+    for (const auto &jm : joint_mappings)
+    {
+        if (jm.type == JointType::SE3 && !bounds)
+        {
+            throw std::runtime_error(
+                "FreeFlyer joint detected but no bounds provided. "
+                "Please specify lower and upper in the configuration.");
+        }
+        if (jm.type == JointType::SE2 && !bounds)
+        {
+            throw std::runtime_error(
+                "Planar joint detected but no bounds provided. "
+                "Please specify lower and upper in the configuration.");
+        }
+    }
+
+    ADVectorXs ad_q(nq);
+    ADVectorXs ad_out(1);
+
+    for (auto i = 0; i < nq; ++i)
+    {
+        ad_q[i] = ADCG(0.0);
+    }
+
+    Independent(ad_q);
+
+    // Start with valid = 1.0, multiply by per-joint validity
+    ADCG valid = ADCG(1.0);
+
+    for (const auto &jm : joint_mappings)
+    {
+        switch (jm.type)
+        {
+            case JointType::Bounded:
+            {
+                double lo = model.lowerPositionLimit[jm.idx_q];
+                double hi = model.upperPositionLimit[jm.idx_q];
+                ADCG q = ad_q[jm.idx_q];
+                ADCG above_lo = CppAD::CondExpGe(q, ADCG(lo), ADCG(1.0), ADCG(0.0));
+                ADCG below_hi = CppAD::CondExpLe(q, ADCG(hi), ADCG(1.0), ADCG(0.0));
+                valid *= above_lo * below_hi;
+                break;
+            }
+            case JointType::UnboundedRevolute:
+            case JointType::SO3:
+                // Always valid by construction
+                break;
+            case JointType::SE3:
+            {
+                for (int i = 0; i < 3; ++i)
+                {
+                    double lo = bounds->lower[i];
+                    double hi = bounds->upper[i];
+                    ADCG q = ad_q[jm.idx_q + i];
+                    ADCG above_lo = CppAD::CondExpGe(q, ADCG(lo), ADCG(1.0), ADCG(0.0));
+                    ADCG below_hi = CppAD::CondExpLe(q, ADCG(hi), ADCG(1.0), ADCG(0.0));
+                    valid *= above_lo * below_hi;
+                }
+                break;
+            }
+            case JointType::SE2:
+            {
+                for (int i = 0; i < 2; ++i)
+                {
+                    double lo = bounds->lower[i];
+                    double hi = bounds->upper[i];
+                    ADCG q = ad_q[jm.idx_q + i];
+                    ADCG above_lo = CppAD::CondExpGe(q, ADCG(lo), ADCG(1.0), ADCG(0.0));
+                    ADCG below_hi = CppAD::CondExpLe(q, ADCG(hi), ADCG(1.0), ADCG(0.0));
+                    valid *= above_lo * below_hi;
+                }
+                break;
+            }
+            default:
+                throw std::runtime_error("Unsupported joint type in trace_check_bounds");
+        }
+    }
+
+    ad_out[0] = valid;
+
+    ADFun<CGD> check_func(ad_q, ad_out);
+
+    CodeHandler<double> handler;
+    CppAD::vector<CGD> ind_vars(nq);
+    handler.makeVariables(ind_vars);
+
+    CppAD::vector<CGD> result = check_func.Forward(0, ind_vars);
+
+    LangCDefaultVariableNameGenerator<double> nameGen;
+    std::ostringstream function_code;
+
+    if (language == "c++")
+    {
+        LanguageCCustom<double> langC("double");
+        handler.generateCode(function_code, langC, result, nameGen);
+    }
+    else if (language == "rust")
+    {
+        LanguageRust<double> langRust("double");
+        handler.generateCode(function_code, langRust, result, nameGen);
+    }
+    else
+    {
+        throw std::runtime_error(fmt::format("unsupported language {}", language));
+    }
+
+    return Traced{function_code.str(), handler.getTemporaryVariableCount(), 1};
+}
+
+// Trace a function that interpolates between two configurations
+// Input: q0 (nq), q1 (nq), t (1) -> Output: q_interp (nq)
+auto trace_interpolate(const Model &model, const std::string &language) -> Traced
+{
+    auto nq = model.nq;
+    std::size_t n_input = 2 * nq + 1;  // q0, q1, t
+
+    // Cast model to AD scalar type for use with Pinocchio's interpolate
+    using ADModel = pinocchio::ModelTpl<ADCG>;
+    ADModel ad_model = model.cast<ADCG>();
+
+    ADVectorXs ad_input(n_input);
+    ADVectorXs ad_out(nq);
+
+    for (std::size_t i = 0U; i < n_input; ++i)
+    {
+        ad_input[i] = ADCG(0.0);
+    }
+
+    Independent(ad_input);
+
+    // Extract q0, q1, t from input
+    ADVectorXs ad_q0 = ad_input.head(nq);
+    ADVectorXs ad_q1 = ad_input.segment(nq, nq);
+    ADCG t = ad_input[2 * nq];
+
+    // Use Pinocchio's interpolate - handles all joint types via Lie group operations
+    pinocchio::interpolate(ad_model, ad_q0, ad_q1, t, ad_out);
+
+    ADFun<CGD> interp_func(ad_input, ad_out);
+
+    CodeHandler<double> handler;
+    CppAD::vector<CGD> ind_vars(n_input);
+    handler.makeVariables(ind_vars);
+
+    CppAD::vector<CGD> result = interp_func.Forward(0, ind_vars);
+
+    LangCDefaultVariableNameGenerator<double> nameGen;
+    std::ostringstream function_code;
+
+    if (language == "c++")
+    {
+        LanguageCCustom<double> langC("double");
+        handler.generateCode(function_code, langC, result, nameGen);
+    }
+    else if (language == "rust")
+    {
+        LanguageRust<double> langRust("double");
+        handler.generateCode(function_code, langRust, result, nameGen);
+    }
+    else
+    {
+        throw std::runtime_error(fmt::format("unsupported language {}", language));
+    }
+
+    return Traced{function_code.str(), handler.getTemporaryVariableCount(), static_cast<std::size_t>(nq)};
 }
 
 int main(int argc, char **argv)
@@ -898,26 +1104,26 @@ int main(int argc, char **argv)
         language = data["language"];
     }
 
-    // Parse freeflyer_bounds if provided
-    std::optional<FreeflyerBounds> freeflyer_bounds = std::nullopt;
-    if (data.contains("freeflyer_bounds"))
+    // Parse bounds if provided
+    std::optional<Bounds> bounds = std::nullopt;
+    if (data.contains("bounds"))
     {
-        FreeflyerBounds bounds;
-        auto &fb = data["freeflyer_bounds"];
-        if (!fb.contains("position_lower") || !fb.contains("position_upper"))
+        Bounds b;
+        auto &bd = data["bounds"];
+        if (!bd.contains("lower") || !bd.contains("upper"))
         {
             throw std::runtime_error(
-                "freeflyer_bounds must contain both 'position_lower' and 'position_upper' arrays");
+                "bounds must contain both 'lower' and 'upper' arrays");
         }
-        auto lower = fb["position_lower"].get<std::vector<double>>();
-        auto upper = fb["position_upper"].get<std::vector<double>>();
-        if (lower.size() != 3 || upper.size() != 3)
+        auto lower = bd["lower"].get<std::vector<double>>();
+        auto upper = bd["upper"].get<std::vector<double>>();
+        if (lower.size() < 2 || lower.size() > 3 || upper.size() < 2 || upper.size() > 3)
         {
-            throw std::runtime_error("freeflyer_bounds position arrays must have exactly 3 elements");
+            throw std::runtime_error("bounds arrays must have 2 or 3 elements");
         }
-        bounds.position_lower = Eigen::Vector3d(lower[0], lower[1], lower[2]);
-        bounds.position_upper = Eigen::Vector3d(upper[0], upper[1], upper[2]);
-        freeflyer_bounds = bounds;
+        b.lower = Eigen::Vector3d(lower[0], lower[1], lower.size() == 3 ? lower[2] : 0.0);
+        b.upper = Eigen::Vector3d(upper[0], upper[1], upper.size() == 3 ? upper[2] : 0.0);
+        bounds = b;
     }
 
     RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_name);
@@ -945,11 +1151,22 @@ int main(int argc, char **argv)
     data["ccfkee_code_output"] = traced_ccfkee_code.outputs;
 
     // Trace mapToConfiguration function
-    auto traced_mapconfig_code = trace_map_to_configuration(robot.model, language, freeflyer_bounds);
+    auto traced_mapconfig_code = trace_map_to_configuration(robot.model, language, bounds);
     data["mapconfig_code"] = traced_mapconfig_code.code;
     data["mapconfig_code_vars"] = traced_mapconfig_code.temp_variables;
     data["mapconfig_code_output"] = traced_mapconfig_code.outputs;
     data["n_u"] = get_randomness_dimension(robot.model);
+
+    // Trace checkBounds function
+    auto traced_checkbounds_code = trace_check_bounds(robot.model, language, bounds);
+    data["checkbounds_code"] = traced_checkbounds_code.code;
+    data["checkbounds_code_vars"] = traced_checkbounds_code.temp_variables;
+
+    // Trace interpolate function
+    auto traced_interpolate_code = trace_interpolate(robot.model, language);
+    data["interpolate_code"] = traced_interpolate_code.code;
+    data["interpolate_code_vars"] = traced_interpolate_code.temp_variables;
+    data["interpolate_code_output"] = traced_interpolate_code.outputs;
 
     inja::Environment env;
 
