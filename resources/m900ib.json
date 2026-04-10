@@ -1,0 +1,15 @@
+{
+    "name": "M900IB400L",
+    "urdf": "m900ib/spherized.urdf",
+    "srdf": "m900ib/m900ib400l.srdf",
+    "end_effector": "link_6",
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "mimics": [
+        {"name": "pjoint_1", "joint": "joint_3", "multiplier": -1.0, "offset": 0},
+        {"name": "balancer_left_joint", "joint": "joint_2", "multiplier": 0.18, "offset": 0},
+        {"name": "balancer_right_joint", "joint": "joint_2", "multiplier": 0.18, "offset": 0}
+    ],
+    "output": "m900ib400l.hh"
+}

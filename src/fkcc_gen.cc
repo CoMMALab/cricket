@@ -237,7 +237,7 @@ struct RobotInfo
             throw std::runtime_error(fmt::format("URDF file {} does not exist!", urdf_file.string()));
         }
 
-        pinocchio::urdf::buildModel(urdf_file, model);
+        pinocchio::urdf::buildModel(urdf_file, model, false, true);
         pinocchio::urdf::buildGeom(model, urdf_file, COLLISION, collision_model);
 
         if (srdf_file and not std::filesystem::exists(*srdf_file))
@@ -555,6 +555,15 @@ struct RobotInfo
         {
             collision_model.addCollisionPair(CollisionPair(pair.first, pair.second));
         }
+    }
+
+    auto add_mimic_joint(const std::string &name, const std::string &joint, double multiplier, double offset)
+        -> void
+    {
+        Model temp;
+        pinocchio::transformJointIntoMimic(
+            model, model.getJointId(joint), model.getJointId(name), multiplier, offset, temp);
+        model = temp;
     }
 
     Model model;
@@ -1070,10 +1079,6 @@ int main(int argc, char **argv)
         throw std::runtime_error(fmt::format("JSON file {} does not exist!", json_path.string()));
     }
 
-    if (not std::filesystem::exists(json_path))
-    {
-    }
-
     std::ifstream json_file(json_path);
     nlohmann::json data;
 
@@ -1127,6 +1132,15 @@ int main(int argc, char **argv)
     }
 
     RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_name);
+
+    if (data.contains("mimics"))
+    {
+        auto mimics = data["mimics"];
+        for (const auto &mimic : mimics)
+        {
+            robot.add_mimic_joint(mimic["name"], mimic["joint"], mimic["multiplier"], mimic["offset"]);
+        }
+    }
 
     data.update(robot.json());
 
