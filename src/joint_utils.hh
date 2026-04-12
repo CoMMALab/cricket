@@ -105,21 +105,18 @@ inline auto classify_joints(const pinocchio::Model &model)
     return {total_nu, mappings};
 }
 
-// Get the randomness dimension (nu) for a model
 inline auto get_randomness_dimension(const pinocchio::Model &model) -> std::size_t
 {
     auto [nu, _] = classify_joints(model);
     return nu;
 }
 
-// Maps [0,1] to bounded range: q = lower + u * (upper - lower)
 template <typename Scalar>
 auto map_bounded(Scalar u, double lower, double upper) -> Scalar
 {
     return Scalar(lower) + u * Scalar(upper - lower);
 }
 
-// Maps [0,1] to (cos, sin) for unbounded revolute
 template <typename Scalar>
 void map_unbounded_revolute(Scalar u, Scalar &cos_out, Scalar &sin_out)
 {
@@ -129,8 +126,6 @@ void map_unbounded_revolute(Scalar u, Scalar &cos_out, Scalar &sin_out)
     sin_out = sin(theta);
 }
 
-// Shoemake's algorithm for uniform quaternion sampling from 3 uniform [0,1] inputs
-// Returns quaternion as (x, y, z, w) - Pinocchio convention
 template <typename Scalar>
 void map_so3_shoemake(Scalar u1, Scalar u2, Scalar u3, Scalar &x, Scalar &y, Scalar &z, Scalar &w)
 {

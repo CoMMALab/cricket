@@ -1,9 +1,9 @@
 #pragma once
 
-#include "pinocchio_cppadcg.hh"
-#include "lang_cpp.hh"
-#include "lang_rust.hh"
-#include "lang_name_gen.hh"
+#include "codegen/pinocchio_cppadcg.hh"
+#include "codegen/lang_cpp.hh"
+#include "codegen/lang_rust.hh"
+#include "codegen/lang_name_gen.hh"
 
 #include <fmt/core.h>
 
