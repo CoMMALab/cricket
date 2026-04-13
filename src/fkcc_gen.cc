@@ -117,7 +117,7 @@ int main(int argc, char **argv)
         }
     }
 
-    data.update(robot.json());
+    data.update(robot.json(bounds));
 
     auto traced_eefk_code = trace_sphere_cc_fk(robot, language, false, false, true);
     data["eefk_code"] = traced_eefk_code.code;

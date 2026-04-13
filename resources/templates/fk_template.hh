@@ -17,6 +17,7 @@ struct {{name}}
     static constexpr float min_radius = {{min_radius}};
     static constexpr float max_radius = {{max_radius}};
     static constexpr std::size_t resolution = {{resolution}};
+    static constexpr bool euclidean = {{euclidean}};
 
     static constexpr std::array<std::string_view, dimension> joint_names = {"{{join(joint_names, "\", \"")}}"};
     static constexpr char* end_effector = "{{end_effector}}";
@@ -50,19 +51,25 @@ struct {{name}}
     inline static auto sample(const Sample &x_in) -> Configuration
     {
         std::array<FloatVector<rake, 1>, {{mapconfig_code_vars}}> v;
-        std::array<float, {{mapconfig_code_output}}> y;
+        ConfigurationBuffer y;
         const auto x = x_in.to_array();
         {{mapconfig_code}}
         return Configuration(y);
     }
 
-    inline static auto in_bounds(const Configuration &x_in) -> bool
+    static const ConfigurationBuffer lower{
+       {{join(lower, ", ")}}
+    };
+    
+    static const ConfigurationBuffer upper{
+        {{join(upper, ", ")}}
+    };
+
+    inline static auto in_bounds(const Configuration &x) -> bool
     {
-        std::array<float, {{checkbounds_code_vars}}> v;
-        std::array<float, 1> y;
-        const auto x = x_in.to_array();
-        {{checkbounds_code}}
-        return y[0] == 1.;
+        static const auto upper_v = Configuration(upper);
+        static const auto lower_v = Configuration(lower);
+        return (x <= upper_v).all() and (copy >= lower_v).all();
     }
 
     inline static auto interpolate(const Configuration &a, const Configuration &b, float t)

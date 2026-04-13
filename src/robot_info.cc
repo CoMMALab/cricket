@@ -1,4 +1,5 @@
 #include "robot_info.hh"
+#include "joint_utils.hh"
 
 #include <pinocchio/parsers/urdf.hpp>
 #include <pinocchio/parsers/srdf.hpp>
@@ -47,6 +48,64 @@ auto min_sphere_of_spheres(const std::vector<SphereInfo> &info) -> std::array<fl
     std::copy(ms.center_cartesian_begin(), ms.center_cartesian_end(), sphere.begin());
     sphere[3] = ms.radius();
     return sphere;
+}
+
+auto compute_bounds(
+    const pinocchio::Model &model,
+    const std::optional<Bounds> &bounds)
+    -> std::pair<Eigen::VectorXd, Eigen::VectorXd>
+{
+    Eigen::VectorXd lower = model.lowerPositionLimit;
+    Eigen::VectorXd upper = model.upperPositionLimit;
+
+    if (!bounds)
+    {
+        return {lower, upper};
+    }
+
+    auto [nu, joint_mappings] = classify_joints(model);
+
+    for (const auto &jm : joint_mappings)
+    {
+        switch (jm.type)
+        {
+            case JointType::SE3:
+                // Override x, y, z position bounds (first 3 DOFs)
+                for (int i = 0; i < 3; ++i)
+                {
+                    lower[jm.idx_q + i] = bounds->lower[i];
+                    upper[jm.idx_q + i] = bounds->upper[i];
+                }
+                break;
+            case JointType::SE2:
+                // Override x, y position bounds (first 2 DOFs)
+                for (int i = 0; i < 2; ++i)
+                {
+                    lower[jm.idx_q + i] = bounds->lower[i];
+                    upper[jm.idx_q + i] = bounds->upper[i];
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    return {lower, upper};
+}
+
+auto is_euclidean(const pinocchio::Model &model) -> bool
+{
+    auto [nu, joint_mappings] = classify_joints(model);
+
+    for (const auto &jm : joint_mappings)
+    {
+        if (jm.type != JointType::Bounded)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 }  // namespace
@@ -99,10 +158,9 @@ RobotInfo::RobotInfo(
     end_effector_index = model.getFrameId(end_effector_name);
 }
 
-auto RobotInfo::json() -> nlohmann::json
+auto RobotInfo::json(const std::optional<Bounds> &bounds) -> nlohmann::json
 {
-    const Eigen::VectorXd lower_bound = model.lowerPositionLimit;
-    const Eigen::VectorXd upper_bound = model.upperPositionLimit;
+    const auto [lower_bound, upper_bound] = compute_bounds(model, bounds);
     const Eigen::VectorXd bound_range = upper_bound - lower_bound;
 
     float measure = 1.0;
@@ -130,6 +188,7 @@ auto RobotInfo::json() -> nlohmann::json
     json["links_with_geometry"] = links_with_geometry;
     json["bounding_sphere_index"] = bounding_sphere_index;
     json["end_effector_collisions"] = get_frames_colliding_end_effector();
+    json["euclidean"] = is_euclidean(model);
 
     std::vector<std::string> link_names;
     for (auto i = 0U; i < model.frames.size(); ++i)

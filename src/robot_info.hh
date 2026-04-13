@@ -25,7 +25,7 @@ public:
         const std::optional<std::filesystem::path> &srdf_file,
         const std::optional<std::string> &end_effector);
 
-    auto json() -> nlohmann::json;
+    auto json(const std::optional<Bounds> &bounds = std::nullopt) -> nlohmann::json;
     auto dof_to_joint_names() -> std::vector<std::string>;
     auto get_frames_colliding_end_effector() -> std::vector<std::size_t>;
     auto add_mimic_joint(const std::string &name, const std::string &joint, double multiplier, double offset)
