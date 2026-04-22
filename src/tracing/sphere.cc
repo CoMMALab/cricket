@@ -74,9 +74,7 @@ auto trace_frame(std::size_t ee_index, const ADData &ad_data, ADVectorXs &data, 
     data[index + 11] = R(2, 2);
 }
 
-}  // namespace
-
-auto trace_sphere_cc_fk(
+auto trace_sphere_cc_fk_impl(
     const RobotInfo &info,
     const std::string &language,
     bool spheres,
@@ -216,6 +214,28 @@ auto trace_sphere_cc_fk(
         // Use default y[] output naming
         return Traced{generate_code(handler, result, language), handler.getTemporaryVariableCount(), n_out};
     }
+}
+
+}  // namespace
+
+auto trace_eefk(const RobotInfo &info, const std::string &language) -> Traced
+{
+    return trace_sphere_cc_fk_impl(info, language, false, false, true, false);
+}
+
+auto trace_sphere_fk(const RobotInfo &info, const std::string &language) -> Traced
+{
+    return trace_sphere_cc_fk_impl(info, language, true, false, false, true);
+}
+
+auto trace_ccfk(const RobotInfo &info, const std::string &language) -> Traced
+{
+    return trace_sphere_cc_fk_impl(info, language, true, true, false, false);
+}
+
+auto trace_ccfk_ee(const RobotInfo &info, const std::string &language) -> Traced
+{
+    return trace_sphere_cc_fk_impl(info, language, true, true, true, false);
 }
 
 }  // namespace cricket

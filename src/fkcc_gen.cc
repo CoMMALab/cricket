@@ -119,43 +119,43 @@ int main(int argc, char **argv)
 
     data.update(robot.json(bounds));
 
-    auto traced_eefk_code = trace_sphere_cc_fk(robot, language, false, false, true);
+    auto traced_eefk_code = trace_eefk(robot, language);
     data["eefk_code"] = traced_eefk_code.code;
     data["eefk_code_vars"] = traced_eefk_code.temp_variables;
     data["eefk_code_output"] = traced_eefk_code.outputs;
 
-    auto traced_spherefk_code = trace_sphere_cc_fk(robot, language, true, false, false, true);
+    auto traced_spherefk_code = trace_sphere_fk(robot, language);
     data["spherefk_code"] = traced_spherefk_code.code;
     data["spherefk_code_vars"] = traced_spherefk_code.temp_variables;
     data["spherefk_code_output"] = traced_spherefk_code.outputs;
 
-    auto traced_ccfk_code = trace_sphere_cc_fk(robot, language, true, true, false);
+    auto traced_ccfk_code = trace_ccfk(robot, language);
     data["ccfk_code"] = traced_ccfk_code.code;
     data["ccfk_code_vars"] = traced_ccfk_code.temp_variables;
     data["ccfk_code_output"] = traced_ccfk_code.outputs;
 
-    auto traced_ccfkee_code = trace_sphere_cc_fk(robot, language, true, true, true);
+    auto traced_ccfkee_code = trace_ccfk_ee(robot, language);
     data["ccfkee_code"] = traced_ccfkee_code.code;
     data["ccfkee_code_vars"] = traced_ccfkee_code.temp_variables;
     data["ccfkee_code_output"] = traced_ccfkee_code.outputs;
 
-    // Trace mapToConfiguration function
     auto traced_mapconfig_code = trace_map_to_configuration(robot.model, language, bounds);
     data["mapconfig_code"] = traced_mapconfig_code.code;
     data["mapconfig_code_vars"] = traced_mapconfig_code.temp_variables;
     data["mapconfig_code_output"] = traced_mapconfig_code.outputs;
     data["n_u"] = get_randomness_dimension(robot.model);
 
-    // Trace checkBounds function
-    auto traced_checkbounds_code = trace_check_bounds(robot.model, language, bounds);
-    data["checkbounds_code"] = traced_checkbounds_code.code;
-    data["checkbounds_code_vars"] = traced_checkbounds_code.temp_variables;
-
-    // Trace interpolate function
     auto traced_interpolate_code = trace_interpolate(robot.model, language);
     data["interpolate_code"] = traced_interpolate_code.code;
     data["interpolate_code_vars"] = traced_interpolate_code.temp_variables;
-    data["interpolate_code_output"] = traced_interpolate_code.outputs;
+
+    auto traced_interpolate_block_code = trace_interpolate_block(robot.model, language);
+    data["interpolate_block_code"] = traced_interpolate_block_code.code;
+    data["interpolate_block_code_vars"] = traced_interpolate_block_code.temp_variables;
+
+    auto traced_distance_code = trace_distance(robot.model, language);
+    data["distance_code"] = traced_distance_code.code;
+    data["distance_code_vars"] = traced_distance_code.temp_variables;
 
     inja::Environment env;
 

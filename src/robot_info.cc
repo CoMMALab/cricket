@@ -108,6 +108,43 @@ auto is_euclidean(const pinocchio::Model &model) -> bool
     return true;
 }
 
+auto joint_type_to_string(JointType type) -> std::string
+{
+    switch (type)
+    {
+        case JointType::Bounded:
+            return "LP";
+        case JointType::UnboundedRevolute:
+            return "SO2";
+        case JointType::SO3:
+            return "SO3";
+        case JointType::SE3:
+            return "SE3";
+        case JointType::SE2:
+            return "SE2";
+        default:
+            return "Unsupported";
+    }
+}
+
+auto generate_joint_topology(const pinocchio::Model &model) -> nlohmann::json
+{
+    auto [nu, joint_mappings] = classify_joints(model);
+
+    nlohmann::json topology = nlohmann::json::array();
+
+    for (const auto &jm : joint_mappings)
+    {
+        nlohmann::json joint_info;
+        joint_info["type"] = joint_type_to_string(jm.type);
+        joint_info["idx_q"] = jm.idx_q;
+        joint_info["nq"] = jm.nq;
+        topology.push_back(joint_info);
+    }
+
+    return topology;
+}
+
 }  // namespace
 
 RobotInfo::RobotInfo(
@@ -189,6 +226,7 @@ auto RobotInfo::json(const std::optional<Bounds> &bounds) -> nlohmann::json
     json["bounding_sphere_index"] = bounding_sphere_index;
     json["end_effector_collisions"] = get_frames_colliding_end_effector();
     json["euclidean"] = is_euclidean(model);
+    json["joint_topology"] = generate_joint_topology(model);
 
     std::vector<std::string> link_names;
     for (auto i = 0U; i < model.frames.size(); ++i)

@@ -10,9 +10,23 @@ namespace cricket
 // Describes a segment of variables with a common name
 struct VarSegment
 {
-    std::string name;   // Base name (e.g., "a", "out.x", "t")
-    std::size_t size;   // Number of variables in this segment
-    bool is_array;      // true = name[i], false = scalar (just "name")
+    std::string name;       // Base name (e.g., "a", "out.x", "t")
+    std::size_t size;       // Number of variables in this segment
+    bool is_array;          // true = indexed access, false = scalar (just "name")
+    std::string prefix;     // Custom prefix before index (default: "[")
+    std::string suffix;     // Custom suffix after index (default: "]")
+
+    // Default constructor for backward compatibility: name[i] syntax
+    VarSegment(std::string n, std::size_t s, bool arr)
+      : name(std::move(n)), size(s), is_array(arr), prefix("["), suffix("]")
+    {
+    }
+
+    // Custom prefix/suffix constructor for syntax like name.broadcast(i)
+    VarSegment(std::string n, std::size_t s, bool arr, std::string pre, std::string suf)
+      : name(std::move(n)), size(s), is_array(arr), prefix(std::move(pre)), suffix(std::move(suf))
+    {
+    }
 };
 
 template <class Base>
@@ -98,7 +112,7 @@ public:
             const auto &seg = _input_segments[seg_idx];
             if (seg.is_array)
             {
-                _ss << seg.name << "[" << local_idx << "]";
+                _ss << seg.name << seg.prefix << local_idx << seg.suffix;
             }
             else
             {
@@ -130,7 +144,7 @@ public:
             const auto &seg = _output_segments[seg_idx];
             if (seg.is_array)
             {
-                _ss << seg.name << "[" << local_idx << "]";
+                _ss << seg.name << seg.prefix << local_idx << seg.suffix;
             }
             else
             {

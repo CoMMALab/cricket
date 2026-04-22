@@ -6,7 +6,14 @@
 namespace cricket
 {
 
-auto trace_interpolate(const pinocchio::Model &model, const std::string &language) -> Traced
+namespace
+{
+
+auto trace_interpolate_impl(
+    const pinocchio::Model &model,
+    const std::string &language,
+    std::vector<VarSegment> input_segments,
+    std::vector<VarSegment> output_segments) -> Traced
 {
     auto nq = model.nq;
     std::size_t n_input = 2 * nq + 1;  // a, b, t
@@ -39,15 +46,32 @@ auto trace_interpolate(const pinocchio::Model &model, const std::string &languag
 
     CppAD::vector<CGD> result = interp_func.Forward(0, ind_vars);
 
-    // Use custom variable naming: a[0..nq-1], b[0..nq-1], t
-    SegmentedVariableNameGenerator<double> nameGen({
-        {"a", static_cast<std::size_t>(nq), true},
-        {"b", static_cast<std::size_t>(nq), true},
-        {"t", 1, false}
-    });
+    SegmentedVariableNameGenerator<double> nameGen(std::move(input_segments), std::move(output_segments));
 
     return Traced{generate_code(handler, result, language, nameGen), handler.getTemporaryVariableCount(),
                   static_cast<std::size_t>(nq)};
+}
+
+}  // namespace
+
+auto trace_interpolate(const pinocchio::Model &model, const std::string &language) -> Traced
+{
+    auto nq = static_cast<std::size_t>(model.nq);
+    return trace_interpolate_impl(
+        model,
+        language,
+        {{"a", nq, true}, {"b", nq, true}, {"t", 1, false}},
+        {});
+}
+
+auto trace_interpolate_block(const pinocchio::Model &model, const std::string &language) -> Traced
+{
+    auto nq = static_cast<std::size_t>(model.nq);
+    return trace_interpolate_impl(
+        model,
+        language,
+        {{"a", nq, true, ".broadcast(", ")"}, {"b", nq, true, ".broadcast(", ")"}, {"t", 1, false}},
+        {{"out", nq, true}});
 }
 
 }  // namespace cricket

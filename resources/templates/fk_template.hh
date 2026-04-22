@@ -18,6 +18,7 @@ struct {{name}}
     static constexpr float max_radius = {{max_radius}};
     static constexpr std::size_t resolution = {{resolution}};
     static constexpr bool euclidean = {{euclidean}};
+    static constexpr std::size_t n_joints = {{length(joint_topology)}};
 
     static constexpr std::array<std::string_view, dimension> joint_names = {"{{join(joint_names, "\", \"")}}"};
     static constexpr char* end_effector = "{{end_effector}}";
@@ -50,7 +51,7 @@ struct {{name}}
 
     inline static auto sample(const Sample &x_in) -> Configuration
     {
-        std::array<FloatVector<rake, 1>, {{mapconfig_code_vars}}> v;
+        {% if mapconfig_code_vars > 0 %}std::array<float, {{mapconfig_code_vars}}> v;{% endif %}
         ConfigurationBuffer y;
         const auto x = x_in.to_array();
         {{mapconfig_code}}
@@ -71,10 +72,44 @@ struct {{name}}
         static const auto lower_v = Configuration(lower);
         return (x <= upper_v).all() and (copy >= lower_v).all();
     }
-
-    inline static auto interpolate(const Configuration &a, const Configuration &b, float t)
+    
+    inline static auto distance(const Configuration &a_in, const Configuration &b_in) -> float
     {
+        {% if euclidean %}
+        return (b_in - a_in).l2_norm();
+        {% else %}
+        {% if distance_code_vars > 0 %}std::array<float, {{distance_code_vars}}> v;{% endif %}
+        std::array<float, 1> y;
+        const auto a = a_in.to_array();
+        const auto b = b_in.to_array();
+        {{distance_code}}
+        return y[0];
+        {% endif %}
+    }
+
+    inline static auto interpolate(const Configuration &a, const Configuration &b, float t) -> Configuration
+    {
+        {% if euclidean %}
+        return a_in + t * (b_in - a_in);
+        {% else %}
+        {% if interpolate_code_vars > 0 %}std::array<float, {{interpolate_code_vars}}> v;{% endif %}
+        const auto a = a_in.to_array();
+        const auto b = b_in.to_array();
+        ConfigurationBuffer y;
         {{interpolate_code}}
+        return Configuration(y);
+        {% endif %}
+    }
+
+    template <std::size_t rake>
+    inline static void interpolate_block(
+        const Configuration &a,
+        const Configuration &b,
+        const FloatVector<rake> &t,
+        ConfigurationBlock<rake> &out) noexcept
+    {
+        {% if interpolate_code_vars > 0 %}std::array<FloatVector<rake, 1>, {{interpolate_code_vars}}> v;{% endif %}
+        {{interpolate_block_code}}
     }
 
     template <std::size_t rake>

@@ -73,8 +73,8 @@ add_executable(fkcc_gen
     src/robot_info.cc
     src/tracing/sphere.cc
     src/tracing/mapping.cc
-    src/tracing/bounds.cc
     src/tracing/interpolate.cc
+    src/tracing/distance.cc
 )
 
 # Set include directories

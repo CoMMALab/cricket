@@ -11,24 +11,16 @@
 namespace cricket
 {
 
-auto trace_sphere_cc_fk(
-    const RobotInfo &info,
-    const std::string &language,
-    bool spheres = true,
-    bool bounding_spheres = true,
-    bool fk = true,
-    bool use_soa_output = false) -> Traced;
-
+auto trace_eefk(const RobotInfo &info, const std::string &language) -> Traced;
+auto trace_sphere_fk(const RobotInfo &info, const std::string &language) -> Traced;
+auto trace_ccfk(const RobotInfo &info, const std::string &language) -> Traced;
+auto trace_ccfk_ee(const RobotInfo &info, const std::string &language) -> Traced;
 auto trace_map_to_configuration(
     const pinocchio::Model &model,
     const std::string &language,
     const std::optional<Bounds> &bounds = std::nullopt) -> Traced;
-
-auto trace_check_bounds(
-    const pinocchio::Model &model,
-    const std::string &language,
-    const std::optional<Bounds> &bounds = std::nullopt) -> Traced;
-
 auto trace_interpolate(const pinocchio::Model &model, const std::string &language) -> Traced;
+auto trace_interpolate_block(const pinocchio::Model &model, const std::string &language) -> Traced;
+auto trace_distance(const pinocchio::Model &model, const std::string &language) -> Traced;
 
 }  // namespace cricket
