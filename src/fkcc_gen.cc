@@ -49,6 +49,14 @@ struct SphereInfo
     SE3 relative;
 };
 
+struct CoupledJoint
+{
+    std::size_t master_q_idx;  // index in full model q-space
+    std::size_t slave_q_idx;   // index in full model q-space
+    double multiplier;
+    double offset;
+};
+
 auto min_sphere_of_spheres(const std::vector<SphereInfo> &info) -> std::array<float, 4>
 {
     using K = CGAL::Exact_predicates_inexact_constructions_kernel;
@@ -125,23 +133,59 @@ struct RobotInfo
 
     auto json() -> nlohmann::json
     {
-        const Eigen::VectorXd lower_bound = model.lowerPositionLimit;
-        const Eigen::VectorXd upper_bound = model.upperPositionLimit;
-        const Eigen::VectorXd bound_range = upper_bound - lower_bound;
-        const Eigen::VectorXd bound_descale = bound_range.cwiseInverse();
+        auto vnq = virtual_nq();
+
+        // Compute bounds in virtual config space: skip coupled slaves and
+        // tighten master limits so the slave stays within its own limits.
+        std::vector<float> v_lower(vnq), v_range(vnq), v_descale(vnq);
+        std::size_t vi = 0;
+        for (std::size_t i = 0; i < static_cast<std::size_t>(model.nq); ++i)
+        {
+            if (is_slave(i))
+                continue;
+
+            double lo = model.lowerPositionLimit[i];
+            double hi = model.upperPositionLimit[i];
+
+            auto *mc = find_master_coupling(i);
+            if (mc)
+            {
+                double s_lo = model.lowerPositionLimit[mc->slave_q_idx];
+                double s_hi = model.upperPositionLimit[mc->slave_q_idx];
+                if (mc->multiplier > 0)
+                {
+                    lo = std::max(lo, (s_lo - mc->offset) / mc->multiplier);
+                    hi = std::min(hi, (s_hi - mc->offset) / mc->multiplier);
+                }
+                else
+                {
+                    lo = std::max(lo, (s_hi - mc->offset) / mc->multiplier);
+                    hi = std::min(hi, (s_lo - mc->offset) / mc->multiplier);
+                }
+            }
+
+            v_lower[vi] = static_cast<float>(lo);
+            v_range[vi] = static_cast<float>(hi - lo);
+            v_descale[vi] = static_cast<float>(1.0 / (hi - lo));
+            vi++;
+        }
+
+        double measure = 1.0;
+        for (std::size_t i = 0; i < vnq; ++i)
+            measure *= v_range[i];
 
         nlohmann::json json;
-        json["n_q"] = model.nq;
+        json["n_q"] = vnq;
         json["n_spheres"] = spheres.size();
-        json["bound_lower"] = std::vector<float>(lower_bound.data(), lower_bound.data() + model.nq);
-        json["bound_range"] = std::vector<float>(bound_range.data(), bound_range.data() + model.nq);
-        json["bound_descale"] = std::vector<float>(bound_descale.data(), bound_descale.data() + model.nq);
-        json["measure"] = bound_range.prod();
+        json["bound_lower"] = v_lower;
+        json["bound_range"] = v_range;
+        json["bound_descale"] = v_descale;
+        json["measure"] = measure;
         json["end_effector"] = end_effector_name;
         json["end_effector_index"] = end_effector_index;
         json["min_radius"] = min_radius;
         json["max_radius"] = max_radius;
-        json["joint_names"] = dof_to_joint_names();
+        json["joint_names"] = virtual_joint_names();
         json["allowed_link_pairs"] = allowed_link_pairs;
         json["per_link_spheres"] = per_link_spheres;
         json["links_with_geometry"] = links_with_geometry;
@@ -398,6 +442,87 @@ struct RobotInfo
         }
     }
 
+    // ── Coupled joint support ──────────────────────────────────────
+
+    auto parse_coupling(const nlohmann::json &coupling_json) -> void
+    {
+        for (const auto &entry : coupling_json)
+        {
+            std::string master_name = entry["master"];
+            std::string slave_name = entry["slave"];
+            double mult = entry["multiplier"];
+            double off = entry.value("offset", 0.0);
+
+            auto master_jid = model.getJointId(master_name);
+            auto slave_jid = model.getJointId(slave_name);
+
+            if (master_jid >= model.joints.size())
+                throw std::runtime_error("Unknown master joint: " + master_name);
+            if (slave_jid >= model.joints.size())
+                throw std::runtime_error("Unknown slave joint: " + slave_name);
+
+            CoupledJoint cj;
+            cj.master_q_idx = model.joints[master_jid].idx_q();
+            cj.slave_q_idx = model.joints[slave_jid].idx_q();
+            cj.multiplier = mult;
+            cj.offset = off;
+            coupled_joints.push_back(cj);
+        }
+    }
+
+    auto virtual_nq() const -> std::size_t
+    {
+        return static_cast<std::size_t>(model.nq) - coupled_joints.size();
+    }
+
+    auto is_slave(std::size_t q_idx) const -> bool
+    {
+        for (const auto &c : coupled_joints)
+            if (c.slave_q_idx == q_idx)
+                return true;
+        return false;
+    }
+
+    auto find_slave_coupling(std::size_t q_idx) const -> const CoupledJoint *
+    {
+        for (const auto &c : coupled_joints)
+            if (c.slave_q_idx == q_idx)
+                return &c;
+        return nullptr;
+    }
+
+    auto find_master_coupling(std::size_t q_idx) const -> const CoupledJoint *
+    {
+        for (const auto &c : coupled_joints)
+            if (c.master_q_idx == q_idx)
+                return &c;
+        return nullptr;
+    }
+
+    auto full_to_virtual(std::size_t full_idx) const -> std::size_t
+    {
+        std::size_t offset = 0;
+        for (const auto &c : coupled_joints)
+            if (c.slave_q_idx < full_idx)
+                offset++;
+        return full_idx - offset;
+    }
+
+    auto virtual_joint_names() -> std::vector<std::string>
+    {
+        auto names = dof_to_joint_names();
+        if (coupled_joints.empty())
+            return names;
+
+        std::vector<std::string> result;
+        for (std::size_t i = 0; i < static_cast<std::size_t>(model.nq); ++i)
+        {
+            if (!is_slave(i))
+                result.push_back(names[i]);
+        }
+        return result;
+    }
+
     Model model;
     GeometryModel collision_model;
     std::string end_effector_name;
@@ -411,6 +536,7 @@ struct RobotInfo
     std::vector<std::vector<std::size_t>> per_link_spheres;
     std::set<std::pair<std::size_t, std::size_t>> allowed_link_pairs;
     std::vector<std::size_t> bounding_sphere_index;
+    std::vector<CoupledJoint> coupled_joints;
 };
 
 auto trace_sphere(const SphereInfo &sphere, const ADData &ad_data, ADVectorXs &data, std::size_t index)
@@ -468,16 +594,36 @@ auto trace_sphere_cc_fk(
     bool fk = true) -> Traced
 {
     auto nq = info.model.nq;
+    auto vnq = info.virtual_nq();
     ADModel ad_model = info.model.cast<ADCG>();
     ADData ad_data(ad_model);
 
-    ADVectorXs ad_q(nq);
-    for (auto i = 0U; i < nq; ++i)
+    // Independent variables live in the virtual (reduced) config space.
+    ADVectorXs ad_virtual_q(vnq);
+    for (auto i = 0U; i < vnq; ++i)
     {
-        ad_q[i] = ADCG(0.0);
+        ad_virtual_q[i] = ADCG(0.0);
     }
 
-    Independent(ad_q);
+    Independent(ad_virtual_q);
+
+    // Map virtual config → full config, applying joint coupling.
+    ADVectorXs ad_q(nq);
+    std::size_t vi = 0;
+    for (std::size_t i = 0; i < static_cast<std::size_t>(nq); ++i)
+    {
+        auto *coupling = info.find_slave_coupling(i);
+        if (coupling)
+        {
+            auto master_vi = info.full_to_virtual(coupling->master_q_idx);
+            ad_q[i] = ADCG(coupling->multiplier) * ad_virtual_q[master_vi]
+                       + ADCG(coupling->offset);
+        }
+        else
+        {
+            ad_q[i] = ad_virtual_q[vi++];
+        }
+    }
 
     forwardKinematics(ad_model, ad_data, ad_q);
     updateFramePlacements(ad_model, ad_data);
@@ -516,11 +662,11 @@ auto trace_sphere_cc_fk(
         trace_frame(info.end_effector_index, ad_data, data, n_spheres_data + n_bounding_spheres_data);
     }
 
-    // Create the AD function
-    ADFun<CGD> collision_sphere_func(ad_q, data);
+    // Create the AD function (independent vars are in virtual config space)
+    ADFun<CGD> collision_sphere_func(ad_virtual_q, data);
 
     CodeHandler<double> handler;
-    CppAD::vector<CGD> ind_vars(nq);
+    CppAD::vector<CGD> ind_vars(vnq);
     handler.makeVariables(ind_vars);
 
     CppAD::vector<CGD> result = collision_sphere_func.Forward(0, ind_vars);
@@ -619,6 +765,11 @@ int main(int argc, char **argv)
     }
 
     RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_name);
+
+    if (data.contains("coupled_joints"))
+    {
+        robot.parse_coupling(data["coupled_joints"]);
+    }
 
     data.update(robot.json());
 
