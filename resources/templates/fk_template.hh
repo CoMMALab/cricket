@@ -234,6 +234,17 @@ struct {{name}}
 
         return to_isometry(y.data());
     }
+
+    template <typename InputVector>    
+    static inline auto parameterized_ik(const InputVector &x) noexcept
+    {
+        std::array<float, {{param_ik_code_vars}}> v;
+        std::array<float, {{param_ik_code_output}}> y;
+
+        {{param_ik_code}}
+
+    }
+
 };
 }
 

@@ -22,13 +22,13 @@ using std::max;
 using std::min;
 using std::sin;
 
-template <typename T>
-Eigen::Matrix4<T> ComputeDHMatrix(const T &ti, double ai, double di)
+template <typename T, typename U>
+Eigen::Matrix4<T> ComputeDHMatrix(const T &ti, U ai, U di)
 {
     T ct = cos(ti);
     T st = sin(ti);
-    double ca = std::cos(ai);
-    double sa = std::sin(ai);
+    U ca = cos(ai);
+    U sa = sin(ai);
 
     Eigen::Matrix4<T> mat;
     mat << ct, -st * ca, st * sa, 0, st, ct * ca, -ct * sa, 0, 0, sa, ca, di, 0, 0, 0, 1;
@@ -39,20 +39,29 @@ template <typename T>
 Eigen::Matrix3<T> CrossProductMatrix(const Eigen::Matrix<T, 3, 1> &a)
 {
     Eigen::Matrix3<T> A;
-    // A << 0, -a(2), a(1), a(2), 0, -a(0), -a(1), a(0), 0;
+    A << (T)0, -a(2), a(1), a(2), (T)0, -a(0), -a(1), a(0), (T)0;
+    // A(0, 0) = 0;
+    // A(0, 1) = -a(2);
+    // A(0, 2) = a(1);
+    // A(1, 0) = a(2);
+    // A(1, 1) = 0;
+    // A(1, 2) = -a(0);
+    // A(2, 0) = -a(1);
+    // A(2, 1) = a(0);
+    // A(2, 2) = 0;
     return A;
 }
 
-template <typename T>
-T ScalarClip(const T &val, double a, double b)
+template <typename T, typename U>
+T ScalarClip(const T &val, U a, U b)
 {
     return std::max(static_cast<T>(a), std::min(static_cast<T>(b), val));
 }
 
-template <typename T>
-T SafeArccos(const T &val, double a, double b)
+template <typename T, typename U>
+T SafeArccos(const T &val, U a, U b)
 {
-    return acos(ScalarClip(val, a, b));
+    return acos(ScalarClip<T,U>(val, a, b));
 }
 
 template <typename T>
@@ -61,7 +70,9 @@ auto IiwaBimanualParameterization(
     bool compute_gradient = false
 )
 {
-    const size_t num_inp = 8 + 1 + 1 + 1 + 4 + 1;
+
+    std::cout << "Generating parameterized IK code for iiwa..." << std::endl;
+    const size_t num_inp = 8 + 1 + 1 + 1 + 1;
 
     ADVectorXs ad_inp(num_inp);  // 3 4x4 matrices
     for (auto i = 0U; i < num_inp; ++i)
@@ -70,10 +81,16 @@ auto IiwaBimanualParameterization(
     }
     // now distribute the input values into different variables
     ADVectorXs q_and_psi = ad_inp.segment(0, 8);
-    const ADCG shoulder_up = CondExpGt(q_and_psi[8], ADCG(0.5), ADCG(1.0), ADCG(-1.0));
-    const ADCG elbow_up = CondExpGt(q_and_psi[9], ADCG(0.5), ADCG(1.0), ADCG(-1.0));
-    const ADCG wrist_up = CondExpGt(q_and_psi[10], ADCG(0.5), ADCG(1.0), ADCG(-1.0));
-    ADCG grasp_distance = q_and_psi[11];
+    const auto shoulder_up = CondExpGt(ad_inp[8], ADCG(0.5), ADCG(1.0), ADCG(-1.0));
+    const auto elbow_up = CondExpGt(ad_inp[9], ADCG(0.5), ADCG(1.0), ADCG(-1.0));
+    const auto wrist_up = CondExpGt(ad_inp[10], ADCG(0.5), ADCG(1.0), ADCG(-1.0));
+    const ADCG grasp_distance = ad_inp[11];
+
+    const auto GC2 = shoulder_up;
+    const auto GC4 = elbow_up;
+    const auto GC6 = wrist_up;
+
+    std::cout << "Copied all inputs into AD variables." << std::endl;
 
     // it is assumed that q_and_psi is of size (8)
 
@@ -89,18 +106,33 @@ auto IiwaBimanualParameterization(
     q_full.head(7) = q_controlled;
 
     // iiwa kinematic parameters.
-    Eigen::VectorXd iiwa_alpha(7);
-    iiwa_alpha << -M_PI_2, M_PI_2, M_PI_2, -M_PI_2, -M_PI_2, M_PI_2, 0.0;
-    Eigen::VectorXd iiwa_d(7);
-    iiwa_d << 0.36, 0.0, 0.42, 0.0, 0.4, 0.0, 0.126 - 0.045;
+    Eigen::VectorX<T> iiwa_alpha(7);
+    iiwa_alpha(0) = -M_PI_2;
+    iiwa_alpha(1) = M_PI_2;
+    iiwa_alpha(2) = M_PI_2;
+    iiwa_alpha(3) = -M_PI_2;
+    iiwa_alpha(4) = -M_PI_2;
+    iiwa_alpha(5) = M_PI_2;
+    iiwa_alpha(6) = 0.0;
+    // iiwa_alpha << -M_PI_2, M_PI_2, M_PI_2, -M_PI_2, -M_PI_2, M_PI_2, 0.0;
+    Eigen::VectorX<T> iiwa_d(7);
+    iiwa_d(0) = 0.36;
+    iiwa_d(1) = 0.0;
+    iiwa_d(2) = 0.42;
+    iiwa_d(3) = 0.0;
+    iiwa_d(4) = 0.4;
+    iiwa_d(5) = 0.0;
+    iiwa_d(6) = 0.126 - 0.045;
 
     const T d_bs = iiwa_d[0];
     const T d_se = iiwa_d[2];
     const T d_ew = iiwa_d[4];
     const T d_wf = iiwa_d[6];
 
+    std::cout << "Defined kinematic parameters." << std::endl;
+
     const Eigen::Vector3d base_translation(0, -0.765, 0);
-    const T clip = 1.0 - 1e-4;
+    const T clip = (T) (1.0 - 1e-4);
 
     // Forward kinematics.
     Eigen::Matrix4<T> tf_goal = ComputeDHMatrix(q_controlled[0], iiwa_alpha[0], iiwa_d[0]);
@@ -109,36 +141,51 @@ auto IiwaBimanualParameterization(
         tf_goal = tf_goal * ComputeDHMatrix(q_controlled[i], iiwa_alpha[i], iiwa_d[i]);
     }
 
+    std::cout << "Computed the goal matrix." << std::endl;
+
     // Adjust for grasp distance, etc.
     // const T ang = (180.0 - 2.0 * 68.0) * M_PI / 180.0;
-    const T c = cos(ang);
-    const T s = sin(ang);
+    const T c = cos((T)ang);
+    const T s = sin((T)ang);
 
     Eigen::Matrix3<T> R1;
-    R1 << -1, 0, 0, 0, 1, 0, 0, 0, -1;
+    R1(0) = -1; R1(1) = 0; R1(2) = 0;
+    R1(3) = 0; R1(4) = 1; R1(5) = 0;
+    R1(6) = 0; R1(7) = 0; R1(8) = -1;
+    // R1 << -1, 0, 0, 0, 1, 0, 0, 0, -1;
 
     Eigen::Matrix3<T> R2;
-    R2 << c, -s, 0, s, c, 0, 0, 0, 1;
+    R2(0) = c; R2(1) = -s; R2(2) = 0;
+    R2(3) = s; R2(4) = c; R2(5) = 0;
+    R2(6) = 0; R2(7) = 0; R2(8) = 1;
+    // R2 << c, -s, 0, s, c, 0, 0, 0, 1;
 
     Eigen::Matrix3<T> R3;
-    R3 << -1, 0, 0, 0, -1, 0, 0, 0, 1;
+    R3(0) = -1; R3(1) = 0; R3(2) = 0;
+    R3(3) = 0; R3(4) = -1; R3(5) = 0;
+    R3(6) = 0; R3(7) = 0; R3(8) = 1;
+    // R3 << -1, 0, 0, 0, -1, 0, 0, 0, 1;
 
     tf_goal.template block<3, 3>(0, 0) = tf_goal.template block<3, 3>(0, 0) * R1 * R2 * R3;
 
+    Eigen::Matrix<T, 3, 1> grasp_distance_vec((T)0, (T)0, -grasp_distance);
+
     tf_goal.template block<3, 1>(0, 3) +=
-        tf_goal.template block<3, 3>(0, 0) * Eigen::Matrix<T, 3, 1>(0.0, 0.0, -grasp_distance);
+        tf_goal.template block<3, 3>(0, 0) * grasp_distance_vec;
 
     tf_goal.template block<3, 1>(0, 3) += base_translation.cast<T>();
+
+    std::cout << "Adjusted the goal matrix for grasp distance and base translation." << std::endl;
 
     // if (unclipped_vals != nullptr) {
     //   unclipped_vals->resize(4);
     // }
 
-    // Do the IK!!!!
-    Eigen::Matrix<T, 3, 1> p_02(0.0, 0.0, d_bs);
-    Eigen::Matrix<T, 3, 1> p_24(0.0, d_se, 0.0);
-    Eigen::Matrix<T, 3, 1> p_46(0.0, 0.0, d_ew);
-    Eigen::Matrix<T, 3, 1> p_67(0.0, 0.0, d_wf);
+    // // Do the IK!!!!
+    Eigen::Matrix<T, 3, 1> p_02((T)0.0, (T)0.0, (T)d_bs);
+    Eigen::Matrix<T, 3, 1> p_24((T)0.0, (T)d_se, (T)0.0);
+    Eigen::Matrix<T, 3, 1> p_46((T)0.0, (T)0.0, (T)d_ew);
+    Eigen::Matrix<T, 3, 1> p_67((T)0.0, (T)0.0, (T)d_wf);
 
     Eigen::Matrix<T, 3, 1> p_07 = tf_goal.template block<3, 1>(0, 3);
     Eigen::Matrix3<T> R_07 = tf_goal.template block<3, 3>(0, 0);
@@ -173,12 +220,16 @@ auto IiwaBimanualParameterization(
     T theta_4v = GC4 * SafeArccos(arccos_in, -clip, clip);
     q_subordinate[3] = theta_4v;
 
+    std::cout << "Computed the first 4 joint angles using the analytical IK solution." << std::endl;
+
     // Build list of transforms T_01, T_12, T_23 using Ts[0], Ts[1], Ts[2] and
     // theta_[0:3]
     std::vector<Eigen::Matrix4<T>> T_vs;
     T_vs.push_back(ComputeDHMatrix(theta_1v, iiwa_alpha(0), iiwa_d(0)));
     T_vs.push_back(ComputeDHMatrix(theta_2v, iiwa_alpha(1), iiwa_d(1)));
     T_vs.push_back(ComputeDHMatrix(theta_3v, iiwa_alpha(2), iiwa_d(2)));
+
+    std::cout << "Constructed the first three transformation matrices." << std::endl;
 
     Eigen::Matrix4<T> T_03_v = T_vs[0] * T_vs[1] * T_vs[2];
     Eigen::Matrix3<T> R_03_v = T_03_v.template block<3, 3>(0, 0);
@@ -188,6 +239,8 @@ auto IiwaBimanualParameterization(
     Eigen::Matrix3<T> A_s = cprod_p_26 * R_03_v;
     Eigen::Matrix3<T> B_s = -cprod_p_26 * cprod_p_26 * R_03_v;
     Eigen::Matrix3<T> C_s = p_26_hat * p_26_hat.transpose() * R_03_v;
+
+    std::cout << "Computed the A_s, B_s, C_s matrices for the spherical wrist IK solution." << std::endl;
 
     // EQ (17)-(19)
     q_subordinate(0) = atan2(
@@ -227,32 +280,42 @@ auto IiwaBimanualParameterization(
         GC6 * (A_w(2, 1) * sin(psi) + B_w(2, 1) * cos(psi) + C_w(2, 1)),
         GC6 * (-A_w(2, 0) * sin(psi) - B_w(2, 0) * cos(psi) - C_w(2, 0)));
 
+    std::cout << "Computed the last 3 joint angles using the spherical wrist IK solution." << std::endl;
+
     q_full.tail(7) = q_subordinate;
     // return q_full;
-
-    ADVectorXs data(14);
-    for (int i = 0; i < 14; ++i)
+    const size_t n_out = 14;
+    ADVectorXs data(n_out);
+    for (int i = 0; i < n_out; ++i)
     {
         data[i] = q_full[i];
     }
 
+    std::cout << "Copied the output joint angles into AD variables." << std::endl;
+
     ADFun<CGD> iiwa_param_func(ad_inp, data);
+    std::cout << "Created the ADFun object for the parameterized IK." << std::endl;
     CodeHandler<double> handler;
     CppAD::vector<CGD> ind_vars(num_inp);
+
+    std::cout << "Going to make the AD function for the parameterized IK." << std::endl;
     handler.makeVariables(ind_vars);
 
+    std::cout << "Created the AD function for the parameterized IK." << std::endl;
+
     CppAD::vector<CGD> result = iiwa_param_func.Forward(0, ind_vars);
+    std::cout << "Ran the AD function." << std::endl;
 
 
     if (compute_gradient)
     {
       // this is the full jacobian
-      CppAD::vector<CGD> jac = iiwa_param_func.Jacobian(ind_vars);
-      CppAD::vector<CGD> jac_e_q(n_out * nq);  // this is jacobian with respect to joint configs only.
+      CppAD::vector<CGD> jac_e_q = iiwa_param_func.Jacobian(ind_vars);
+    //   CppAD::vector<CGD> jac_e_q(n_out * nq);  // this is jacobian with respect to joint configs only.
 
-      for (auto i = 0U; i < n_out; i++)
-          for (auto j = 0U; j < nq; j++)
-              jac_e_q[i * nq + j] = jac[i * num_inp + j];
+    //   for (auto i = 0U; i < n_out; i++)
+    //       for (auto j = 0U; j < nq; j++)
+    //           jac_e_q[i * nq + j] = jac[i * num_inp + j];
 
       std::move(jac_e_q.begin(), jac_e_q.end(), std::back_inserter(result));              
     }
@@ -276,7 +339,7 @@ auto IiwaBimanualParameterization(
         throw std::runtime_error(fmt::format("unsupported language {}", language));
     }
 
-
+    std::cout << "Generated the parameterized IK code." << std::endl;
     return Traced{function_code.str(), handler.getTemporaryVariableCount(), result.size()};    
 
 }

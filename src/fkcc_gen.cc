@@ -236,10 +236,14 @@ int main(int argc, char **argv)
     data["ccfkee_code_vars"] = traced_ccfkee_code.temp_variables;
     data["ccfkee_code_output"] = traced_ccfkee_code.outputs;
 
-    auto traced_iiwa_param_code = IiwaBimanualParameterization<ADCG>(language, false);
-    data["iiwa_param_code"] = traced_iiwa_param_code.code;
-    data["iiwa_param_code_vars"] = traced_iiwa_param_code.temp_variables;
-    data["iiwa_param_code_output"] = traced_iiwa_param_code.outputs;
+    if (data.contains("generate_param_ik") && data["generate_param_ik"].get<bool>())
+    {
+        auto traced_iiwa_param_code = IiwaBimanualParameterization<ADCG>(language, false);
+        data["param_ik_code"] = traced_iiwa_param_code.code;
+        data["param_ik_code_vars"] = traced_iiwa_param_code.temp_variables;
+        data["param_ik_code_output"] = traced_iiwa_param_code.outputs;
+    }
+
 
     inja::Environment env;
 

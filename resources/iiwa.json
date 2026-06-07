@@ -1,0 +1,10 @@
+{
+    "name": "Iiwa",
+    "urdf": "kuka_iiwa/spherized_kuka.urdf",
+    "end_effectors": ["lbr_iiwa_link_ee_kuka"],
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "iiwa_fk.hh",
+    "generate_param_ik" : true
+}
