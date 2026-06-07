@@ -11,6 +11,7 @@
 #include "robot_info.hh"
 #include "housekeeping.hh"
 #include "tracer_utils.hh"
+#include "iiwa_parameterization.hh"
 
 
 auto trace_sphere(const SphereInfo &sphere, const ADData &ad_data, ADVectorXs &data, std::size_t index)
@@ -234,6 +235,11 @@ int main(int argc, char **argv)
     data["ccfkee_code"] = traced_ccfkee_code.code;
     data["ccfkee_code_vars"] = traced_ccfkee_code.temp_variables;
     data["ccfkee_code_output"] = traced_ccfkee_code.outputs;
+
+    auto traced_iiwa_param_code = IiwaBimanualParameterization<ADCG>(language, false);
+    data["iiwa_param_code"] = traced_iiwa_param_code.code;
+    data["iiwa_param_code_vars"] = traced_iiwa_param_code.temp_variables;
+    data["iiwa_param_code_output"] = traced_iiwa_param_code.outputs;
 
     inja::Environment env;
 
