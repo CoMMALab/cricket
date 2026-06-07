@@ -68,11 +68,17 @@ list(APPEND cppadcg_INCLUDE_DIRS
 
 # Create the executable
 add_executable(fkcc_gen src/fkcc_gen.cc)
+add_executable(spat_out_iiwa_ik src/spat_out_iiwa_ik.cc)
 
 # Set include directories
 target_include_directories(fkcc_gen PRIVATE
     ${cppad_INCLUDE_DIRS}
     ${cppadcg_INCLUDE_DIRS}
+)
+
+target_include_directories(spat_out_iiwa_ik PRIVATE
+  ${cppad_INCLUDE_DIRS}
+  ${cppadcg_INCLUDE_DIRS}
 )
 
 # Link libraries
@@ -86,6 +92,10 @@ target_link_libraries(fkcc_gen
     fmt::fmt
     cxxopts::cxxopts
 )
+
+  target_link_libraries(spat_out_iiwa_ik
+    Eigen3::Eigen
+  )
 
 # Add compiler definitions
 target_compile_definitions(fkcc_gen PRIVATE
