@@ -1,0 +1,11 @@
+moveit_setup_assistant_config:
+  URDF:
+    package: ""
+    relative_path: /src/robot_models/bimanual_iiwa/bimanual_iiwa_spherized.urdf
+    xacro_args: ""
+  SRDF:
+    relative_path: config/bimanual_iiwa.srdf
+  CONFIG:
+    author_name: siyer
+    author_email: iyer270@purdue.edu
+    generated_timestamp: 1781401042

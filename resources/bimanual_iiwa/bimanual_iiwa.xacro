@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="bimanual_iiwa">
+
+  <!--
+    This XACRO composes a bimanual IIWA setup based on the YAML directives.
+    It places two iiwa arms (left at origin, right translated in Y by 0.765m)
+    and creates attach frames for the WSG grippers. Table and mug rack are ignored.
+
+    Notes:
+    - This file expects the IIWA and WSG model files to be available in a
+      package named `bimanual` at the same paths used in the YAML.
+    - Depending on how the included URDF/SDF files are authored you may need
+      to adapt prefixes or the included filenames (some URDFs are xacro-ready,
+      some are plain URDF). This xacro attempts a simple, namespaced composition.
+  -->
+
+  <xacro:property name="right_y" value="0.765"/>
+
+  <!-- Paths (use relative paths since not running inside a ROS package) -->
+  <xacro:property name="iiwa_urdf" value="iiwa14_convex_decimated_collision.urdf"/>
+  <xacro:property name="wsg_sdf" value="wsg_finray/wsg50_110_finray_fingers_box_collision.urdf"/>
+
+  <!-- Macro to spawn an IIWA instance and attach a simplified gripper frame -->
+  <xacro:macro name="spawn_iiwa" params="prefix x y z">
+    <!-- include the IIWA model; many URDFs/xacros will insert their contents here -->
+    <group ns="${prefix}">
+      <xacro:include filename="${iiwa_urdf}"/>
+    </group>
+
+    <!-- weld the robot base to the world at the requested pose -->
+    <joint name="${prefix}_weld" type="fixed">
+      <parent link="world"/>
+      <child link="${prefix}::base"/>
+      <origin xyz="${x} ${y} ${z}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- create an attach frame at the end effector for a gripper -->
+    <link name="${prefix}::wsg_attach"/>
+    <joint name="${prefix}_wsg_attach_weld" type="fixed">
+      <parent link="${prefix}::iiwa_link_7"/>
+      <child link="${prefix}_wsg::body"/>
+      <!-- translation 0,0,0.09 and rotation RPY(90deg,0,68deg) from YAML -->
+      <origin xyz="0 0 0.09" rpy="1.57079632679 0 1.18682389152"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- Spawn left and right arms -->
+  <xacro:spawn_iiwa prefix="iiwa_left" x="0" y="0" z="0"/>
+  <xacro:spawn_iiwa prefix="iiwa_right" x="0" y="${right_y}" z="0"/>
+
+  <!-- Include the WSG gripper models under simple namespaces (may need adaptation) -->
+  <group ns="iiwa_left_wsg">
+    <xacro:include filename="${wsg_sdf}"/>
+  </group>
+  <group ns="iiwa_right_wsg">
+    <xacro:include filename="${wsg_sdf}"/>
+  </group>
+
+</robot>

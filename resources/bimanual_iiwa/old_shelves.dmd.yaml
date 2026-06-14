@@ -1,0 +1,91 @@
+# Model directive for planar iiwa with simple collision and welded gripper
+
+directives:
+
+# Add iiwa_left
+- add_model:
+    name: iiwa_left
+    file: package://bimanual/models/iiwa14_convex_decimated_collision.urdf
+
+- add_weld:
+    parent: world
+    child: iiwa_left::base
+
+# Add schunk_left
+- add_model:
+    name: wsg_left
+    file: package://bimanual/models/wsg_finray/wsg50_110_finray_fingers_box_collision.sdf
+
+- add_frame:
+    name: iiwa_left::wsg_attach
+    X_PF:
+      base_frame: iiwa_left::iiwa_link_7
+      translation: [0, 0, 0.09]
+      rotation: !Rpy { deg: [90.0, 0.0, 68.0 ]}
+
+- add_weld:
+    parent: iiwa_left::wsg_attach
+    child: wsg_left::body
+
+# Add iiwa_right
+- add_model:
+    name: iiwa_right
+    file: package://bimanual/models/iiwa14_convex_decimated_collision.urdf
+
+- add_frame:
+    name: iiwa_right_origin
+    X_PF:
+      base_frame: world
+      translation: [0, 0.765, 0]
+
+- add_weld:
+    parent: iiwa_right_origin
+    child: iiwa_right::base
+
+# Add schunk_right
+- add_model:
+    name: wsg_right
+    file: package://bimanual/models/wsg_finray/wsg50_110_finray_fingers_box_collision.sdf
+
+- add_frame:
+    name: iiwa_right::wsg_attach
+    X_PF:
+      base_frame: iiwa_right::iiwa_link_7
+      translation: [0, 0, 0.09]
+      rotation: !Rpy { deg: [90.0, 0.0, 68.0 ]}
+
+- add_weld:
+    parent: iiwa_right::wsg_attach
+    child: wsg_right::body
+
+# Add table
+- add_model:
+    name: table
+    file: package://bimanual/models/old_table/table_wide.sdf
+
+- add_frame:
+    name: table_origin
+    X_PF:
+      base_frame: world
+      translation: [0.4, 0.3825, 0.0]
+      rotation: !Rpy { deg: [0., 0., 0.]}
+
+- add_weld:
+    parent: table_origin
+    child: table::table_body
+
+# Mug Rack
+- add_model:
+    name: old_shelves
+    file: package://bimanual/models/old_shelves.sdf
+
+- add_frame:
+    name: shelves_origin
+    X_PF:
+        base_frame: table_origin
+        translation: [0.4, 0, 0.0]
+        rotation: !Rpy { deg: [0, 0, 0]}
+
+- add_weld:
+    parent: shelves_origin
+    child: old_shelves::base

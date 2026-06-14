@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<robot name="wsg50_110_finray">
+
+  <!-- Converted from SDF: simplified URDF version readable by xacro includes -->
+
+  <link name="body">
+    <inertial>
+      <mass value="0.988882"/>
+      <inertia ixx="0.162992" ixy="0.0" ixz="0.0" iyy="0.162992" iyz="0.0" izz="0.164814"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 -0.049133 0" rpy="0 0 0"/>
+      <geometry>
+        <!-- no body mesh available locally; use a box approximate visual -->
+        <box size="0.146 0.0725 0.05"/>
+      </geometry>
+      <material name="gray">
+        <color rgba="0.6 0.6 0.6 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 -0.049133 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.146 0.0725 0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="left_finger">
+    <inertial>
+      <mass value="0.05"/>
+      <inertia ixx="0.16" ixy="0.0" ixz="0.0" iyy="0.16" iyz="0.0" izz="0.16"/>
+    </inertial>
+    <visual>
+      <origin xyz="-0.05 0.014 -0.013" rpy="1.57079632679 3.14159265359 0"/>
+      <geometry>
+        <mesh filename="meshes/one_piece_wide_grasp_finray_finger.obj" scale="1 1 1"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.05 0.014 -0.013" rpy="1.57079632679 3.14159265359 0"/>
+      <geometry>
+        <mesh filename="meshes/one_piece_wide_grasp_finray_finger.obj" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="right_finger">
+    <inertial>
+      <mass value="0.05"/>
+      <inertia ixx="0.16" ixy="0.0" ixz="0.0" iyy="0.16" iyz="0.0" izz="0.16"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.05 0.014 0.013" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <mesh filename="meshes/one_piece_wide_grasp_finray_finger.obj" scale="1 1 1"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.05 0.014 0.013" rpy="1.57079632679 0 0"/>
+      <geometry>
+        <mesh filename="meshes/one_piece_wide_grasp_finray_finger.obj" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="left_finger_sliding_joint" type="fixed">
+    <parent link="body"/>
+    <child link="left_finger"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="right_finger_sliding_joint" type="fixed">
+    <parent link="body"/>
+    <child link="right_finger"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+</robot>

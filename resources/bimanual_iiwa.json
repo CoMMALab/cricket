@@ -1,8 +1,8 @@
 {
     "name": "BimanualIiwa",
-    "urdf": "kuka_iiwa/bimanual_spherized_iiwa.urdf",
-    "srdf": "kuka_iiwa/bimanual_iiwa.srdf",
-    "end_effector": "left_lbr_iiwa_link_7",
+    "urdf": "bimanual_iiwa/bimanual_iiwa_spherized.urdf",
+    "srdf": "bimanual_iiwa/bimanual_iiwa.srdf",
+    "end_effector": "iiwa_left_iiwa_link_ee_kuka",
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],

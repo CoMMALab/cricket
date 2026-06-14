@@ -11,7 +11,7 @@
 #include "robot_info.hh"
 #include "housekeeping.hh"
 #include "tracer_utils.hh"
-#include "iiwa_parameterization.hh"
+#include "iiwa_parameterization_gen.hh"
 
 
 auto trace_sphere(const SphereInfo &sphere, const ADData &ad_data, ADVectorXs &data, std::size_t index)
@@ -238,7 +238,7 @@ int main(int argc, char **argv)
 
     if (data.contains("generate_param_ik") && data["generate_param_ik"].get<bool>())
     {
-        auto traced_iiwa_param_code = IiwaBimanualParameterization<ADCG>(language, false);
+        auto traced_iiwa_param_code = IiwaBimanualParameterizationCG<ADCG>(language, false);
         data["param_ik_code"] = traced_iiwa_param_code.code;
         data["param_ik_code_vars"] = traced_iiwa_param_code.temp_variables;
         data["param_ik_code_output"] = traced_iiwa_param_code.outputs;

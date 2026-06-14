@@ -1,0 +1,107 @@
+directives:
+
+- add_model:
+    name: metal_table
+    file: package://bimanual/models/metal_table.sdf
+- add_weld:
+    parent: world
+    child: metal_table::body
+    X_PC:
+      translation: [0, 0, 0]
+      rotation: !Rpy { deg: [0, 0, 0]}
+
+- add_model:
+    name: iiwa_right
+    file: package://bimanual/models/iiwa14_convex_decimated_collision.urdf
+    default_joint_positions:
+      iiwa_joint_1: [0]
+      iiwa_joint_2: [-0.4]
+      iiwa_joint_3: [0]
+      iiwa_joint_4: [-1.8]
+      iiwa_joint_5: [0]
+      iiwa_joint_6: [1.7]
+      iiwa_joint_7: [0.4]
+- add_weld:
+    parent: metal_table::body
+    child: iiwa_right::iiwa_link_0
+    X_PC:
+        translation: [0, -0.3825, 0]
+        rotation: !Rpy { deg: [0, 0, 0]}
+
+- add_model:
+    name: iiwa_left
+    file: package://bimanual/models/iiwa14_convex_decimated_collision.urdf
+    default_joint_positions:
+      iiwa_joint_1: [0]
+      iiwa_joint_2: [-0.4]
+      iiwa_joint_3: [0]
+      iiwa_joint_4: [-1.8]
+      iiwa_joint_5: [0]
+      iiwa_joint_6: [1.7]
+      iiwa_joint_7: [0.4]
+- add_weld:
+    parent: metal_table::body
+    child: iiwa_left::iiwa_link_0
+    X_PC:
+        translation: [0, 0.3825, 0]
+        rotation: !Rpy { deg: [0, 0, 0]}
+
+- add_model:
+    name: wsg_left
+    file: package://bimanual/models/wsg_finray/wsg50_110_finray_fingers_box_collision.sdf
+- add_weld:
+    parent: iiwa_left::iiwa_link_7
+    child: wsg_left::body
+    X_PC:
+        translation: [0, 0, 0.09]
+        rotation: !Rpy { deg: [90, 0, 68]}
+
+- add_model:
+    name: wsg_right
+    file: package://bimanual/models/wsg_finray/wsg50_110_finray_fingers_box_collision.sdf
+- add_weld:
+    parent: iiwa_right::iiwa_link_7
+    child: wsg_right::body
+    X_PC:
+        translation: [0, 0, 0.09]
+        rotation: !Rpy { deg: [90, 0, 68]}
+
+- add_model:
+    name: wooden_table
+    file: package://bimanual/models/wooden_table.sdf
+- add_weld:
+    parent: metal_table::body
+    child: wooden_table::body
+    X_PC:
+        translation: [0.64, 0, 0]
+        rotation: !Rpy { deg: [0, 0, 0]}
+
+- add_model:
+    name: shelves
+    file: package://bimanual/models/shelves/shelves.sdf
+- add_weld:
+    parent: metal_table::body
+    child: shelves::body
+    X_PC:
+        translation: [-.69, 0, -0.72]
+        rotation: !Rpy { deg: [0, 0, 0]}
+
+- add_model:
+    name: left_wall
+    file: package://bimanual/models/wall.sdf
+- add_weld:
+    parent: world
+    child: left_wall::body
+    X_PC:
+        translation: [0, 1, 0]
+        rotation: !Rpy { deg: [90, 0, 0]}
+
+- add_model:
+    name: right_wall
+    file: package://bimanual/models/wall.sdf
+- add_weld:
+    parent: world
+    child: right_wall::body
+    X_PC:
+        translation: [0, -1, 0]
+        rotation: !Rpy { deg: [90, 0, 0]}

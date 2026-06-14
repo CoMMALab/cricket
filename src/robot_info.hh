@@ -115,17 +115,32 @@ struct RobotInfo
 
     auto json() -> nlohmann::json
     {
-        const Eigen::VectorXd lower_bound = model.lowerPositionLimit;
-        const Eigen::VectorXd upper_bound = model.upperPositionLimit;
+        // const Eigen::VectorXd lower_bound = model.lowerPositionLimit;
+        // const Eigen::VectorXd upper_bound = model.upperPositionLimit;
+        // const Eigen::VectorXd bound_range = upper_bound - lower_bound;
+        // const Eigen::VectorXd bound_descale = bound_range.cwiseInverse();
+
+        const size_t sampling_dimension = model.nq / 2 + 1;
+        Eigen::VectorXd lower_bound(sampling_dimension);
+        Eigen::VectorXd upper_bound(sampling_dimension);
+
+
+        // fill the first model.nq/2 dimensions of lower bound 
+        // with model.lowerPositionLimit and similarly upper bound
+
+        lower_bound.head(model.nq / 2) = model.lowerPositionLimit.head(model.nq / 2); lower_bound(model.nq / 2) = 0.0;
+        upper_bound.head(model.nq / 2) = model.upperPositionLimit.head(model.nq / 2); upper_bound(model.nq / 2) = 2.0 * M_PI;
+
         const Eigen::VectorXd bound_range = upper_bound - lower_bound;
         const Eigen::VectorXd bound_descale = bound_range.cwiseInverse();
 
         nlohmann::json json;
-        json["n_q"] = model.nq;
+        json["n_q"] = sampling_dimension;
+        json["ambient_nq"] = model.nq;
         json["n_spheres"] = spheres.size();
-        json["bound_lower"] = std::vector<float>(lower_bound.data(), lower_bound.data() + model.nq);
-        json["bound_range"] = std::vector<float>(bound_range.data(), bound_range.data() + model.nq);
-        json["bound_descale"] = std::vector<float>(bound_descale.data(), bound_descale.data() + model.nq);
+        json["bound_lower"] = std::vector<float>(lower_bound.data(), lower_bound.data() + sampling_dimension);
+        json["bound_range"] = std::vector<float>(bound_range.data(), bound_range.data() + sampling_dimension);
+        json["bound_descale"] = std::vector<float>(bound_descale.data(), bound_descale.data() + sampling_dimension);
         json["measure"] = bound_range.prod();
         json["end_effector"] = end_effector_name;
         json["end_effector_index"] = end_effector_index;

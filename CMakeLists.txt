@@ -69,6 +69,8 @@ list(APPEND cppadcg_INCLUDE_DIRS
 # Create the executable
 add_executable(fkcc_gen src/fkcc_gen.cc)
 add_executable(spat_out_iiwa_ik src/spat_out_iiwa_ik.cc)
+add_executable(iiwa_ik_test src/iiwa_ik_test.cc)
+add_executable(og_drake_ik src/og_drake_ik.cc)
 
 # Set include directories
 target_include_directories(fkcc_gen PRIVATE
@@ -80,6 +82,17 @@ target_include_directories(spat_out_iiwa_ik PRIVATE
   ${cppad_INCLUDE_DIRS}
   ${cppadcg_INCLUDE_DIRS}
 )
+
+target_include_directories(iiwa_ik_test PRIVATE
+  ${cppad_INCLUDE_DIRS}
+  ${cppadcg_INCLUDE_DIRS}
+)
+
+target_include_directories(og_drake_ik PRIVATE
+  ${cppad_INCLUDE_DIRS}
+  ${cppadcg_INCLUDE_DIRS}
+)
+
 
 # Link libraries
 target_link_libraries(fkcc_gen
@@ -97,7 +110,15 @@ target_link_libraries(fkcc_gen
     Eigen3::Eigen
   )
 
-# Add compiler definitions
+  target_link_libraries(iiwa_ik_test
+    Eigen3::Eigen
+  )
+
+  target_link_libraries(og_drake_ik
+    Eigen3::Eigen  
+  )
+
+  # Add compiler definitions
 target_compile_definitions(fkcc_gen PRIVATE
     ${pinocchio_CFLAGS_OTHER}
 )

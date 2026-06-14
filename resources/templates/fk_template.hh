@@ -17,7 +17,10 @@ struct {{name}}
     static constexpr float max_radius = {{max_radius}};
     static constexpr std::size_t resolution = {{resolution}};
 
-    static constexpr std::array<std::string_view, dimension> joint_names = {"{{join(joint_names, "\", \"")}}"};
+    static constexpr std::size_t ambient_dimension = {{ambient_nq}};
+
+
+    static constexpr std::array<std::string_view, ambient_dimension> joint_names = {"{{join(joint_names, "\", \"")}}"};
     static constexpr char* end_effector = "{{end_effector}}";
 
     using Configuration = FloatVector<dimension>;
@@ -30,6 +33,9 @@ struct {{name}}
 
     template <std::size_t rake>
     using ConfigurationBlock = FloatVector<rake, dimension>;
+
+    template <std::size_t rake>
+    using AmbientConfigurationBlock = FloatVector<rake, ambient_dimension>;
 
     template <std::size_t rake>
     struct Spheres
@@ -84,7 +90,7 @@ struct {{name}}
     }
 
     template <std::size_t rake>
-    static inline void sphere_fk(const ConfigurationBlock<rake> &x, Spheres<rake> &out) noexcept
+    static inline void sphere_fk(const AmbientConfigurationBlock<rake> &x, Spheres<rake> &out) noexcept
     {
         std::array<FloatVector<rake, 1>, {{spherefk_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{spherefk_code_output}}> y;
@@ -105,7 +111,7 @@ struct {{name}}
     template <std::size_t rake>
         static inline auto fkcc_debug(
             const vamp::collision::Environment<FloatVector<rake>> &environment,
-            const ConfigurationBlock<rake> &x) noexcept -> Debug
+            const AmbientConfigurationBlock<rake> &x) noexcept -> Debug
     {
         std::array<FloatVector<rake, 1>, {{ccfk_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{ccfk_code_output}}> y;
@@ -159,7 +165,7 @@ struct {{name}}
     template <std::size_t rake>
         static inline bool fkcc(
             const vamp::collision::Environment<FloatVector<rake>> &environment,
-            const ConfigurationBlock<rake> &x) noexcept
+            const AmbientConfigurationBlock<rake> &x) noexcept
     {
         std::array<FloatVector<rake, 1>, {{ccfk_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{ccfk_code_output}}> y;
@@ -173,7 +179,7 @@ struct {{name}}
     template <std::size_t rake>
     static inline bool fkcc_attach(
         const vamp::collision::Environment<FloatVector<rake>> &environment,
-        const ConfigurationBlock<rake> &x) noexcept
+        const AmbientConfigurationBlock<rake> &x) noexcept
     {
         std::array<FloatVector<rake, 1>, {{ccfkee_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{ccfkee_code_output}}> y;
@@ -235,15 +241,45 @@ struct {{name}}
         return to_isometry(y.data());
     }
 
-    template <typename InputVector>    
-    static inline auto parameterized_ik(const InputVector &x) noexcept
+    template <typename InputVector, std::size_t rake>
+    static inline auto parameterized_ik(const InputVector &x) noexcept -> std::pair<bool, AmbientConfigurationBlock<rake>>
     {
+        // We expect x to be of size dimension + some addition parameters to specify the self-motion manifold.
+        FloatVector<rake, {{param_ik_code_vars}}> v;
+        FloatVector<rake, {{param_ik_code_output}}> y;
+
+        {{param_ik_code}}
+
+        // Check if y are within joint limits
+        {% for index in range(n_q - 1) %}
+        if ((y[{{index + n_q - 1}}] < {{ at(bound_lower, index) }}).any() || (y[{{index}}] > {{ at(bound_lower, index) }} + {{ at(bound_range, index) }}).any())
+        {
+            return {false, y};
+        }
+        {% endfor %}
+
+        return {true, y};
+    }
+
+    static inline auto parameterized_ik(const std::array<float, {{n_q + 4}}> &x) noexcept -> std::pair<bool, std::array<float, {{param_ik_code_output}}>>
+    {
+        // We expect x to be of size dimension + some addition parameters to specify the self-motion manifold.
         std::array<float, {{param_ik_code_vars}}> v;
         std::array<float, {{param_ik_code_output}}> y;
 
         {{param_ik_code}}
 
+        // Check if y are within joint limits
+        {% for index in range(n_q - 1) %}
+        if ((y[{{index + n_q - 1}}] < {{ at(bound_lower, index) }}) || (y[{{index}}] > {{ at(bound_lower, index) }} + {{ at(bound_range, index) }}))
+        {
+            return {false, y};
+        }
+        {% endfor %}
+
+        return {true, y};
     }
+
 
 };
 }

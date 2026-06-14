@@ -1,0 +1,87 @@
+<?xml version="1.0"?>
+<sdf version="1.7">
+  <model name="shelves">
+    <link name="body">
+        <collision name="shelf_1">
+            <pose>0.000 0.000 0.055 0 0 0</pose>
+            <geometry>
+                <box>
+                    <size>0.610 1.520 0.050</size>
+                </box>
+            </geometry>
+        </collision>
+        <collision name="shelf_2">
+            <pose>0.000 0.000 0.487 0 0 0</pose>
+            <geometry>
+                <box>
+                    <size>0.610 1.520 0.050</size>
+                </box>
+            </geometry>
+        </collision>
+        <collision name="shelf_3">
+            <pose>0.000 0.000 0.847 0 0 0</pose>
+            <geometry>
+                <box>
+                    <size>0.610 1.520 0.050</size>
+                </box>
+            </geometry>
+        </collision>
+        <collision name="shelf_4">
+            <pose>0.000 0.000 1.319 0 0 0</pose>
+            <geometry>
+                <box>
+                    <size>0.610 1.520 0.050</size>
+                </box>
+            </geometry>
+        </collision>
+        <collision name="shelf_5">
+            <pose>0.000 0.000 1.791 0 0 0</pose>
+            <geometry>
+                <box>
+                    <size>0.610 1.520 0.050</size>
+                </box>
+            </geometry>
+        </collision>
+        <collision name="edge_1">
+            <pose>0.305 0.760 0.950 0 0 0</pose>
+            <geometry>
+                <box>
+                    <size>0.030 0.030 1.900</size>
+                </box>
+            </geometry>
+        </collision>
+        <collision name="edge_2">
+            <pose>0.305 -0.760 0.950 0 0 0</pose>
+            <geometry>
+                <box>
+                    <size>0.030 0.030 1.900</size>
+                </box>
+            </geometry>
+        </collision>
+        <collision name="edge_3">
+            <pose>-0.305 0.760 0.950 0 0 0</pose>
+            <geometry>
+                <box>
+                    <size>0.030 0.030 1.900</size>
+                </box>
+            </geometry>
+        </collision>
+        <collision name="edge_4">
+            <pose>-0.305 -0.760 0.950 0 0 0</pose>
+            <geometry>
+                <box>
+                    <size>0.030 0.030 1.900</size>
+                </box>
+            </geometry>
+        </collision>
+        <visual name="shelves_visual">
+            <pose>-0.0 0.0 0.0 1.57 0.0 0.0</pose>
+            <geometry>
+                <mesh>
+                    <uri>package://bimanual/models/shelves/IiwaShelvesUpdated.obj</uri>
+                </mesh>
+            </geometry>
+        </visual>
+    </link>
+  </model>
+</sdf>

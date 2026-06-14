@@ -1,12 +1,4 @@
-// TODO (siyer) -- ask tommy
-// 1. URDF of the iiwa along with end effector
-// 2. Why not sample
-
 #pragma once
-
-#include "housekeeping.hh"
-#include "robot_info.hh"
-#include "tracer_utils.hh"
 
 #include <Eigen/Dense>
 #include <algorithm>
@@ -15,12 +7,15 @@
 // define a macro constant for ang
 #define ang ((180.0 - 2.0 * 68.0) * M_PI / 180.0)
 
-// Using declarations (optional, but clearer)
-// using std::atan2;
-// using std::cos;
-// using std::max;
-// using std::min;
-// using std::sin;
+double CondExpGe(double x, double y, double true_val, double false_val)
+{
+    return (x >= y) ? true_val : false_val;
+}
+double CondExpLe(double x, double y, double true_val, double false_val)
+{
+    return (x <= y) ? true_val : false_val;
+}
+
 
 template <typename T>
 Eigen::Matrix4<T> ComputeDHMatrix(const T &ti, T ai, T di)
@@ -40,15 +35,6 @@ Eigen::Matrix3<T> CrossProductMatrix(const Eigen::Matrix<T, 3, 1> &a)
 {
     Eigen::Matrix3<T> A;
     A << (T)0, -a(2), a(1), a(2), (T)0, -a(0), -a(1), a(0), (T)0;
-    // A(0, 0) = 0;
-    // A(0, 1) = -a(2);
-    // A(0, 2) = a(1);
-    // A(1, 0) = a(2);
-    // A(1, 1) = 0;
-    // A(1, 2) = -a(0);
-    // A(2, 0) = -a(1);
-    // A(2, 1) = a(0);
-    // A(2, 2) = 0;
     return A;
 }
 
@@ -69,29 +55,16 @@ T SafeArccos(const T &val, U a, U b)
     return acos(ScalarClip<T,U>(val, a, b));
 }
 
-template <typename T>
+template <typename T, typename InputVector>
 auto IiwaBimanualParameterization(
-    const std::string &language,
-    bool compute_gradient = false
-)
-{
-
-    std::cout << "Generating parameterized IK code for iiwa..." << std::endl;
-    const size_t num_inp = 8 + 1 + 1 + 1 + 1;
-
-    ADVectorXs ad_inp(num_inp);  // 3 4x4 matrices
-    for (auto i = 0U; i < num_inp; ++i)
-    {
-        ad_inp[i] = ADCG(0.0001);
-    }
-    Independent(ad_inp);
-    
+    InputVector &ad_inp
+) {
     // now distribute the input values into different variables
-    ADVectorXs q_and_psi = ad_inp.segment(0, 8);
+    auto q_and_psi = ad_inp.segment(0, 8);
     // const auto shoulder_up = CondExpGt(ad_inp[8], 0.5, ADCG(1.0), ADCG(-1.0));
     // const auto elbow_up = CondExpGt(ad_inp[9], 0.5, ADCG(1.0), ADCG(-1.0));
     // const auto wrist_up = CondExpGt(ad_inp[10], 0.5, ADCG(1.0), ADCG(-1.0));
-    const ADCG grasp_distance = ad_inp[11];
+    const T grasp_distance = ad_inp[11];
 
     // It is
     const auto GC2 = ad_inp[8];
@@ -140,30 +113,21 @@ auto IiwaBimanualParameterization(
     {
         tf_goal = tf_goal * ComputeDHMatrix(q_controlled[i], iiwa_alpha[i], iiwa_d[i]);
     }
-    // std::cout << "T_02: " << std::endl << tf_goal << std::endl;
 
     // Adjust for grasp distance, etc.
     // const T ang = static_cast<T> ((180.0 - 2.0 * 68.0) * M_PI / 180.0);
     const T c = cos((T)ang);
     const T s = sin((T)ang);
 
+    const T one = static_cast<T>(1);
+    const T zero = static_cast<T>(0);
+
     Eigen::Matrix3<T> R1;
-    R1(0) = -1; R1(1) = 0; R1(2) = 0;
-    R1(3) = 0; R1(4) = 1; R1(5) = 0;
-    R1(6) = 0; R1(7) = 0; R1(8) = -1;
-    // R1 << -1, 0, 0, 0, 1, 0, 0, 0, -1;
-
+    R1 << -one, zero, zero, zero, one, zero, zero, zero, -one;
     Eigen::Matrix3<T> R2;
-    R2(0) = c; R2(1) = -s; R2(2) = 0;
-    R2(3) = s; R2(4) = c; R2(5) = 0;
-    R2(6) = 0; R2(7) = 0; R2(8) = 1;
-    // R2 << c, -s, 0, s, c, 0, 0, 0, 1;
-
+    R2 << c, -s, zero, s, c, zero, zero, zero, one;
     Eigen::Matrix3<T> R3;
-    R3(0) = -1; R3(1) = 0; R3(2) = 0;
-    R3(3) = 0; R3(4) = -1; R3(5) = 0;
-    R3(6) = 0; R3(7) = 0; R3(8) = 1;
-    // R3 << -1, 0, 0, 0, -1, 0, 0, 0, 1;
+    R3 << -one, zero, zero, zero, -one, zero, zero, zero, one;
 
     tf_goal.template block<3, 3>(0, 0) = tf_goal.template block<3, 3>(0, 0) * R1 * R2 * R3;
 
@@ -174,13 +138,11 @@ auto IiwaBimanualParameterization(
 
     tf_goal.template block<3, 1>(0, 3) += base_translation.cast<T>();
 
-    // std::cout << "goal is : " << tf_goal << std::endl;
+    // if (unclipped_vals != nullptr) {
+    //   unclipped_vals->resize(4);
+    // }
 
-    // // if (unclipped_vals != nullptr) {
-    // //   unclipped_vals->resize(4);
-    // // }
-
-    // // // Do the IK!!!!
+    // Do the IK!!!!
     Eigen::Matrix<T, 3, 1> p_02((T)0.0, (T)0.0, (T)d_bs);
     Eigen::Matrix<T, 3, 1> p_24((T)0.0, (T)d_se, (T)0.0);
     Eigen::Matrix<T, 3, 1> p_46((T)0.0, (T)0.0, (T)d_ew);
@@ -275,79 +237,5 @@ auto IiwaBimanualParameterization(
         GC6 * (-A_w(2, 0) * sin(psi) - B_w(2, 0) * cos(psi) - C_w(2, 0)));
 
     q_full.tail(7) = q_subordinate;
-    std::cout << "q_full: " << q_full.transpose() << std::endl;
-    // return q_full;
-    const size_t n_out = 14;
-    ADVectorXs data(n_out);
-    for (int i = 0; i < n_out; ++i)
-    {
-        data[i] = q_full[i];
-    }
-
-    std::cout << "Copied to data." << std::endl;
-    ADFun<CGD> iiwa_param_func(ad_inp, data);
-    std::cout << "Created the AD function." << std::endl;
-    CodeHandler<double> handler;
-    CppAD::vector<CGD> ind_vars(num_inp);
-
-    handler.makeVariables(ind_vars);
-
-
-    CppAD::vector<CGD> result = iiwa_param_func.Forward(0, ind_vars);
-    std::cout << "Ran the AD function." << std::endl;
-
-
-    if (compute_gradient)
-    {
-      // this is the full jacobian
-      CppAD::vector<CGD> jac_e_q = iiwa_param_func.Jacobian(ind_vars);
-    //   CppAD::vector<CGD> jac_e_q(n_out * nq);  // this is jacobian with respect to joint configs only.
-
-    //   for (auto i = 0U; i < n_out; i++)
-    //       for (auto j = 0U; j < nq; j++)
-    //           jac_e_q[i * nq + j] = jac[i * num_inp + j];
-
-      std::move(jac_e_q.begin(), jac_e_q.end(), std::back_inserter(result));              
-    }
-
-    LangCDefaultVariableNameGenerator<double> nameGen;
-
-    std::ostringstream function_code;
-
-    if (language == "c++")
-    {
-        LanguageCCustom<double> langC("double");
-        handler.generateCode(function_code, langC, result, nameGen);
-    }
-    else if (language == "rust")
-    {
-        LanguageRust<double> langRust("double");
-        handler.generateCode(function_code, langRust, result, nameGen);
-    }
-    else
-    {
-        throw std::runtime_error(fmt::format("unsupported language {}", language));
-    }
-
-    std::cout << "Generated the parameterized IK code." << std::endl;
-    return Traced{function_code.str(), handler.getTemporaryVariableCount(), result.size()};    
-
+    return q_full;
 }
-
-// template <typename T>
-// Eigen::VectorX<T> IiwaBimanualParameterization(
-//     const Eigen::VectorX<T> &q_and_psi,
-//     const bool shoulder_up,
-//     const bool elbow_up,
-//     const bool wrist_up,
-//     std::nullptr_t,
-//     const double grasp_distance)
-// {
-//     return IiwaBimanualParameterization(
-//         q_and_psi,
-//         shoulder_up,
-//         elbow_up,
-//         wrist_up,
-//         static_cast<Eigen::VectorX<T> *>(nullptr),
-//         grasp_distance);
-// }
