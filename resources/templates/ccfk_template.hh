@@ -1,4 +1,5 @@
-{% for i in range(length(links_with_geometry)) %}
+{% for rev_i in range(length(links_with_geometry)) %}
+    {% set i = length(links_with_geometry) - 1 - rev_i %}
 {% set array_index = length(links_with_geometry) - i - 1 %}
 {% set link_index = at(links_with_geometry, array_index) %}
 {% set link_spheres = at(per_link_spheres, link_index) %}
@@ -34,7 +35,8 @@ if (sphere_environment_in_collision(environment,
 // robot self-collisions
 //
 
-{% for i in range(length(allowed_link_pairs)) %}
+{% for rev_i in range(length(allowed_link_pairs)) %}
+{% set i = length(allowed_link_pairs) - 1 - rev_i %}
 {% set pair = at(allowed_link_pairs, i) %}
 {% set link_1_index = at(pair, 0) %}
 {% set link_2_index = at(pair, 1) %}
