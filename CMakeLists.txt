@@ -119,7 +119,10 @@ target_include_directories(cricket
 
 target_link_libraries(cricket
     PUBLIC
-        pinocchio::pinocchio
+        # Only the pinocchio subtargets we actually use, the *_parallel targets bring in OpenMP
+        pinocchio::pinocchio_default
+        pinocchio::pinocchio_parsers
+        pinocchio::pinocchio_collision
         Eigen3::Eigen
         nlohmann_json::nlohmann_json
         CGAL::CGAL
@@ -134,7 +137,7 @@ target_compile_definitions(cricket PUBLIC
     ${pinocchio_CFLAGS_OTHER}
 )
 
-# CGAL's breaks under -ffast-math, remove these flags
+# CGAL breaks under -ffast-math, remove these flags
 target_compile_options(cricket PRIVATE
     -fno-fast-math
     -frounding-math
