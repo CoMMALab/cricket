@@ -187,7 +187,7 @@ struct {{name}}
         //
         // attachment vs. environment collisions
         //
-        if (attachment_environment_collision(environment))
+        if (attachment_environment_collision(environment)) [[unlikely]]
         {
             return false;
         }
@@ -206,7 +206,7 @@ struct {{name}}
                                                         y[{{(n_spheres + link_bs) * 4 + 0}}],
                                                         y[{{(n_spheres + link_bs) * 4 + 1}}],
                                                         y[{{(n_spheres + link_bs) * 4 + 2}}],
-                                                        y[{{(n_spheres + link_bs) * 4 + 3}}]))
+                                                        y[{{(n_spheres + link_bs) * 4 + 3}}])) [[unlikely]]
         {
             {% for j in range(length(link_spheres)) %}
             {% set sphere_index = at(link_spheres, j) %}
@@ -214,7 +214,7 @@ struct {{name}}
                                                             y[{{sphere_index * 4 + 0}}],
                                                             y[{{sphere_index * 4 + 1}}],
                                                             y[{{sphere_index * 4 + 2}}],
-                                                            y[{{sphere_index * 4 + 3}}]))
+                                                            y[{{sphere_index * 4 + 3}}])) [[unlikely]]
             {
                 return false;
             }
