@@ -145,6 +145,14 @@ target_compile_definitions(cricket PUBLIC
     ${pinocchio_CFLAGS_OTHER}
 )
 
+# Expose the vendored inja header for downstream packages (i.e., VAMP)
+add_library(cricket_inja INTERFACE)
+add_library(cricket::inja ALIAS cricket_inja)
+target_include_directories(cricket_inja INTERFACE
+    $<BUILD_INTERFACE:${_cricket_inja_include}>
+    $<INSTALL_INTERFACE:${_cricket_install_include_iface}>
+)
+
 add_executable(fkcc_gen src/fkcc_gen.cc)
 
 target_link_libraries(fkcc_gen
@@ -238,6 +246,10 @@ install(DIRECTORY include/cricket/ DESTINATION ${_cricket_include_dest}/cricket)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/generated/cricket/embedded_templates.hh
         DESTINATION ${_cricket_include_dest}/cricket)
 install(DIRECTORY resources/        DESTINATION ${_cricket_resources_dest})
+
+install(DIRECTORY third_party/inja/include/inja
+        DESTINATION ${_cricket_include_dest})
+install(TARGETS cricket_inja EXPORT cricketTargets)
 
 include(CMakePackageConfigHelpers)
 configure_package_config_file(
