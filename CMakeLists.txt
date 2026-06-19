@@ -3,18 +3,18 @@ project(cricket
   LANGUAGES CXX
 )
 
-# Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-# Set CMake Policies
 set(CMAKE_POLICY_DEFAULT_CMP0167 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0175 OLD)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
+
+option(CRICKET_BUILD_JIT    "Build the JIT runtime" ON)
+option(CRICKET_BUILD_PYTHON "Build the cricket Python extension" OFF)
 
 # Download and setup CPM
 if(NOT DEFINED ENV{CPM_SOURCE_CACHE})
@@ -36,14 +36,8 @@ find_package(CGAL REQUIRED)
 find_package(fmt REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
-find_package(inja QUIET)
-if(NOT inja_FOUND)
-  CPMAddPackage(
-    NAME inja
-    GITHUB_REPOSITORY pantor/inja
-    GIT_TAG v3.4.0
-  )
-endif()
+set(_cricket_inja_include
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/inja/include")
 
 CPMAddPackage(
   NAME cxxopts
@@ -94,11 +88,19 @@ list(APPEND cppadcg_INCLUDE_DIRS
   "${cppadcg_SOURCE_DIR}/include"
   "${cppadcg_BINARY_DIR}/include")
 
-option(CRICKET_BUILD_JIT "Build the JIT runtime" ON)
 if(CRICKET_BUILD_JIT)
   find_package(LLVM REQUIRED CONFIG)
   find_package(Clang REQUIRED CONFIG)
 endif()
+
+# Load FK templates into embedded strings
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/resources/templates/fk_template.hh"   CRICKET_FK_TEMPLATE)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/resources/templates/ccfk_template.hh" CRICKET_CCFK_TEMPLATE)
+configure_file(
+    include/cricket/embedded_templates.hh.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/cricket/embedded_templates.hh
+    @ONLY
+)
 
 add_library(cricket
     src/robot_info.cc
@@ -107,10 +109,17 @@ add_library(cricket
 add_library(cricket::cricket ALIAS cricket)
 set_target_properties(cricket PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+if(CRICKET_BUILD_PYTHON)
+  set(_cricket_install_include_iface "cricket/include")
+else()
+  set(_cricket_install_include_iface "${CMAKE_INSTALL_INCLUDEDIR}")
+endif()
+
 target_include_directories(cricket
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
+        $<INSTALL_INTERFACE:${_cricket_install_include_iface}>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${cppad_INCLUDE_DIRS}
@@ -129,24 +138,11 @@ target_link_libraries(cricket
     PRIVATE
         ${cppad_LINK_LIBRARIES}
         fmt::fmt
-        pantor::inja
 )
 
-# Pinocchio's compile flags affect structs inside coal, so they must be visible.
+target_include_directories(cricket PRIVATE ${_cricket_inja_include})
 target_compile_definitions(cricket PUBLIC
     ${pinocchio_CFLAGS_OTHER}
-)
-
-# CGAL breaks under -ffast-math, remove these flags
-target_compile_options(cricket PRIVATE
-    -fno-fast-math
-    -frounding-math
-    -fsigned-zeros
-    -fno-associative-math
-    -ffp-contract=off
-    -fno-finite-math-only
-    -ftrapping-math
-    -fmath-errno
 )
 
 add_executable(fkcc_gen src/fkcc_gen.cc)
@@ -154,11 +150,11 @@ add_executable(fkcc_gen src/fkcc_gen.cc)
 target_link_libraries(fkcc_gen
     PRIVATE
         cricket::cricket
-        pantor::inja
         fmt::fmt
         cxxopts::cxxopts
 )
 
+target_include_directories(fkcc_gen PRIVATE ${_cricket_inja_include})
 target_compile_definitions(fkcc_gen PRIVATE
     ${pinocchio_CFLAGS_OTHER}
 )
@@ -175,7 +171,7 @@ if(CRICKET_BUILD_JIT)
   target_include_directories(cricket_jit
       PUBLIC
           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-          $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+          $<INSTALL_INTERFACE:${_cricket_install_include_iface}>
           ${LLVM_INCLUDE_DIRS}
           ${CLANG_INCLUDE_DIRS}
   )
@@ -188,27 +184,79 @@ if(CRICKET_BUILD_JIT)
           clang-cpp
           LLVM
   )
+endif()
 
-  install(TARGETS cricket_jit
-      EXPORT cricketTargets
-      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+if(CRICKET_BUILD_PYTHON)
+  find_package(Python 3.8 REQUIRED COMPONENTS Interpreter Development.Module)
+  find_package(nanobind CONFIG QUIET)
+  if(NOT nanobind_FOUND)
+    CPMAddPackage("gh:wjakob/nanobind#9a25aed8a7edfe60ef9ad1c911e57667bc4916c4")
+  endif()
+
+  nanobind_add_module(_core_ext
+      NB_STATIC
+      STABLE_ABI
+      src/bindings/python.cc
+  )
+  target_link_libraries(_core_ext PRIVATE cricket::cricket)
+  target_include_directories(_core_ext PRIVATE
+      third_party/nanobind_json/include
   )
 endif()
 
-# Install
-include(GNUInstallDirs)
+if(CRICKET_BUILD_PYTHON)
+  set(_cricket_lib_dest       cricket/lib)
+  set(_cricket_include_dest   cricket/include)
+  set(_cricket_resources_dest cricket/resources)
+  set(_cricket_cmake_dest     cricket/cmake)
+  set(_cricket_bin_dest       cricket/bin)
+  set(_cricket_python_dest    cricket)
+else()
+  include(GNUInstallDirs)
+  set(_cricket_lib_dest       ${CMAKE_INSTALL_LIBDIR})
+  set(_cricket_include_dest   ${CMAKE_INSTALL_INCLUDEDIR})
+  set(_cricket_resources_dest ${CMAKE_INSTALL_DATAROOTDIR}/cricket/resources)
+  set(_cricket_cmake_dest     ${CMAKE_INSTALL_DATAROOTDIR}/cricket/cmake)
+  set(_cricket_bin_dest       ${CMAKE_INSTALL_BINDIR})
+endif()
+
 install(TARGETS cricket
     EXPORT cricketTargets
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${_cricket_lib_dest}
+    ARCHIVE DESTINATION ${_cricket_lib_dest}
+    RUNTIME DESTINATION ${_cricket_bin_dest}
 )
-install(DIRECTORY include/cricket
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+if(TARGET cricket_jit)
+  install(TARGETS cricket_jit
+      EXPORT cricketTargets
+      LIBRARY DESTINATION ${_cricket_lib_dest}
+      ARCHIVE DESTINATION ${_cricket_lib_dest}
+      RUNTIME DESTINATION ${_cricket_bin_dest}
+  )
+endif()
+install(DIRECTORY include/cricket/ DESTINATION ${_cricket_include_dest}/cricket)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/generated/cricket/embedded_templates.hh
+        DESTINATION ${_cricket_include_dest}/cricket)
+install(DIRECTORY resources/        DESTINATION ${_cricket_resources_dest})
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    cmake/cricketConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/cricketConfig.cmake
+    INSTALL_DESTINATION ${_cricket_cmake_dest}
 )
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cricketConfig.cmake
+        DESTINATION ${_cricket_cmake_dest})
+install(EXPORT cricketTargets
+        FILE cricketTargets.cmake
+        NAMESPACE cricket::
+        DESTINATION ${_cricket_cmake_dest})
+
 install(TARGETS fkcc_gen
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    RUNTIME DESTINATION ${_cricket_bin_dest}
     COMPONENT Runtime
 )
+
+if(CRICKET_BUILD_PYTHON)
+  install(TARGETS _core_ext LIBRARY DESTINATION ${_cricket_python_dest})
+endif()

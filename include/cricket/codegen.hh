@@ -34,13 +34,13 @@ namespace cricket
         std::filesystem::path template_path;
         std::map<std::string, std::filesystem::path> subtemplates;
         std::string language = "c++";
-        nlohmann::json extra_data;
+        nlohmann::json data;
     };
 
     struct GenResult
     {
         std::string source;
-        nlohmann::json metadata;
+        nlohmann::json data;
         std::string robot_name;
         std::size_t dimension = 0;
         std::size_t n_spheres = 0;

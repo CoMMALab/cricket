@@ -1,4 +1,5 @@
 #include <cricket/codegen.hh>
+#include <cricket/embedded_templates.hh>
 
 #include "pinocchio_cppadcg.hh"
 
@@ -161,7 +162,8 @@ namespace cricket
 
     auto generate_robot_source(const GenOptions &opts) -> GenResult
     {
-        if (!std::filesystem::exists(opts.template_path))
+        const bool use_embedded = opts.template_path.empty();
+        if (not use_embedded and not std::filesystem::exists(opts.template_path))
         {
             throw std::runtime_error(
                 fmt::format(
@@ -171,7 +173,7 @@ namespace cricket
 
         RobotInfo robot(opts.urdf, opts.srdf, opts.end_effector);
 
-        nlohmann::json data = opts.extra_data;
+        nlohmann::json data = opts.data;
         data.update(robot.json());
 
         auto eefk = trace_sphere_cc_fk(robot, opts.language, false, false, true);
@@ -195,39 +197,48 @@ namespace cricket
         data["ccfkee_code_output"] = ccfkee.outputs;
 
         inja::Environment env;
-        for (const auto &[name, path] : opts.subtemplates)
+        inja::Template main_template;
+        if (use_embedded)
         {
-            if (!std::filesystem::exists(path))
-            {
-                throw std::runtime_error(
-                    fmt::format(
-                        "cricket::generate_robot_source: subtemplate '{}' not found: {}",
-                        name,
-                        path.string()));
-            }
-            inja::Template t = env.parse_template(path.string());
-            env.include_template(name, t);
+            auto ccfk_t = env.parse(std::string(embedded::kCcfkTemplate));
+            env.include_template("ccfk", ccfk_t);
+            main_template = env.parse(std::string(embedded::kFkTemplate));
         }
-
-        inja::Template main_template = env.parse_template(opts.template_path.string());
+        else
+        {
+            for (const auto &[name, path] : opts.subtemplates)
+            {
+                if (not std::filesystem::exists(path))
+                {
+                    throw std::runtime_error(
+                        fmt::format(
+                            "cricket::generate_robot_source: subtemplate '{}' not found: {}",
+                            name,
+                            path.string()));
+                }
+                inja::Template t = env.parse_template(path.string());
+                env.include_template(name, t);
+            }
+            main_template = env.parse_template(opts.template_path.string());
+        }
 
         GenResult result;
         result.source = env.render(main_template, data);
-        result.metadata = std::move(data);
+        result.data = std::move(data);
 
-        if (result.metadata.contains("name"))
+        if (result.data.contains("name"))
         {
-            result.robot_name = result.metadata["name"].get<std::string>();
+            result.robot_name = result.data["name"].get<std::string>();
         }
 
-        if (result.metadata.contains("n_q"))
+        if (result.data.contains("n_q"))
         {
-            result.dimension = result.metadata["n_q"].get<std::size_t>();
+            result.dimension = result.data["n_q"].get<std::size_t>();
         }
-        
-        if (result.metadata.contains("n_spheres"))
+
+        if (result.data.contains("n_spheres"))
         {
-            result.n_spheres = result.metadata["n_spheres"].get<std::size_t>();
+            result.n_spheres = result.data["n_spheres"].get<std::size_t>();
         }
 
         return result;

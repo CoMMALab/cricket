@@ -1,0 +1,30 @@
+[build-system]
+requires = ["scikit-build-core>=0.4", "nanobind>=2.0.0", "cmake>=3.16"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "cricket"
+version = "0.1.0"
+description = "Tracing compilation + JIT for spherized robot kinematics"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "Zachary Kingston", email = "zkingston@purdue.edu" }]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.urls]
+Homepage = "https://github.com/CoMMALab/cricket"
+
+[tool.scikit-build]
+minimum-version = "0.4"
+build-dir = "build/{wheel_tag}"
+wheel.packages = ["python/cricket"]
+cmake.build-type = "Release"
+
+[tool.scikit-build.cmake.define]
+CRICKET_BUILD_PYTHON = "ON"
+CRICKET_BUILD_JIT = "ON"
