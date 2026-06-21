@@ -80,9 +80,13 @@ namespace cricket::jit
         return jit_->addIRModule(std::move(tsm));
     }
 
+    auto JitSession::add_object_file(std::unique_ptr<llvm::MemoryBuffer> obj) -> llvm::Error
+    {
+        return jit_->addObjectFile(std::move(obj));
+    }
+
     auto JitSession::add_external_symbol(const std::string &name, void *addr) -> llvm::Error
     {
-        // intern() mutates the session's string pool — needs a non-const ref.
         auto &es = jit_->getExecutionSession();
         const auto mangled = es.intern(name);
         lo::SymbolMap syms;

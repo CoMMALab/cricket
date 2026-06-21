@@ -28,7 +28,12 @@
 
 namespace
 {
-    auto hash_id(const std::string &source, const cricket::jit::CompileOptions &opts) -> std::string
+    constexpr const char *kVirtualSourceName = "cricket_jit_input.cc";
+}  // namespace
+
+namespace cricket::jit
+{
+    auto hash_source(const std::string &source, const CompileOptions &opts) -> std::string
     {
         llvm::SHA1 sha;
         sha.update(source);
@@ -62,9 +67,7 @@ namespace
 
         return "cricket-" + llvm::toHex(sha.final(), true);
     }
-
-    constexpr const char *kVirtualSourceName = "cricket_jit_input.cc";
-}  // namespace
+}  // namespace cricket::jit
 
 namespace cricket::jit
 {
@@ -189,7 +192,7 @@ namespace cricket::jit
             throw std::runtime_error("cricket::jit: action produced no module:\n" + diag_text);
         }
 
-        std::string id = opts.module_id.empty() ? hash_id(source, opts) : opts.module_id;
+        std::string id = opts.module_id.empty() ? hash_source(source, opts) : opts.module_id;
         module->setModuleIdentifier(id);
         module->setSourceFileName(id);
 

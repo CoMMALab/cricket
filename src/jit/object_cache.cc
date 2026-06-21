@@ -57,7 +57,12 @@ namespace cricket::jit
 
     auto DiskObjectCache::getObject(const llvm::Module *M) -> std::unique_ptr<llvm::MemoryBuffer>
     {
-        const auto path = dir_ / (M->getModuleIdentifier() + ".o");
+        return load_object(M->getModuleIdentifier());
+    }
+
+    auto DiskObjectCache::load_object(const std::string &id) const -> std::unique_ptr<llvm::MemoryBuffer>
+    {
+        const auto path = dir_ / (id + ".o");
         auto buf = llvm::MemoryBuffer::getFile(path.string(), false, false);
         if (not buf)
         {

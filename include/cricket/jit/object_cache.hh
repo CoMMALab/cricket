@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <string>
 
 namespace cricket::jit
 {
@@ -15,6 +16,11 @@ namespace cricket::jit
         auto notifyObjectCompiled(const llvm::Module *M, llvm::MemoryBufferRef Obj) -> void override;
 
         auto getObject(const llvm::Module *M) -> std::unique_ptr<llvm::MemoryBuffer> override;
+
+        // Probe the cache by id directly (no Module required). Returns
+        // nullptr on miss. Callers pair this with `hash_source` to skip the
+        // compiler entirely when the cache is warm.
+        auto load_object(const std::string &id) const -> std::unique_ptr<llvm::MemoryBuffer>;
 
         auto directory() const -> const std::filesystem::path &
         {
