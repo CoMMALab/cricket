@@ -10,7 +10,7 @@ namespace vamp::robots
 {
 struct {{name}}
 {
-    static constexpr char* name = "{{lower(name)}}";
+    static constexpr const char *name = "{{lower(name)}}";
     static constexpr std::size_t dimension = {{n_q}};
     static constexpr std::size_t n_spheres = {{n_spheres}};
     static constexpr float min_radius = {{min_radius}};
@@ -18,7 +18,7 @@ struct {{name}}
     static constexpr std::size_t resolution = {{resolution}};
 
     static constexpr std::array<std::string_view, dimension> joint_names = {"{{join(joint_names, "\", \"")}}"};
-    static constexpr char* end_effector = "{{end_effector}}";
+    static constexpr const char *end_effector = "{{end_effector}}";
 
     using Configuration = FloatVector<dimension>;
     using ConfigurationArray = std::array<FloatT, dimension>;
@@ -187,7 +187,7 @@ struct {{name}}
         //
         // attachment vs. environment collisions
         //
-        if (attachment_environment_collision(environment))
+        if (attachment_environment_collision(environment)) [[unlikely]]
         {
             return false;
         }
@@ -206,7 +206,7 @@ struct {{name}}
                                                         y[{{(n_spheres + link_bs) * 4 + 0}}],
                                                         y[{{(n_spheres + link_bs) * 4 + 1}}],
                                                         y[{{(n_spheres + link_bs) * 4 + 2}}],
-                                                        y[{{(n_spheres + link_bs) * 4 + 3}}]))
+                                                        y[{{(n_spheres + link_bs) * 4 + 3}}])) [[unlikely]]
         {
             {% for j in range(length(link_spheres)) %}
             {% set sphere_index = at(link_spheres, j) %}
@@ -214,7 +214,7 @@ struct {{name}}
                                                             y[{{sphere_index * 4 + 0}}],
                                                             y[{{sphere_index * 4 + 1}}],
                                                             y[{{sphere_index * 4 + 2}}],
-                                                            y[{{sphere_index * 4 + 3}}]))
+                                                            y[{{sphere_index * 4 + 3}}])) [[unlikely]]
             {
                 return false;
             }

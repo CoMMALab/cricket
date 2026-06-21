@@ -10,3 +10,5 @@
 /*.hh
 /*.rs
 /.cpm-cache/
+
+__pycache__

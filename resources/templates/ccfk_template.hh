@@ -13,7 +13,7 @@ if (sphere_environment_in_collision(environment,
                                     y[{{bs_loc + 0}}],
                                     y[{{bs_loc + 1}}],
                                     y[{{bs_loc + 2}}],
-                                    y[{{bs_loc + 3}}]))
+                                    y[{{bs_loc + 3}}])) [[unlikely]]
 {
     {% for j in range(length(link_spheres)) %}
     {% set sphere_loc = at(link_spheres, j) * 4 %}
@@ -21,7 +21,7 @@ if (sphere_environment_in_collision(environment,
                                         y[{{ sphere_loc + 0 }}],
                                         y[{{ sphere_loc + 1 }}],
                                         y[{{ sphere_loc + 2 }}],
-                                        y[{{ sphere_loc + 3 }}]))
+                                        y[{{ sphere_loc + 3 }}])) [[unlikely]]
     {
         return false;
     }
@@ -53,7 +53,7 @@ if (sphere_sphere_self_collision<decltype(x[0])>(y[{{link_1_bs_loc + 0}}],
                                                  y[{{link_2_bs_loc + 0}}],
                                                  y[{{link_2_bs_loc + 1}}],
                                                  y[{{link_2_bs_loc + 2}}],
-                                                 y[{{link_2_bs_loc + 3}}]))
+                                                 y[{{link_2_bs_loc + 3}}])) [[unlikely]]
 {
     {% for j in range(length(link_1_spheres)) %}
     {% for k in range(length(link_2_spheres)) %}
@@ -68,7 +68,7 @@ if (sphere_sphere_self_collision<decltype(x[0])>(y[{{link_1_bs_loc + 0}}],
                                                      y[{{ sphere_2_loc * 4 + 0}} ],
                                                      y[{{ sphere_2_loc * 4 + 1}} ],
                                                      y[{{ sphere_2_loc * 4 + 2}} ],
-                                                     y[{{ sphere_2_loc * 4 + 3}} ]))
+                                                     y[{{ sphere_2_loc * 4 + 3}} ])) [[unlikely]]
     {
         return false;
     }
