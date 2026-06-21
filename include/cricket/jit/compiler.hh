@@ -32,9 +32,5 @@ namespace cricket::jit
         auto compile(const std::string &source, const CompileOptions &opts) -> llvm::orc::ThreadSafeModule;
     };
 
-    // Stable hash of (source + canonicalized opts). Matches the module
-    // identifier `compile(...)` stamps onto its output, and thus the filename
-    // the DiskObjectCache stores under. Exposed so callers can probe the
-    // cache before invoking the compiler.
     auto hash_source(const std::string &source, const CompileOptions &opts) -> std::string;
 }  // namespace cricket::jit
