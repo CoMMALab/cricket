@@ -6,4 +6,5 @@
 /output.json
 /*_fk.hh
 /resources/
+!/resources/templates/
 Dockerfile
