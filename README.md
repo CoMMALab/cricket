@@ -32,6 +32,19 @@ Run the script.
 clang-format -i panda_fk.hh
 ```
 
+### Pip Install
+
+Cricket also ships a Python package (the C++ library + Python bindings via [nanobind](https://github.com/wjakob/nanobind)). After setting up the conda env above:
+```bash
+pip install .
+```
+Or for a dev install:
+```bash
+pip install --no-build-isolation -e .
+```
+This installs `cricket` as an importable module and places `fkcc_gen`, headers, and CMake config files under `<env>/lib/python3.X/site-packages/cricket/`. 
+CMake builds of downstream projects can locate it via `find_package(cricket CONFIG REQUIRED)`.
+
 ### Docker Installation
 
 Build the container:
@@ -47,6 +60,37 @@ docker run --rm -v "$(pwd):/mount" --user "$(id -u):$(id -g)" cricket:latest /mo
 clang-format -i panda_fk.hh
 ```
 Note the use of the `/mount` directory and specification of output file.
+
+## JIT Runtime
+
+In addition to the `fkcc_gen` CLI, cricket optionally builds a small C++ library (`cricket::cricket_jit`) that wraps clang + LLVM's ORC JIT to compile and load generated robot code at runtime.
+This is used by [VAMP](https://github.com/kavrakiLab/vamp)'s `vamp.jit.load_robot(...)` to specialize a planner for an arbitrary URDF without full rebuilding.
+
+### Building
+
+Building the JIT library is **on by default**. It requires LLVM + Clang development libraries and a `clang` executable on `PATH` at runtime.
+To disable:
+```bash
+cmake -GNinja -Bbuild -DCRICKET_BUILD_JIT=OFF .
+```
+
+## Python API
+
+The Python bindings expose the code generation pipeline as functions:
+
+```python
+import cricket
+
+opts = cricket.GenOptions(
+    urdf="path/to/panda_spherized.urdf",
+    srdf="path/to/panda.srdf",
+    end_effector="panda_grasptarget",
+    template_path=cricket.resources_dir() / "templates" / "fk_template.hh",
+    data={"name": "Panda", "resolution": 32},
+)
+gen = cricket.generate_robot_source(opts)
+print(gen.robot_name, gen.dimension, gen.n_spheres)
+```
 
 ## Configuration
 

@@ -13,7 +13,13 @@ dependencies:
   - cmake
   - cxx-compiler
   - llvm
+  - llvmdev
+  - clangdev
   - ninja
+  - python
+  - pip
+  - scikit-build-core
+  - nanobind
   - fmt
   - pkg-config
   - patch

@@ -1,0 +1,10 @@
+name: cricket
+
+channels:
+  - conda-forge
+
+dependencies:
+  - pinocchio
+  - cppad
+  - cgal
+  - fmt
