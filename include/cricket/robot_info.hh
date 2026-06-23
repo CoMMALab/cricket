@@ -30,6 +30,34 @@ namespace cricket
 
     auto min_sphere_of_spheres(const std::vector<SphereInfo> &info) -> std::array<float, 4>;
 
+    // Optional explicit Cartesian bounds for FreeFlyer / Planar joints, where
+    // the URDF leaves position bounds unspecified.
+    struct Bounds
+    {
+        Eigen::Vector3d lower;
+        Eigen::Vector3d upper;
+    };
+
+    enum class JointType
+    {
+        Bounded,            // Revolute/prismatic with limits: nq=1, nu=1
+        UnboundedRevolute,  // Continuous revolute (cos,sin): nq=2, nu=1
+        SO3,                // Spherical (xyzw quaternion): nq=4, nu=3
+        SE3,                // FreeFlyer: nq=7, nu=6
+        SE2,                // Planar: nq=4, nu=3
+        Unsupported
+    };
+
+    struct JointMapping
+    {
+        JointType type;
+        std::size_t joint_id;
+        std::size_t idx_q;
+        std::size_t idx_u;
+        std::size_t nq;
+        std::size_t nu;
+    };
+
     class RobotInfo
     {
     public:
@@ -38,7 +66,7 @@ namespace cricket
             const std::optional<std::filesystem::path> &srdf_file,
             const std::optional<std::string> &end_effector);
 
-        auto json() -> nlohmann::json;
+        auto json(const std::optional<Bounds> &bounds = std::nullopt) -> nlohmann::json;
 
         auto dof_to_joint_names() -> std::vector<std::string>;
         auto get_frames_colliding_end_effector() -> std::vector<std::size_t>;

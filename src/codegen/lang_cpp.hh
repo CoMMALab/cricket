@@ -27,7 +27,6 @@ namespace CppAD
             template <class Output>
             void writeParameter(const Base &value, Output &output)
             {
-                // make sure all digits of floating point values are printed
                 std::ostringstream os;
                 os << std::setprecision(LanguageC<Base>::_parameterPrecision) << value;
 
@@ -36,8 +35,6 @@ namespace CppAD
 
                 if (number.find('.') == std::string::npos && number.find('e') == std::string::npos)
                 {
-                    // also make sure there is always a '.' after the number in
-                    // order to avoid integer overflows
                     output << '.';
                 }
             }

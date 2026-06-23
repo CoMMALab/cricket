@@ -12,16 +12,19 @@ struct {{name}}
 {
     static constexpr const char *name = "{{lower(name)}}";
     static constexpr std::size_t dimension = {{n_q}};
+    static constexpr std::size_t sample_dimension = {{n_u}};
     static constexpr std::size_t n_spheres = {{n_spheres}};
     static constexpr float min_radius = {{min_radius}};
     static constexpr float max_radius = {{max_radius}};
     static constexpr std::size_t resolution = {{resolution}};
+    static constexpr bool euclidean = {{euclidean}};
 
     static constexpr std::array<std::string_view, dimension> joint_names = {"{{join(joint_names, "\", \"")}}"};
     static constexpr const char *end_effector = "{{end_effector}}";
 
     using Configuration = FloatVector<dimension>;
     using ConfigurationArray = std::array<FloatT, dimension>;
+    using Sample = FloatVector<sample_dimension>;
 
     struct alignas(FloatVectorAlignment) ConfigurationBuffer
         : std::array<float, Configuration::num_scalars_rounded>
@@ -81,6 +84,81 @@ struct {{name}}
     inline static auto space_measure() noexcept -> float
     {
         return {{measure}};
+    }
+
+    alignas(Configuration::S::Alignment) static constexpr std::array<float, dimension> lower_bound{
+        {{join(lower, ", ")}}
+    };
+
+    alignas(Configuration::S::Alignment) static constexpr std::array<float, dimension> upper_bound{
+        {{join(upper, ", ")}}
+    };
+
+    static inline auto in_bounds(const Configuration &x) -> bool
+    {
+        return (x <= Configuration(upper_bound)).all() and (x >= Configuration(lower_bound)).all();
+    }
+
+    static inline auto sample(const Sample &x_in) -> Configuration
+    {
+        {% if euclidean %}
+        // Euclidean fast path: same affine map as scale_configuration,
+        // operating on the packed FloatVector in one SIMD step. Sample and
+        // Configuration alias to the same FloatVector type when Euclidean.
+        Configuration q = x_in;
+        scale_configuration(q);
+        return q;
+        {% else %}
+        {% if mapconfig_code_vars > 0 %}std::array<float, {{mapconfig_code_vars}}> v;{% endif %}
+        ConfigurationBuffer y;
+        const auto x = x_in.to_array();
+        {{mapconfig_code}}
+        return Configuration(y.data());
+        {% endif %}
+    }
+
+    static inline auto distance(const Configuration &a_in, const Configuration &b_in) -> float
+    {
+        {% if euclidean %}
+        return a_in.distance(b_in);
+        {% else %}
+        {% if distance_code_vars > 0 %}std::array<float, {{distance_code_vars}}> v;{% endif %}
+        std::array<float, 1> y;
+        const auto a = a_in.to_array();
+        const auto b = b_in.to_array();
+        {{distance_code}}
+        return y[0];
+        {% endif %}
+    }
+
+    static inline auto interpolate(const Configuration &a_in, const Configuration &b_in, float t) -> Configuration
+    {
+        {% if euclidean %}
+        return a_in.interpolate(b_in, t);
+        {% else %}
+        {% if interpolate_code_vars > 0 %}std::array<float, {{interpolate_code_vars}}> v;{% endif %}
+        ConfigurationBuffer y;
+        const auto a = a_in.to_array();
+        const auto b = b_in.to_array();
+        {{interpolate_code}}
+        return Configuration(y.data());
+        {% endif %}
+    }
+
+    template <std::size_t rake>
+    static inline void interpolate_block(
+        const Configuration &a,
+        const Configuration &b,
+        const FloatVector<rake> &t,
+        ConfigurationBlock<rake> &out) noexcept
+    {
+        // V is referenced by the SIMD-mask form emitted by LanguageCVampBlock
+        // for non-Euclidean robots; constants and operands get wrapped as
+        // V(x).blend(V(y), (V(...) CMP V(...))) so .blend() always has a
+        // vector receiver.
+        using V = FloatVector<rake, 1>;
+        {% if interpolate_block_code_vars > 0 %}std::array<V, {{interpolate_block_code_vars}}> v;{% endif %}
+        {{interpolate_block_code}}
     }
 
     template <std::size_t rake>
