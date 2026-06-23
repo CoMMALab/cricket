@@ -105,6 +105,9 @@ configure_file(
 add_library(cricket
     src/robot_info.cc
     src/codegen.cc
+    src/tracing/mapping.cc
+    src/tracing/interpolate.cc
+    src/tracing/distance.cc
 )
 add_library(cricket::cricket ALIAS cricket)
 set_target_properties(cricket PROPERTIES POSITION_INDEPENDENT_CODE ON)

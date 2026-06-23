@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="r2000ic125l" path="r2000ic125l/robot.urdf">
+	<link name="base_link">
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/visual/base_link.stl"></mesh>
+			</geometry>
+			<material name="">
+				<color rgba="0.4 0.4 0.4 1.0"></color>
+			</material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.37748"></sphere>
+			</geometry>
+			<origin xyz="0.10600198175522058 0.11468970888653676 0.13947118637987557" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.39327"></sphere>
+			</geometry>
+			<origin xyz="0.0678719817552206 -0.13196229111346325 0.14203318637987558" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.352412"></sphere>
+			</geometry>
+			<origin xyz="-0.39377601824477937 -0.07463629111346325 0.11121518637987557" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.350431"></sphere>
+			</geometry>
+			<origin xyz="-0.3796890182447794 0.16515870888653675 0.11488918637987558" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_1">
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/visual/link_1.stl"></mesh>
+			</geometry>
+			<material name="">
+				<color rgba="0.96 0.76 0.13 1.0"></color>
+			</material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.433243"></sphere>
+			</geometry>
+			<origin xyz="0.10985992933654785 -0.028534989891052243 -0.14290397716665268" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.426651"></sphere>
+			</geometry>
+			<origin xyz="-0.12967607066345216 0.13732501010894776 -0.12888797716665268" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_2">
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/visual/link_2.stl"></mesh>
+			</geometry>
+			<material name="">
+				<color rgba="0.96 0.76 0.13 1.0"></color>
+			</material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.259344"></sphere>
+			</geometry>
+			<origin xyz="-0.041901503027915954 0.21983635729457437 -0.03486092936038976" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.279952"></sphere>
+			</geometry>
+			<origin xyz="0.017052496972084046 0.20851635729457438 0.14434907063961028" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.27699"></sphere>
+			</geometry>
+			<origin xyz="0.0036894969720840456 0.23535135729457438 0.3489750706396103" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.270172"></sphere>
+			</geometry>
+			<origin xyz="0.04292249697208404 0.2423583572945744 0.5757820706396103" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.16512"></sphere>
+			</geometry>
+			<origin xyz="0.19789449697208406 0.3144973572945744 1.1654880706396102" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.22871"></sphere>
+			</geometry>
+			<origin xyz="0.13914949697208406 0.27804935729457436 0.8831370706396102" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.212687"></sphere>
+			</geometry>
+			<origin xyz="-0.07244750302791596 0.25892235729457436 0.8364290706396103" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.180727"></sphere>
+			</geometry>
+			<origin xyz="-0.011533503027915955 0.2895873572945744 1.0905340706396103" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_3">
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/visual/link_3.stl"></mesh>
+			</geometry>
+			<material name="">
+				<color rgba="0.96 0.76 0.13 1.0"></color>
+			</material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.294234"></sphere>
+			</geometry>
+			<origin xyz="0.09213133422803876 0.02379200066757202 0.07223599475479126" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.296908"></sphere>
+			</geometry>
+			<origin xyz="0.3378393342280388 0.04286900066757202 0.12223099475479127" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.288027"></sphere>
+			</geometry>
+			<origin xyz="0.12411833422803875 0.02909800066757202 0.14320299475479126" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.221419"></sphere>
+			</geometry>
+			<origin xyz="0.019215334228038783 0.09408600066757203 0.0006419947547912641" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.265325"></sphere>
+			</geometry>
+			<origin xyz="0.5584063342280388 0.03618400066757202 0.15589099475479126" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.248616"></sphere>
+			</geometry>
+			<origin xyz="0.8099093342280388 0.02482100066757202 0.16358199475479127" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.22538"></sphere>
+			</geometry>
+			<origin xyz="1.1118983342280389 0.01414600066757202 0.19385499475479126" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.162023"></sphere>
+			</geometry>
+			<origin xyz="1.3725443342280388 0.0038320006675720206 0.21668799475479128" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_4">
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/visual/link_4.stl"></mesh>
+			</geometry>
+			<material name="">
+				<color rgba="0.96 0.76 0.13 1.0"></color>
+			</material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.134082"></sphere>
+			</geometry>
+			<origin xyz="1.5851360681343079 -0.001914 -1.0882656574249268e-06" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.115573"></sphere>
+			</geometry>
+			<origin xyz="1.721474068134308 -0.005281 0.0005319117343425751" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_5">
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/visual/link_5.stl"></mesh>
+			</geometry>
+			<material name="">
+				<color rgba="0.96 0.76 0.13 1.0"></color>
+			</material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.187291"></sphere>
+			</geometry>
+			<origin xyz="0.05225649361634255 -0.029890014735221862 -9.725444316864028e-07" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_6">
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/visual/link_6.stl"></mesh>
+			</geometry>
+			<material name="">
+				<color rgba="0.15 0.15 0.15 1.0"></color>
+			</material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.082031"></sphere>
+			</geometry>
+			<origin xyz="-0.01825013444495201 -0.00028381008076667786 9.052716422080999e-05" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.080978"></sphere>
+			</geometry>
+			<origin xyz="-0.01825013444495201 0.007707189919233322 -0.00578247283577919" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="base"></link>
+	<link name="flange"></link>
+	<link name="tool0"></link>
+	<link name="torch">
+		<visual>
+			<origin xyz="0 0 0" rpy="0 0 -1.5707963267948966"></origin>
+			<geometry>
+				<mesh filename="meshes/long_torch.stl"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.05408"></sphere>
+			</geometry>
+			<origin xyz="-0.052508671189518547 0.0002391825280613188 0.7725440723151334" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.052335"></sphere>
+			</geometry>
+			<origin xyz="-0.002944671189518546 -0.0005398174719386812 0.6959770723151335" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.053334"></sphere>
+			</geometry>
+			<origin xyz="-9.867118951854825e-05 -5.7817471938681215e-05 0.5951730723151335" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06483"></sphere>
+			</geometry>
+			<origin xyz="0.00044132881048145056 0.0005151825280613187 0.49166507231513346" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.067675"></sphere>
+			</geometry>
+			<origin xyz="-0.0006316711895185401 0.00016418252806131876 0.3749360723151335" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.067556"></sphere>
+			</geometry>
+			<origin xyz="-0.00045867118951854746 -3.381747193868123e-05 0.2563920723151335" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.068335"></sphere>
+			</geometry>
+			<origin xyz="-0.00025967118951854273 -0.00018881747193868123 0.1357160723151335" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.058488"></sphere>
+			</geometry>
+			<origin xyz="-0.0012456711895185435 0.0011461825280613188 0.02519807231513349" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="torch_bend">
+		<visual>
+			<origin xyz="0 0 0" rpy="0 0 0"></origin>
+			<geometry>
+				<sphere radius="0.001"></sphere>
+			</geometry>
+		</visual>
+	</link>
+	<link name="tcp">
+		<visual>
+			<origin xyz="0 0 0" rpy="0 0 0"></origin>
+			<geometry>
+				<sphere radius="0.001"></sphere>
+			</geometry>
+		</visual>
+	</link>
+	<joint name="joint_1" type="revolute">
+		<origin rpy="0 0 0" xyz="0 0 0.670"></origin>
+		<parent link="base_link"></parent>
+		<child link="link_1"></child>
+		<axis xyz="0 0 1"></axis>
+		<limit effort="0" lower="-3.2288591161895095" upper="3.2288591161895095" velocity="2.2689280275926285"></limit>
+	</joint>
+	<joint name="joint_2" type="revolute">
+		<origin rpy="0 0 0" xyz="0.312 0 0"></origin>
+		<parent link="link_1"></parent>
+		<child link="link_2"></child>
+		<axis xyz="0 1 0"></axis>
+		<limit effort="0" lower="-1.0471975511965976" upper="1.3264502315156905" velocity="2.007128639793479"></limit>
+	</joint>
+	<joint name="joint_3" type="revolute">
+		<origin rpy="0 0 0" xyz="0 0 1.075"></origin>
+		<parent link="link_2"></parent>
+		<child link="link_3"></child>
+		<axis xyz="0 -1 0"></axis>
+		<limit effort="0" lower="-2.111848394913139" upper="3.141592653589793" velocity="2.181661564992912"></limit>
+	</joint>
+	<joint name="joint_4" type="revolute">
+		<origin rpy="0 0 0" xyz="0 0 0.225"></origin>
+		<parent link="link_3"></parent>
+		<child link="link_4"></child>
+		<axis xyz="-1 0 0"></axis>
+		<limit effort="0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"></limit>
+	</joint>
+	<joint name="joint_5" type="revolute">
+		<origin rpy="0 0 0" xyz="1.730 0 0"></origin>
+		<parent link="link_4"></parent>
+		<child link="link_5"></child>
+		<axis xyz="0 -1 0"></axis>
+		<limit effort="0" lower="-2.181661564992912" upper="2.181661564992912" velocity="3.141592653589793"></limit>
+	</joint>
+	<joint name="joint_6" type="revolute">
+		<origin rpy="0 0 0" xyz="0.215 0 0"></origin>
+		<parent link="link_5"></parent>
+		<child link="link_6"></child>
+		<axis xyz="-1 0 0"></axis>
+		<limit effort="0" lower="-6.283185307179586" upper="6.283185307179586" velocity="4.537856055185257"></limit>
+	</joint>
+	<joint name="base_link-base" type="fixed">
+		<origin rpy="0 0 0" xyz="0 0 0.670"></origin>
+		<parent link="base_link"></parent>
+		<child link="base"></child>
+	</joint>
+	<joint name="joint_6-flange" type="fixed">
+		<origin rpy="0 0 0" xyz="0 0 0"></origin>
+		<parent link="link_6"></parent>
+		<child link="flange"></child>
+	</joint>
+	<joint name="link_6-tool0" type="fixed">
+		<origin rpy="3.141592653589793 -1.5707963267948966 0" xyz="0 0 0"></origin>
+		<parent link="link_6"></parent>
+		<child link="tool0"></child>
+	</joint>
+	<joint name="tool0-torch" type="fixed">
+		<parent link="tool0"></parent>
+		<child link="torch"></child>
+		<origin xyz="0 0 0" rpy="0 0 0"></origin>
+	</joint>
+	<joint name="torch-torch_bend" type="fixed">
+		<parent link="torch"></parent>
+		<child link="torch_bend"></child>
+		<origin xyz="0 0 0.716495" rpy="0 -0.7853 0"></origin>
+	</joint>
+	<joint name="torch_bend-tcp" type="fixed">
+		<parent link="torch_bend"></parent>
+		<child link="tcp"></child>
+		<origin xyz="0 0 0.126622" rpy="0 -1.5707963267948966 0"></origin>
+	</joint>
+</robot>

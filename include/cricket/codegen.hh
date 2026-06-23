@@ -2,6 +2,8 @@
 
 #include <cricket/robot_info.hh>
 
+#include <pinocchio/multibody/model.hpp>
+
 #include <nlohmann/json_fwd.hpp>
 
 #include <cstddef>
@@ -9,6 +11,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace cricket
 {
@@ -26,6 +29,15 @@ namespace cricket
         bool bounding_spheres = true,
         bool fk = true) -> Traced;
 
+    auto trace_map_to_configuration(
+        const pinocchio::Model &model,
+        const std::string &language,
+        const std::optional<Bounds> &bounds = std::nullopt) -> Traced;
+
+    auto trace_interpolate(const pinocchio::Model &model, const std::string &language) -> Traced;
+    auto trace_interpolate_block(const pinocchio::Model &model, const std::string &language) -> Traced;
+    auto trace_distance(const pinocchio::Model &model, const std::string &language) -> Traced;
+
     struct GenOptions
     {
         std::filesystem::path urdf;
@@ -34,6 +46,7 @@ namespace cricket
         std::filesystem::path template_path;
         std::map<std::string, std::filesystem::path> subtemplates;
         std::string language = "c++";
+        std::optional<Bounds> bounds;
         nlohmann::json data;
     };
 

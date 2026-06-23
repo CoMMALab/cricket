@@ -1,7 +1,9 @@
 #include <cricket/codegen.hh>
 #include <cricket/embedded_templates.hh>
 
-#include "pinocchio_cppadcg.hh"
+#include "codegen/pinocchio_cppadcg.hh"
+#include "codegen/lang_cpp.hh"
+#include "codegen/lang_rust.hh"
 
 #include <pinocchio/algorithm/frames.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
@@ -12,9 +14,6 @@
 
 #include <sstream>
 #include <stdexcept>
-
-#include "lang_cpp.hh"
-#include "lang_rust.hh"
 
 namespace cricket
 {
@@ -174,7 +173,7 @@ namespace cricket
         RobotInfo robot(opts.urdf, opts.srdf, opts.end_effector);
 
         nlohmann::json data = opts.data;
-        data.update(robot.json());
+        data.update(robot.json(opts.bounds));
 
         auto eefk = trace_sphere_cc_fk(robot, opts.language, false, false, true);
         data["eefk_code"] = eefk.code;
@@ -195,6 +194,23 @@ namespace cricket
         data["ccfkee_code"] = ccfkee.code;
         data["ccfkee_code_vars"] = ccfkee.temp_variables;
         data["ccfkee_code_output"] = ccfkee.outputs;
+
+        auto mapconfig = trace_map_to_configuration(robot.model, opts.language, opts.bounds);
+        data["mapconfig_code"] = mapconfig.code;
+        data["mapconfig_code_vars"] = mapconfig.temp_variables;
+        data["mapconfig_code_output"] = mapconfig.outputs;
+
+        auto interp = trace_interpolate(robot.model, opts.language);
+        data["interpolate_code"] = interp.code;
+        data["interpolate_code_vars"] = interp.temp_variables;
+
+        auto interp_block = trace_interpolate_block(robot.model, opts.language);
+        data["interpolate_block_code"] = interp_block.code;
+        data["interpolate_block_code_vars"] = interp_block.temp_variables;
+
+        auto dist = trace_distance(robot.model, opts.language);
+        data["distance_code"] = dist.code;
+        data["distance_code_vars"] = dist.temp_variables;
 
         inja::Environment env;
         inja::Template main_template;

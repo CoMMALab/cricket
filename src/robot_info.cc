@@ -1,5 +1,7 @@
 #include <cricket/robot_info.hh>
 
+#include "joint_utils.hh"
+
 #include <pinocchio/parsers/urdf.hpp>
 #include <pinocchio/parsers/srdf.hpp>
 #include <pinocchio/algorithm/joint-configuration.hpp>
@@ -17,6 +19,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 namespace cricket
@@ -57,7 +60,7 @@ namespace cricket
             throw std::runtime_error(fmt::format("URDF file {} does not exist!", urdf_file.string()));
         }
 
-        pinocchio::urdf::buildModel(urdf_file, model);
+        pinocchio::urdf::buildModel(urdf_file, model, false, true);
         pinocchio::urdf::buildGeom(model, urdf_file, COLLISION, collision_model);
 
         if (srdf_file and not std::filesystem::exists(*srdf_file))
@@ -95,20 +98,123 @@ namespace cricket
         end_effector_index = model.getFrameId(end_effector_name);
     }
 
-    auto RobotInfo::json() -> nlohmann::json
+    namespace
     {
-        const Eigen::VectorXd lower_bound = model.lowerPositionLimit;
-        const Eigen::VectorXd upper_bound = model.upperPositionLimit;
+        auto compute_extended_bounds(
+            const pinocchio::Model &model,
+            const std::optional<Bounds> &bounds)
+            -> std::pair<Eigen::VectorXd, Eigen::VectorXd>
+        {
+            Eigen::VectorXd lower = model.lowerPositionLimit;
+            Eigen::VectorXd upper = model.upperPositionLimit;
+
+            if (not bounds)
+            {
+                return {lower, upper};
+            }
+
+            auto [nu, joint_mappings] = classify_joints(model);
+            (void)nu;
+            for (const auto &jm : joint_mappings)
+            {
+                if (jm.type == JointType::SE3)
+                {
+                    for (int i = 0; i < 3; ++i)
+                    {
+                        lower[jm.idx_q + i] = bounds->lower[i];
+                        upper[jm.idx_q + i] = bounds->upper[i];
+                    }
+                }
+                else if (jm.type == JointType::SE2)
+                {
+                    for (int i = 0; i < 2; ++i)
+                    {
+                        lower[jm.idx_q + i] = bounds->lower[i];
+                        upper[jm.idx_q + i] = bounds->upper[i];
+                    }
+                }
+            }
+
+            return {lower, upper};
+        }
+
+        auto is_euclidean(const pinocchio::Model &model) -> bool
+        {
+            auto [nu, joint_mappings] = classify_joints(model);
+            (void)nu;
+            for (const auto &jm : joint_mappings)
+            {
+                if (jm.type != JointType::Bounded)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        auto joint_type_to_string(JointType type) -> std::string
+        {
+            switch (type)
+            {
+                case JointType::Bounded:
+                    return "LP";
+                case JointType::UnboundedRevolute:
+                    return "SO2";
+                case JointType::SO3:
+                    return "SO3";
+                case JointType::SE3:
+                    return "SE3";
+                case JointType::SE2:
+                    return "SE2";
+                default:
+                    return "Unsupported";
+            }
+        }
+
+        auto generate_joint_topology(const pinocchio::Model &model) -> nlohmann::json
+        {
+            auto [nu, joint_mappings] = classify_joints(model);
+            (void)nu;
+            nlohmann::json topology = nlohmann::json::array();
+            for (const auto &jm : joint_mappings)
+            {
+                nlohmann::json info;
+                info["type"] = joint_type_to_string(jm.type);
+                info["idx_q"] = jm.idx_q;
+                info["nq"] = jm.nq;
+                info["nu"] = jm.nu;
+                info["idx_u"] = jm.idx_u;
+                topology.push_back(info);
+            }
+            return topology;
+        }
+    }  // namespace
+
+    auto RobotInfo::json(const std::optional<Bounds> &bounds) -> nlohmann::json
+    {
+        const auto [lower_bound, upper_bound] = compute_extended_bounds(model, bounds);
         const Eigen::VectorXd bound_range = upper_bound - lower_bound;
         const Eigen::VectorXd bound_descale = bound_range.cwiseInverse();
 
+        float measure = 1.0F;
+        for (auto i = 0U; i < bound_range.size(); ++i)
+        {
+            if (std::isfinite(bound_range[i]))
+            {
+                measure *= static_cast<float>(bound_range[i]);
+            }
+        }
+
         nlohmann::json json;
         json["n_q"] = model.nq;
+        json["n_u"] = get_randomness_dimension(model);
         json["n_spheres"] = spheres.size();
         json["bound_lower"] = std::vector<float>(lower_bound.data(), lower_bound.data() + model.nq);
         json["bound_range"] = std::vector<float>(bound_range.data(), bound_range.data() + model.nq);
         json["bound_descale"] = std::vector<float>(bound_descale.data(), bound_descale.data() + model.nq);
-        json["measure"] = bound_range.prod();
+        json["lower"] = std::vector<float>(lower_bound.data(), lower_bound.data() + model.nq);
+        json["upper"] = std::vector<float>(upper_bound.data(), upper_bound.data() + model.nq);
+        json["measure"] = measure;
         json["end_effector"] = end_effector_name;
         json["end_effector_index"] = end_effector_index;
         json["min_radius"] = min_radius;
@@ -119,6 +225,8 @@ namespace cricket
         json["links_with_geometry"] = links_with_geometry;
         json["bounding_sphere_index"] = bounding_sphere_index;
         json["end_effector_collisions"] = get_frames_colliding_end_effector();
+        json["euclidean"] = is_euclidean(model);
+        json["joint_topology"] = generate_joint_topology(model);
 
         std::vector<std::string> link_names;
         for (auto i = 0U; i < model.frames.size(); ++i)
