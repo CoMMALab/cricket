@@ -30,8 +30,7 @@ namespace cricket
 
     auto min_sphere_of_spheres(const std::vector<SphereInfo> &info) -> std::array<float, 4>;
 
-    // Optional explicit Cartesian bounds for FreeFlyer / Planar joints, where
-    // the URDF leaves position bounds unspecified.
+    // Optional explicit Cartesian bounds for FreeFlyer / Planar joints
     struct Bounds
     {
         Eigen::Vector3d lower;

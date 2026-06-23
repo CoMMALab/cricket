@@ -37,10 +37,6 @@ namespace cricket
         }
         else if (language == "c++_block")
         {
-            // SIMD-rake variant: emits VAMP mask/blend for conditional
-            // assignments instead of if/else. Used by trace_interpolate_block
-            // so pinocchio's branching geodesic kernels lower to vectorizable
-            // code over a FloatVector<rake, 1>.
             CppAD::cg::LanguageCVampBlock<double> langC("double");
             handler.generateCode(function_code, langC, result, nameGen);
         }

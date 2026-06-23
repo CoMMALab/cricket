@@ -29,19 +29,13 @@ namespace cricket
         bool bounding_spheres = true,
         bool fk = true) -> Traced;
 
-    // Trace pinocchio's joint-aware mapping from [0,1]^n_u random inputs to a
-    // valid configuration vector. SE3/SE2 joints require Cartesian `bounds`.
     auto trace_map_to_configuration(
         const pinocchio::Model &model,
         const std::string &language,
         const std::optional<Bounds> &bounds = std::nullopt) -> Traced;
 
-    // Trace pinocchio's joint-aware configuration interpolation.
     auto trace_interpolate(const pinocchio::Model &model, const std::string &language) -> Traced;
-    // SIMD-friendly variant: broadcasts the two endpoints over a rake.
     auto trace_interpolate_block(const pinocchio::Model &model, const std::string &language) -> Traced;
-
-    // Trace pinocchio's joint-aware configuration distance.
     auto trace_distance(const pinocchio::Model &model, const std::string &language) -> Traced;
 
     struct GenOptions

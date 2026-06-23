@@ -60,17 +60,11 @@ namespace cricket
     {
         const auto nq = static_cast<std::size_t>(model.nq);
         return trace_interpolate_impl(
-            model,
-            language,
-            {{"a", nq, true}, {"b", nq, true}, {"t", 1, false}},
-            {});
+            model, language, {{"a", nq, true}, {"b", nq, true}, {"t", 1, false}}, {});
     }
 
     auto trace_interpolate_block(const pinocchio::Model &model, const std::string &language) -> Traced
     {
-        // For C++ we need the SIMD-friendly LanguageCVampBlock, which emits
-        // mask/blend instead of `if (cond) y = ...; else ...` so the trace
-        // lowers cleanly to FloatVector<rake, 1>. Rust path is unchanged.
         const std::string lang = (language == "c++") ? "c++_block" : language;
         const auto nq = static_cast<std::size_t>(model.nq);
         return trace_interpolate_impl(
