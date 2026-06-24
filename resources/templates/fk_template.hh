@@ -4,7 +4,13 @@
 #include <vamp/vector/math.hh>
 #include <vamp/collision/environment.hh>
 #include <vamp/collision/validity.hh>
+#include <vamp/planning/nn.hh>
 
+#include <Eigen/Geometry>
+#include <nigh/so3_space.hpp>
+#include <nigh/cartesian_space.hpp>
+
+// clang-format off
 // NOLINTBEGIN(*-magic-numbers)
 namespace vamp::robots
 {
@@ -23,8 +29,29 @@ struct {{name}}
     static constexpr const char *end_effector = "{{end_effector}}";
 
     using Configuration = FloatVector<dimension>;
-    using ConfigurationArray = std::array<FloatT, dimension>;
+    struct alignas(FloatVectorAlignment) ConfigurationArray
+        : std::array<FloatT, dimension>
+    {
+    };
     using Sample = FloatVector<sample_dimension>;
+
+    using NNKey = std::tuple<
+        {% for seg in nn_segments -%}
+        {% if seg.type == "LP" %}vamp::planning::NNFloatArray<{{seg.size}}>{% else %}Eigen::Quaternion<float>{% endif %}{% if not loop.is_last %},{% endif %}
+        {% endfor %}>;
+
+    using NNSpace = unc::robotics::nigh::metric::CartesianSpace<
+        {% for seg in nn_segments -%}
+        {% if seg.type == "LP" %}unc::robotics::nigh::metric::Space<vamp::planning::NNFloatArray<{{seg.size}}>, unc::robotics::nigh::metric::LP<2>>{% else %}unc::robotics::nigh::metric::Space<Eigen::Quaternion<float>, unc::robotics::nigh::metric::SO3>{% endif %}{% if not loop.is_last %},{% endif %}
+        {% endfor %}>;
+
+    static inline auto nn_key(float *cfg_ptr) noexcept -> NNKey
+    {
+        return NNKey{
+            {% for seg in nn_segments -%}
+            {% if seg.type == "LP" %}vamp::planning::NNFloatArray<{{seg.size}}>{cfg_ptr + {{seg.offset}}}{% else %}Eigen::Quaternion<float>(cfg_ptr[{{seg.offset + 3}}], cfg_ptr[{{seg.offset}}], cfg_ptr[{{seg.offset + 1}}], cfg_ptr[{{seg.offset + 2}}]){% endif %}{% if not loop.is_last %},{% endif %}
+            {% endfor %}};
+    }
 
     struct alignas(FloatVectorAlignment) ConfigurationBuffer
         : std::array<float, Configuration::num_scalars_rounded>
@@ -202,6 +229,19 @@ struct {{name}}
                 y[{{ i * 4 + 3 }}]));
         {% endfor %}
 
+        {% if compact_collisions %}
+        for (std::size_t i = 0; i < cc_self_pair_a.size(); ++i)
+        {
+            const auto a = cc_self_pair_a[i] * 4;
+            const auto b = cc_self_pair_b[i] * 4;
+            if (sphere_sphere_self_collision<decltype(x[0])>(
+                    y[a + 0], y[a + 1], y[a + 2], y[a + 3],
+                    y[b + 0], y[b + 1], y[b + 2], y[b + 3]))
+            {
+                output.second.emplace_back(cc_self_pair_a[i], cc_self_pair_b[i]);
+            }
+        }
+        {% else %}
         {% for i in range(length(allowed_link_pairs)) %}
         {% set pair = at(allowed_link_pairs, i) %}
         {% set link_1_index = at(pair, 0) %}
@@ -230,6 +270,7 @@ struct {{name}}
         {% endfor %}
         {% endfor %}
         {% endfor %}
+        {% endif %}
 
         return output;
     }
@@ -312,6 +353,33 @@ struct {{name}}
 
         return to_isometry(y.data());
     }
+
+    {% if compact_collisions %}
+    // Compact collision tables. Declared once at struct scope (not as
+    // function-local statics) so LLVM doesn't have to re-evaluate the
+    // initializer for each fkcc variant — a big JIT-compile-time win for
+    // high-DOF robots where the tables have thousands of entries.
+    struct CCEnvLink { unsigned int bs_array_idx; unsigned int body_start; unsigned int body_count; };
+    struct CCSelfPair { unsigned int bs1_idx; unsigned int bs2_idx; unsigned int pair_start; unsigned int pair_count; };
+
+    static constexpr std::array<CCEnvLink, {{ length(compact_env_entries) }}> cc_env_links = {
+        {% for e in compact_env_entries %}CCEnvLink{ {{at(e,0)}}, {{at(e,1)}}, {{at(e,2)}} },
+        {% endfor %}
+    };
+    static constexpr std::array<unsigned int, {{ length(compact_env_body_idx) }}> cc_env_body_idx = {
+        {% for v in compact_env_body_idx %}{{v}}, {% endfor %}
+    };
+    static constexpr std::array<CCSelfPair, {{ length(compact_self_entries) }}> cc_self_pairs = {
+        {% for e in compact_self_entries %}CCSelfPair{ {{at(e,0)}}, {{at(e,1)}}, {{at(e,2)}}, {{at(e,3)}} },
+        {% endfor %}
+    };
+    static constexpr std::array<unsigned int, {{ length(compact_self_pair_a) }}> cc_self_pair_a = {
+        {% for v in compact_self_pair_a %}{{v}}, {% endfor %}
+    };
+    static constexpr std::array<unsigned int, {{ length(compact_self_pair_b) }}> cc_self_pair_b = {
+        {% for v in compact_self_pair_b %}{{v}}, {% endfor %}
+    };
+    {% endif %}
 };
 }
 

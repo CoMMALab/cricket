@@ -100,9 +100,7 @@ namespace cricket
 
     namespace
     {
-        auto compute_extended_bounds(
-            const pinocchio::Model &model,
-            const std::optional<Bounds> &bounds)
+        auto compute_extended_bounds(const pinocchio::Model &model, const std::optional<Bounds> &bounds)
             -> std::pair<Eigen::VectorXd, Eigen::VectorXd>
         {
             Eigen::VectorXd lower = model.lowerPositionLimit;
@@ -113,8 +111,7 @@ namespace cricket
                 return {lower, upper};
             }
 
-            auto [nu, joint_mappings] = classify_joints(model);
-            (void)nu;
+            auto [_, joint_mappings] = classify_joints(model);
             for (const auto &jm : joint_mappings)
             {
                 if (jm.type == JointType::SE3)
@@ -140,8 +137,7 @@ namespace cricket
 
         auto is_euclidean(const pinocchio::Model &model) -> bool
         {
-            auto [nu, joint_mappings] = classify_joints(model);
-            (void)nu;
+            auto [_, joint_mappings] = classify_joints(model);
             for (const auto &jm : joint_mappings)
             {
                 if (jm.type != JointType::Bounded)
@@ -173,8 +169,7 @@ namespace cricket
 
         auto generate_joint_topology(const pinocchio::Model &model) -> nlohmann::json
         {
-            auto [nu, joint_mappings] = classify_joints(model);
-            (void)nu;
+            auto [_, joint_mappings] = classify_joints(model);
             nlohmann::json topology = nlohmann::json::array();
             for (const auto &jm : joint_mappings)
             {
@@ -188,6 +183,68 @@ namespace cricket
             }
             return topology;
         }
+
+        auto generate_nn_segments(const pinocchio::Model &model) -> nlohmann::json
+        {
+            auto [_, joint_mappings] = classify_joints(model);
+            nlohmann::json segments = nlohmann::json::array();
+
+            std::size_t lp_start = 0;
+            std::size_t lp_size = 0;
+
+            const auto extend_lp = [&](std::size_t idx_q, std::size_t nq)
+            {
+                if (lp_size == 0)
+                {
+                    lp_start = idx_q;
+                }
+
+                lp_size += nq;
+            };
+
+            const auto flush_lp = [&]()
+            {
+                if (lp_size == 0)
+                {
+                    return;
+                }
+
+                nlohmann::json seg;
+                seg["type"] = "LP";
+                seg["offset"] = lp_start;
+                seg["size"] = lp_size;
+                segments.push_back(seg);
+                lp_size = 0;
+            };
+
+            for (const auto &jm : joint_mappings)
+            {
+                if (jm.type == JointType::Bounded or jm.type == JointType::UnboundedRevolute or
+                    jm.type == JointType::SE2)
+                {
+                    extend_lp(jm.idx_q, jm.nq);
+                }
+                else if (jm.type == JointType::SO3)
+                {
+                    flush_lp();
+                    nlohmann::json seg;
+                    seg["type"] = "SO3";
+                    seg["offset"] = jm.idx_q;
+                    segments.push_back(seg);
+                }
+                else if (jm.type == JointType::SE3)
+                {
+                    extend_lp(jm.idx_q, 3);
+                    flush_lp();
+                    nlohmann::json seg;
+                    seg["type"] = "SO3";
+                    seg["offset"] = jm.idx_q + 3;
+                    segments.push_back(seg);
+                }
+            }
+            flush_lp();
+            return segments;
+        }
     }  // namespace
 
     auto RobotInfo::json(const std::optional<Bounds> &bounds) -> nlohmann::json
@@ -196,13 +253,18 @@ namespace cricket
         const Eigen::VectorXd bound_range = upper_bound - lower_bound;
         const Eigen::VectorXd bound_descale = bound_range.cwiseInverse();
 
-        float measure = 1.0F;
+        double measure = 1.0;
         for (auto i = 0U; i < bound_range.size(); ++i)
         {
             if (std::isfinite(bound_range[i]))
             {
-                measure *= static_cast<float>(bound_range[i]);
+                measure *= bound_range[i];
             }
+        }
+
+        if (not std::isfinite(measure))
+        {
+            measure = static_cast<double>(std::numeric_limits<float>::max());
         }
 
         nlohmann::json json;
@@ -227,6 +289,7 @@ namespace cricket
         json["end_effector_collisions"] = get_frames_colliding_end_effector();
         json["euclidean"] = is_euclidean(model);
         json["joint_topology"] = generate_joint_topology(model);
+        json["nn_segments"] = generate_nn_segments(model);
 
         std::vector<std::string> link_names;
         for (auto i = 0U; i < model.frames.size(); ++i)
@@ -234,6 +297,51 @@ namespace cricket
             link_names.emplace_back(model.frames[i].name);
         }
         json["link_names"] = link_names;
+
+        nlohmann::json env_entries = nlohmann::json::array();
+        nlohmann::json env_body_idx = nlohmann::json::array();
+        const std::size_t n_links = links_with_geometry.size();
+        std::size_t body_offset = 0;
+        for (std::size_t i = 0; i < n_links; ++i)
+        {
+            const std::size_t array_index = n_links - 1 - i;
+            const std::size_t link_index = links_with_geometry[array_index];
+            const auto &body = per_link_spheres[link_index];
+            env_entries.push_back({array_index, body_offset, body.size()});
+            for (const auto &s : body)
+            {
+                env_body_idx.push_back(s);
+            }
+            body_offset += body.size();
+        }
+        json["compact_env_entries"] = env_entries;
+        json["compact_env_body_idx"] = env_body_idx;
+
+        nlohmann::json self_entries = nlohmann::json::array();
+        nlohmann::json self_pair_a = nlohmann::json::array();
+        nlohmann::json self_pair_b = nlohmann::json::array();
+        std::size_t pair_offset = 0;
+        for (const auto &[link1, link2] : allowed_link_pairs)
+        {
+            const std::size_t bs1 = bounding_sphere_index[link1];
+            const std::size_t bs2 = bounding_sphere_index[link2];
+            const auto &spheres1 = per_link_spheres[link1];
+            const auto &spheres2 = per_link_spheres[link2];
+            const std::size_t count = spheres1.size() * spheres2.size();
+            self_entries.push_back({bs1, bs2, pair_offset, count});
+            for (const auto &a : spheres1)
+            {
+                for (const auto &b : spheres2)
+                {
+                    self_pair_a.push_back(a);
+                    self_pair_b.push_back(b);
+                }
+            }
+            pair_offset += count;
+        }
+        json["compact_self_entries"] = self_entries;
+        json["compact_self_pair_a"] = self_pair_a;
+        json["compact_self_pair_b"] = self_pair_b;
 
         return json;
     }

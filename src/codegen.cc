@@ -173,7 +173,9 @@ namespace cricket
         RobotInfo robot(opts.urdf, opts.srdf, opts.end_effector);
 
         nlohmann::json data = opts.data;
+        const bool compact_collisions = opts.data.value("compact_collisions", false);
         data.update(robot.json(opts.bounds));
+        data["compact_collisions"] = compact_collisions;
 
         auto eefk = trace_sphere_cc_fk(robot, opts.language, false, false, true);
         data["eefk_code"] = eefk.code;

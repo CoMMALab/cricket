@@ -1,0 +1,11 @@
+{
+    "name": "R2c6MinFloat",
+    "urdf": "r2c6/r2c6_minimal_floating_spherized.urdf",
+    "srdf": "r2c6/r2c6.srdf",
+    "resolution": 32,
+    "bounds": {"upper": [3.0, 3.0, 3.0], "lower": [-3.0, -3.0, 0.0]},
+    "compact_collisions": true,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "r2c6_minimal_floating_fk.hh"
+}

@@ -1,3 +1,51 @@
+// clang-format off
+// {% if compact_collisions %}
+//
+// environment vs. robot collisions
+//
+for (const auto &el : cc_env_links)
+{
+    const auto bs = (n_spheres + el.bs_array_idx) * 4;
+    if (sphere_environment_in_collision(environment,
+                                        y[bs + 0], y[bs + 1], y[bs + 2], y[bs + 3])) [[unlikely]]
+    {
+        for (unsigned int k = 0; k < el.body_count; ++k)
+        {
+            const auto s = cc_env_body_idx[el.body_start + k] * 4;
+            if (sphere_environment_in_collision(environment,
+                                                y[s + 0], y[s + 1], y[s + 2], y[s + 3])) [[unlikely]]
+            {
+                return false;
+            }
+        }
+    }
+}
+
+//
+// robot self-collisions
+//
+for (const auto &sp : cc_self_pairs)
+{
+    const auto bs1 = (n_spheres + sp.bs1_idx) * 4;
+    const auto bs2 = (n_spheres + sp.bs2_idx) * 4;
+    if (sphere_sphere_self_collision<decltype(x[0])>(
+            y[bs1 + 0], y[bs1 + 1], y[bs1 + 2], y[bs1 + 3],
+            y[bs2 + 0], y[bs2 + 1], y[bs2 + 2], y[bs2 + 3])) [[unlikely]]
+    {
+        for (unsigned int k = 0; k < sp.pair_count; ++k)
+        {
+            const auto a = cc_self_pair_a[sp.pair_start + k] * 4;
+            const auto b = cc_self_pair_b[sp.pair_start + k] * 4;
+            if (sphere_sphere_self_collision<decltype(x[0])>(
+                    y[a + 0], y[a + 1], y[a + 2], y[a + 3],
+                    y[b + 0], y[b + 1], y[b + 2], y[b + 3])) [[unlikely]]
+            {
+                return false;
+            }
+        }
+    }
+}
+{% else %}
 {% for i in range(length(links_with_geometry)) %}
 {% set array_index = length(links_with_geometry) - i - 1 %}
 {% set link_index = at(links_with_geometry, array_index) %}
@@ -77,4 +125,4 @@ if (sphere_sphere_self_collision<decltype(x[0])>(y[{{link_1_bs_loc + 0}}],
     {% endfor %}
 }
 {% endfor %}
-
+{% endif %}

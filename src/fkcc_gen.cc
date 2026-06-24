@@ -25,7 +25,9 @@ int main(int argc, char **argv)
     options.add_options()                                                                       //
         ("f,configuration_file", "JSON configuration filename", cxxopts::value<std::string>())  //
         ("o,output_filename", "Output JSON filename", cxxopts::value<std::string>())            //
-        ("t,output_template", "Output template filename (override configuration file)", cxxopts::value<std::string>())  //
+        ("t,output_template",
+         "Output template filename (override configuration file)",
+         cxxopts::value<std::string>())  //
         ("h,help", "Print usage")        //
         ;
 
@@ -104,7 +106,10 @@ int main(int argc, char **argv)
 
     cricket::RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_name);
 
+    // Preserve compact_collisions across robot.json() merge; default false.
+    const bool compact_collisions = data.value("compact_collisions", false);
     data.update(robot.json(bounds));
+    data["compact_collisions"] = compact_collisions;
 
     auto traced_eefk_code = cricket::trace_sphere_cc_fk(robot, language, false, false, true);
     data["eefk_code"] = traced_eefk_code.code;
