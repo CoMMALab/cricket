@@ -129,9 +129,6 @@ struct {{name}}
     static inline auto sample(const Sample &x_in) -> Configuration
     {
         {% if euclidean %}
-        // Euclidean fast path: same affine map as scale_configuration,
-        // operating on the packed FloatVector in one SIMD step. Sample and
-        // Configuration alias to the same FloatVector type when Euclidean.
         Configuration q = x_in;
         scale_configuration(q);
         return q;
@@ -179,10 +176,6 @@ struct {{name}}
         const FloatVector<rake> &t,
         ConfigurationBlock<rake> &out) noexcept
     {
-        // V is referenced by the SIMD-mask form emitted by LanguageCVampBlock
-        // for non-Euclidean robots; constants and operands get wrapped as
-        // V(x).blend(V(y), (V(...) CMP V(...))) so .blend() always has a
-        // vector receiver.
         using V = FloatVector<rake, 1>;
         {% if interpolate_block_code_vars > 0 %}std::array<V, {{interpolate_block_code_vars}}> v;{% endif %}
         {{interpolate_block_code}}
@@ -355,10 +348,6 @@ struct {{name}}
     }
 
     {% if compact_collisions %}
-    // Compact collision tables. Declared once at struct scope (not as
-    // function-local statics) so LLVM doesn't have to re-evaluate the
-    // initializer for each fkcc variant — a big JIT-compile-time win for
-    // high-DOF robots where the tables have thousands of entries.
     struct CCEnvLink { unsigned int bs_array_idx; unsigned int body_start; unsigned int body_count; };
     struct CCSelfPair { unsigned int bs1_idx; unsigned int bs2_idx; unsigned int pair_start; unsigned int pair_count; };
 
