@@ -23,7 +23,7 @@ auto IiwaBimanualParameterizationCG(
 {
 
     std::cout << "Generating parameterized IK code for iiwa..." << std::endl;
-    const size_t num_inp = 8 + 1 + 1 + 1 + 1;
+    const size_t num_inp = 8 + 1 + 1 + 1 + 7;
 
     ADVectorXs ad_inp(num_inp);  // 3 4x4 matrices
     for (auto i = 0U; i < num_inp; ++i)

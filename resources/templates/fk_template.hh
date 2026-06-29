@@ -20,8 +20,8 @@ struct {{name}}
     static constexpr std::size_t ambient_dimension = {{ambient_nq}};
 
     static constexpr bool use_parameterized_ik = true;
-    static constexpr std::size_t num_ik_parameters = 4;
-    inline static thread_local std::array<float, 4> ik_parameters = {1.f, 1.f, -1.f, 0.6f};
+    static constexpr std::size_t num_ik_parameters = 3 + 7;
+    inline static thread_local std::array<float, num_ik_parameters> ik_parameters = {1.0, 1.0, -1.0, 0.0, 0.0, 0.6, 0.927184, -0.374607, 0.0, 0.0};
 
 
 
@@ -41,6 +41,8 @@ struct {{name}}
 
     template <std::size_t rake>
     using AmbientConfigurationBlock = FloatVector<rake, ambient_dimension>;
+    using AmbientConfiguration = FloatVector<ambient_dimension>;
+    using AmbientConfigurationArray = std::array<FloatT, ambient_dimension>;
 
     template <std::size_t rake>
     struct Spheres
@@ -266,7 +268,7 @@ struct {{name}}
         return {true, y};
     }
 
-    static inline auto parameterized_ik(const std::array<float, {{n_q + 4}}> &x) noexcept -> std::pair<bool, std::array<float, {{param_ik_code_output}}>>
+    static inline auto parameterized_ik(const std::array<float, {{n_q + 10}}> &x) noexcept -> std::pair<bool, std::array<float, {{param_ik_code_output}}>>
     {
         // We expect x to be of size dimension + some addition parameters to specify the self-motion manifold.
         std::array<float, {{param_ik_code_vars}}> v;

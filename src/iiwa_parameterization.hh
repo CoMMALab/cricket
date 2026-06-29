@@ -3,6 +3,8 @@
 #include <Eigen/Dense>
 #include <algorithm>
 #include <cmath>
+#include <iostream>
+
 
 // define a macro constant for ang
 #define ang ((180.0 - 2.0 * 68.0) * M_PI / 180.0)
@@ -64,7 +66,13 @@ auto IiwaBimanualParameterization(
     // const auto shoulder_up = CondExpGt(ad_inp[8], 0.5, ADCG(1.0), ADCG(-1.0));
     // const auto elbow_up = CondExpGt(ad_inp[9], 0.5, ADCG(1.0), ADCG(-1.0));
     // const auto wrist_up = CondExpGt(ad_inp[10], 0.5, ADCG(1.0), ADCG(-1.0));
-    const T grasp_distance = ad_inp[11];
+    const T rel_x = ad_inp[11];
+    const T rel_y = ad_inp[12];
+    const T rel_z = ad_inp[13];
+    const T rel_qx = ad_inp[14];
+    const T rel_qy = ad_inp[15];
+    const T rel_qz = ad_inp[16];
+    const T rel_qw = ad_inp[17];
 
     // It is
     const auto GC2 = ad_inp[8];
@@ -113,34 +121,31 @@ auto IiwaBimanualParameterization(
     {
         tf_goal = tf_goal * ComputeDHMatrix(q_controlled[i], iiwa_alpha[i], iiwa_d[i]);
     }
+    std::cout << "FK result: " << std::endl;
+    std::cout << tf_goal << std::endl;
 
-    // Adjust for grasp distance, etc.
-    // const T ang = static_cast<T> ((180.0 - 2.0 * 68.0) * M_PI / 180.0);
-    const T c = cos((T)ang);
-    const T s = sin((T)ang);
+    // Compute rotation matrix from relative quaternion (qx, qy, qz, qw)
+    const T q_norm = sqrt(rel_qx * rel_qx + rel_qy * rel_qy + rel_qz * rel_qz + rel_qw * rel_qw + static_cast<T>(1e-12));
+    const T qx = rel_qx / q_norm;
+    const T qy = rel_qy / q_norm;
+    const T qz = rel_qz / q_norm;
+    const T qw = rel_qw / q_norm;
 
+    Eigen::Matrix3<T> R_rel;
     const T one = static_cast<T>(1);
-    const T zero = static_cast<T>(0);
+    const T two = static_cast<T>(2);
+    R_rel << one - two * (qy * qy + qz * qz), two * (qx * qy - qw * qz),       two * (qx * qz + qw * qy),
+             two * (qx * qy + qw * qz),       one - two * (qx * qx + qz * qz), two * (qy * qz - qw * qx),
+             two * (qx * qz - qw * qy),       two * (qy * qz + qw * qx),       one - two * (qx * qx + qy * qy);
 
-    Eigen::Matrix3<T> R1;
-    R1 << -one, zero, zero, zero, one, zero, zero, zero, -one;
-    Eigen::Matrix3<T> R2;
-    R2 << c, -s, zero, s, c, zero, zero, zero, one;
-    Eigen::Matrix3<T> R3;
-    R3 << -one, zero, zero, zero, -one, zero, zero, zero, one;
+    // Apply the relative transform and add base translation to position
+    Eigen::Matrix3<T> R_fk = tf_goal.template block<3, 3>(0, 0);
+    Eigen::Matrix<T, 3, 1> p_fk = tf_goal.template block<3, 1>(0, 3);
 
-    tf_goal.template block<3, 3>(0, 0) = tf_goal.template block<3, 3>(0, 0) * R1 * R2 * R3;
-
-    Eigen::Matrix<T, 3, 1> grasp_distance_vec((T)0, (T)0, -grasp_distance);
-
-    tf_goal.template block<3, 1>(0, 3) +=
-        tf_goal.template block<3, 3>(0, 0) * grasp_distance_vec;
+    tf_goal.template block<3, 3>(0, 0) = R_fk * R_rel;
+    tf_goal.template block<3, 1>(0, 3) = p_fk + R_fk * Eigen::Matrix<T, 3, 1>(rel_x, rel_y, rel_z);
 
     tf_goal.template block<3, 1>(0, 3) += base_translation.cast<T>();
-
-    // if (unclipped_vals != nullptr) {
-    //   unclipped_vals->resize(4);
-    // }
 
     // Do the IK!!!!
     Eigen::Matrix<T, 3, 1> p_02((T)0.0, (T)0.0, (T)d_bs);
