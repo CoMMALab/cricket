@@ -19,6 +19,11 @@ struct {{name}}
 
     static constexpr std::size_t ambient_dimension = {{ambient_nq}};
 
+    static constexpr bool use_parameterized_ik = true;
+    static constexpr std::size_t num_ik_parameters = 4;
+    inline static thread_local std::array<float, 4> ik_parameters = {1.f, 1.f, -1.f, 0.6f};
+
+
 
     static constexpr std::array<std::string_view, ambient_dimension> joint_names = {"{{join(joint_names, "\", \"")}}"};
     static constexpr char* end_effector = "{{end_effector}}";
@@ -252,7 +257,7 @@ struct {{name}}
 
         // Check if y are within joint limits
         {% for index in range(n_q - 1) %}
-        if ((y[{{index + n_q - 1}}] < {{ at(bound_lower, index) }}).any() || (y[{{index}}] > {{ at(bound_lower, index) }} + {{ at(bound_range, index) }}).any())
+        if ((y[{{index + n_q - 1}}] < {{ at(bound_lower, index) }}).any() || (y[{{index + n_q - 1}}] > {{ at(bound_lower, index) }} + {{ at(bound_range, index) }}).any())
         {
             return {false, y};
         }
@@ -271,7 +276,7 @@ struct {{name}}
 
         // Check if y are within joint limits
         {% for index in range(n_q - 1) %}
-        if ((y[{{index + n_q - 1}}] < {{ at(bound_lower, index) }}) || (y[{{index}}] > {{ at(bound_lower, index) }} + {{ at(bound_range, index) }}))
+        if ((y[{{index + n_q - 1}}] < {{ at(bound_lower, index) }}) || (y[{{index + n_q - 1}}] > {{ at(bound_lower, index) }} + {{ at(bound_range, index) }}))
         {
             return {false, y};
         }

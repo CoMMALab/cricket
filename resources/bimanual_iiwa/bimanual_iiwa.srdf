@@ -55,6 +55,7 @@
     <disable_collisions link1="iiwa_left_iiwa_link_4" link2="iiwa_left_wsg_right_finger" reason="Never"/>
     <disable_collisions link1="iiwa_left_iiwa_link_4" link2="iiwa_right_iiwa_link_0" reason="Never"/>
     <disable_collisions link1="iiwa_left_iiwa_link_5" link2="iiwa_left_iiwa_link_6" reason="Adjacent"/>
+    <disable_collisions link1="iiwa_left_iiwa_link_5" link2="iiwa_left_iiwa_link_7" reason="Adjacent"/>
     <disable_collisions link1="iiwa_left_iiwa_link_6" link2="iiwa_left_iiwa_link_7" reason="Adjacent"/>
     <disable_collisions link1="iiwa_left_iiwa_link_6" link2="iiwa_left_wsg_left_finger" reason="Never"/>
     <disable_collisions link1="iiwa_left_iiwa_link_6" link2="iiwa_left_wsg_right_finger" reason="Never"/>
@@ -83,6 +84,7 @@
     <disable_collisions link1="iiwa_right_iiwa_link_4" link2="iiwa_right_wsg_left_finger" reason="Never"/>
     <disable_collisions link1="iiwa_right_iiwa_link_4" link2="iiwa_right_wsg_right_finger" reason="Never"/>
     <disable_collisions link1="iiwa_right_iiwa_link_5" link2="iiwa_right_iiwa_link_6" reason="Adjacent"/>
+    <disable_collisions link1="iiwa_right_iiwa_link_5" link2="iiwa_right_iiwa_link_7" reason="Adjacent"/>
     <disable_collisions link1="iiwa_right_iiwa_link_6" link2="iiwa_right_iiwa_link_7" reason="Adjacent"/>
     <disable_collisions link1="iiwa_right_iiwa_link_6" link2="iiwa_right_wsg_left_finger" reason="Never"/>
     <disable_collisions link1="iiwa_right_iiwa_link_6" link2="iiwa_right_wsg_right_finger" reason="Never"/>
