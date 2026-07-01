@@ -1,13 +1,12 @@
-// Python bindings for cricket's runtime JIT (LLVM ORC) so callers can compile a
-// C++ translation unit at runtime and pull out function pointers — used by
-// pyroffi to JIT-compile a robot-specialised VAMP collision checker and hand its
-// XLA FFI handler to JAX.
+// Python bindings for cricket's runtime JIT (LLVM ORC) so python can compile a
+// C++ translation unit at runtime/pull out function pointers.  The API exposes generic 
+// compile / link / symbol-lookup primitives and knows nothing about any particular caller.
 //
-// Kept deliberately small: a single `JitSession` wrapper that owns a clang
+// The wrapper is lightweight, a single `JitSession` wrapper that owns a clang
 // front-end, an LLJIT, and an on-disk object cache.  `add_source` compiles +
 // links a TU; `handler_capsule` looks up an `extern "C" void *getter()` symbol,
-// calls it, and returns the resulting handler pointer wrapped in a PyCapsule
-// suitable for `jax.ffi.register_ffi_target`.
+// calls it, and returns the resulting pointer wrapped in a PyCapsule.  That
+// capsule is consumable by a C-pointer FFI boundary like PyRoFFI
 
 #include <cricket/jit/compiler.hh>
 #include <cricket/jit/object_cache.hh>
@@ -33,14 +32,10 @@ using namespace nb::literals;
 
 namespace
 {
-    // A niladic getter emitted (with C linkage) by the per-robot translation
-    // unit; returns the address of an XLA FFI custom-call handler.
-    using HandlerGetter = void *(*)();
-
-    class PyJitSession
+    class CricketJitSession
     {
     public:
-        explicit PyJitSession(const std::optional<std::filesystem::path> &cache_dir)
+        explicit CricketJitSession(const std::optional<std::filesystem::path> &cache_dir)
         {
             const auto dir = cache_dir.value_or(cricket::jit::default_cache_dir());
             std::filesystem::create_directories(dir);
@@ -96,8 +91,8 @@ namespace
             return addr->getValue();
         }
 
-        // Look up a `void *getter()` symbol, call it, and wrap the returned
-        // handler pointer in a PyCapsule for jax.ffi.register_ffi_target.
+        // Look up an `extern "C" void *getter()` symbol, call it, and wrap the
+        // returned pointer in a PyCapsule.
         auto handler_capsule(const std::string &getter_symbol) -> nb::capsule
         {
             auto fn = session_->lookup_fn<void *()>(getter_symbol);
@@ -144,41 +139,41 @@ namespace cricket
             .def_rw("extra_flags", &jit::CompileOptions::extra_flags)
             .def_rw("module_id", &jit::CompileOptions::module_id);
 
-        nb::class_<PyJitSession>(jit, "JitSession")
+        nb::class_<CricketJitSession>(jit, "JitSession")
             .def(
                 nb::init<const std::optional<std::filesystem::path> &>(),
                 "cache_dir"_a = nb::none(),
                 "Create a JIT session backed by an on-disk object cache.")
             .def(
                 "try_load_cached",
-                &PyJitSession::try_load_cached,
+                &CricketJitSession::try_load_cached,
                 "module_id"_a,
                 "Link a previously-cached object for module_id, skipping clang. "
                 "Returns True on a cache hit.")
             .def(
                 "add_source",
-                &PyJitSession::add_source,
+                &CricketJitSession::add_source,
                 "source"_a,
                 "options"_a,
                 "Compile a C++ translation unit and add it to the session.")
             .def(
                 "add_external_symbol",
-                &PyJitSession::add_external_symbol,
+                &CricketJitSession::add_external_symbol,
                 "name"_a,
                 "address"_a,
                 "Define an absolute external symbol (address as an integer).")
             .def(
                 "lookup_address",
-                &PyJitSession::lookup_address,
+                &CricketJitSession::lookup_address,
                 "symbol"_a,
                 "Return the JIT address of a symbol as an integer.")
             .def(
                 "handler_capsule",
-                &PyJitSession::handler_capsule,
+                &CricketJitSession::handler_capsule,
                 "getter_symbol"_a,
                 "Call an `extern \"C\" void *getter()` symbol and return its result "
-                "wrapped in a PyCapsule for jax.ffi.register_ffi_target.")
-            .def_prop_ro("cache_dir", &PyJitSession::cache_dir);
+                "wrapped in a PyCapsule (e.g. for jax.ffi.register_ffi_target).")
+            .def_prop_ro("cache_dir", &CricketJitSession::cache_dir);
 
         jit.def(
             "hash_source",
