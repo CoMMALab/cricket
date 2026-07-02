@@ -204,15 +204,24 @@ if(CRICKET_BUILD_PYTHON)
     CPMAddPackage("gh:wjakob/nanobind#9a25aed8a7edfe60ef9ad1c911e57667bc4916c4")
   endif()
 
+  set(_cricket_python_sources src/bindings/python.cc)
+  if(CRICKET_BUILD_JIT)
+    list(APPEND _cricket_python_sources src/bindings/jit.cc)
+  endif()
+
   nanobind_add_module(_core_ext
       NB_STATIC
       STABLE_ABI
-      src/bindings/python.cc
+      ${_cricket_python_sources}
   )
   target_link_libraries(_core_ext PRIVATE cricket::cricket)
   target_include_directories(_core_ext PRIVATE
       third_party/nanobind_json/include
   )
+  if(CRICKET_BUILD_JIT)
+    target_link_libraries(_core_ext PRIVATE cricket::jit)
+    target_compile_definitions(_core_ext PRIVATE CRICKET_WITH_JIT)
+  endif()
 endif()
 
 if(CRICKET_BUILD_PYTHON)

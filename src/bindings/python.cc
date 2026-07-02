@@ -20,9 +20,20 @@
 namespace nb = nanobind;
 using namespace nb::literals;
 
+#ifdef CRICKET_WITH_JIT
+namespace cricket
+{
+    void init_jit(nanobind::module_ &m);
+}
+#endif
+
 NB_MODULE(_core_ext, m)
 {
     m.doc() = "Cricket: tracing compilation for spherized robot kinematics.";
+
+#ifdef CRICKET_WITH_JIT
+    cricket::init_jit(m);
+#endif
 
     nb::class_<cricket::RobotInfo>(m, "RobotInfo")
         .def(
