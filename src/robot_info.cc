@@ -276,6 +276,12 @@ namespace cricket
         json["bound_descale"] = std::vector<float>(bound_descale.data(), bound_descale.data() + model.nq);
         json["lower"] = std::vector<float>(lower_bound.data(), lower_bound.data() + model.nq);
         json["upper"] = std::vector<float>(upper_bound.data(), upper_bound.data() + model.nq);
+
+        const Eigen::VectorXd velocity_limit = model.velocityLimit;
+        const Eigen::VectorXd effort_limit = model.effortLimit;
+        json["velocity_limits"] =
+            std::vector<float>(velocity_limit.data(), velocity_limit.data() + model.nv);
+        json["effort_limits"] = std::vector<float>(effort_limit.data(), effort_limit.data() + model.nv);
         json["measure"] = measure;
         json["end_effector"] = end_effector_name;
         json["end_effector_index"] = end_effector_index;

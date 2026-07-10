@@ -8,6 +8,8 @@
 #include <inja/inja.hpp>
 #include <cxxopts.hpp>
 
+#include <cctype>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -147,6 +149,120 @@ int main(int argc, char **argv)
     auto dist = cricket::trace_distance(robot.model, language);
     data["distance_code"] = dist.code;
     data["distance_code_vars"] = dist.temp_variables;
+
+    if (data.contains("flask"))
+    {
+        const auto &fl = data["flask"];
+        if (not fl.contains("rho"))
+        {
+            throw std::runtime_error("flask configuration must specify 'rho' (LQMT time-effort weight)");
+        }
+
+        const double rho = fl["rho"].get<double>();
+        if (not (rho > 0.))
+        {
+            throw std::runtime_error("flask 'rho' must be positive");
+        }
+        data["rho"] = rho;
+
+        // Python/C++ module identifier; must match the registered binding module name
+        std::string module_name = data["name"].get<std::string>();
+        for (auto &c : module_name)
+        {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        data["module_name"] = fl.value("module_name", module_name);
+
+        // URDF limits emitted by RobotInfo, overridable from the flask block
+        if (fl.contains("velocity_limits"))
+        {
+            data["velocity_limits"] = fl["velocity_limits"];
+        }
+        if (fl.contains("effort_limits"))
+        {
+            data["effort_limits"] = fl["effort_limits"];
+        }
+
+        const auto nq = static_cast<std::size_t>(robot.model.nq);
+        const auto velocity_limits = data["velocity_limits"].get<std::vector<double>>();
+        const auto effort_limits = data["effort_limits"].get<std::vector<double>>();
+        if (velocity_limits.size() != nq or effort_limits.size() != nq)
+        {
+            throw std::runtime_error(
+                fmt::format("flask velocity/effort limits must have {} entries", nq));
+        }
+
+        for (std::size_t i = 0; i < nq; ++i)
+        {
+            if (not std::isfinite(velocity_limits[i]) or velocity_limits[i] <= 0. or
+                not std::isfinite(effort_limits[i]) or effort_limits[i] <= 0.)
+            {
+                throw std::runtime_error(
+                    fmt::format(
+                        "flask limits must be finite and positive (joint {}: velocity {}, effort "
+                        "{}); override via the 'flask' block if the URDF lacks them",
+                        i,
+                        velocity_limits[i],
+                        effort_limits[i]));
+            }
+        }
+
+        data["n_z"] = 2 * nq;
+        data["n_x"] = 3 * nq;
+
+        // Flat-state box: z = (q, qdot) in [q_lower, q_upper] x [-v_max, v_max]
+        const auto q_lower = data["lower"].get<std::vector<double>>();
+        const auto q_upper = data["upper"].get<std::vector<double>>();
+
+        std::vector<double> z_lower(2 * nq);
+        std::vector<double> z_upper(2 * nq);
+        std::vector<double> z_range(2 * nq);
+        std::vector<double> z_descale(2 * nq);
+        double z_measure = 1.;
+        for (std::size_t i = 0; i < nq; ++i)
+        {
+            z_lower[i] = q_lower[i];
+            z_upper[i] = q_upper[i];
+            z_lower[nq + i] = -velocity_limits[i];
+            z_upper[nq + i] = velocity_limits[i];
+        }
+
+        for (std::size_t i = 0; i < 2 * nq; ++i)
+        {
+            z_range[i] = z_upper[i] - z_lower[i];
+            z_descale[i] = 1. / z_range[i];
+            z_measure *= z_range[i];
+        }
+
+        data["z_lower"] = z_lower;
+        data["z_upper"] = z_upper;
+        data["z_range"] = z_range;
+        data["z_descale"] = z_descale;
+        data["z_measure"] = z_measure;
+
+        auto z_joint_names = data["joint_names"].get<std::vector<std::string>>();
+        for (std::size_t i = 0; i < nq; ++i)
+        {
+            z_joint_names.emplace_back(z_joint_names[i] + "_vel");
+        }
+        data["z_joint_names"] = z_joint_names;
+
+        auto flask_interp = cricket::trace_flask_interpolate(robot.model, language);
+        data["flask_interpolate_code"] = flask_interp.code;
+        data["flask_interpolate_code_vars"] = flask_interp.temp_variables;
+
+        auto flask_interp_block = cricket::trace_flask_interpolate_block(robot.model, language);
+        data["flask_interpolate_block_code"] = flask_interp_block.code;
+        data["flask_interpolate_block_code_vars"] = flask_interp_block.temp_variables;
+
+        auto flask_rnea = cricket::trace_flask_rnea(robot.model, language);
+        data["flask_rnea_code"] = flask_rnea.code;
+        data["flask_rnea_code_vars"] = flask_rnea.temp_variables;
+
+        auto flask_rnea_block = cricket::trace_flask_rnea_block(robot.model, language);
+        data["flask_rnea_block_code"] = flask_rnea_block.code;
+        data["flask_rnea_block_code_vars"] = flask_rnea_block.temp_variables;
+    }
 
     inja::Environment env;
 

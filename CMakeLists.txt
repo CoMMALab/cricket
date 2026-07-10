@@ -108,6 +108,7 @@ add_library(cricket
     src/tracing/mapping.cc
     src/tracing/interpolate.cc
     src/tracing/distance.cc
+    src/tracing/flask.cc
 )
 add_library(cricket::cricket ALIAS cricket)
 set_target_properties(cricket PROPERTIES POSITION_INDEPENDENT_CODE ON)

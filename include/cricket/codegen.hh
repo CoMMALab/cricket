@@ -38,6 +38,16 @@ namespace cricket
     auto trace_interpolate_block(const pinocchio::Model &model, const std::string &language) -> Traced;
     auto trace_distance(const pinocchio::Model &model, const std::string &language) -> Traced;
 
+    // FLASK (r = 2): minimum-acceleration cubic between flat states a = (y0, yd0), b = (yf, ydf)
+    // over duration T evaluated at fraction t; outputs 3n rows [y; yd; ydd].
+    auto trace_flask_interpolate(const pinocchio::Model &model, const std::string &language) -> Traced;
+    auto trace_flask_interpolate_block(const pinocchio::Model &model, const std::string &language)
+        -> Traced;
+
+    // Inverse dynamics via RNEA; input x = [q; v; a] (3n rows), outputs n torques.
+    auto trace_flask_rnea(const pinocchio::Model &model, const std::string &language) -> Traced;
+    auto trace_flask_rnea_block(const pinocchio::Model &model, const std::string &language) -> Traced;
+
     struct GenOptions
     {
         std::filesystem::path urdf;

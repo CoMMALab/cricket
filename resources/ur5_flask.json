@@ -1,0 +1,14 @@
+{
+    "name": "UR5Flask",
+    "urdf": "ur5/ur5_spherized.urdf",
+    "srdf": "ur5/ur5.srdf",
+    "end_effector": "robotiq_85_base_link",
+    "resolution": 32,
+    "template": "templates/flask_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "ur5_flask.hh",
+    "flask": {
+        "rho": 16.0,
+        "module_name": "ur5_flask"
+    }
+}
