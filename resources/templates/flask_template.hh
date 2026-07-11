@@ -156,6 +156,12 @@ struct {{name}}
         return vamp::planning::flask::cost<{{name}}>(a_in, b_in);
     }
 
+    static inline auto cost_grad(const Configuration &a_in, const Configuration &b_in) noexcept
+        -> vamp::planning::flask::LQMTCostGrad<dimension>
+    {
+        return vamp::planning::flask::cost_grad<{{name}}>(a_in, b_in);
+    }
+
     static inline auto eval(const Configuration &a_in, const Configuration &b_in, float T, float t) noexcept
         -> std::array<float, {{n_x}}>
     {
