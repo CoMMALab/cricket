@@ -5,10 +5,16 @@
 #include <vamp/collision/environment.hh>
 #include <vamp/collision/validity.hh>
 #include <vamp/planning/nn.hh>
+{% if has_flask %}#include <vamp/planning/flask.hh>{% endif %}
 
 #include <Eigen/Geometry>
 #include <nigh/so3_space.hpp>
 #include <nigh/cartesian_space.hpp>
+{% if has_flask %}
+#include <algorithm>
+#include <cmath>
+#include <limits>
+{% endif %}
 
 // clang-format off
 // NOLINTBEGIN(*-magic-numbers)
@@ -195,9 +201,12 @@ struct {{name}}
         {{interpolate_block_code}}
     }
 
-    template <std::size_t rake>
-    static inline void sphere_fk(const ConfigurationBlock<rake> &x, Spheres<rake> &out) noexcept
+    // The FK/CC kernels read only rows 0..dimension-1, so they accept any block with at least
+    // that many rows; a nested FLASK robot forwards its 3n-row z-blocks here directly.
+    template <std::size_t rake, std::size_t stride = dimension>
+    static inline void sphere_fk(const FloatVector<rake, stride> &x, Spheres<rake> &out) noexcept
     {
+        static_assert(stride >= dimension);
         std::array<FloatVector<rake, 1>, {{spherefk_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{spherefk_code_output}}> y;
 
@@ -214,11 +223,12 @@ struct {{name}}
 
     using Debug = std::pair<std::vector<std::vector<std::string>>, std::vector<std::pair<std::size_t, std::size_t>>>;
 
-    template <std::size_t rake>
+    template <std::size_t rake, std::size_t stride = dimension>
         static inline auto fkcc_debug(
             const vamp::collision::Environment<FloatVector<rake>> &environment,
-            const ConfigurationBlock<rake> &x) noexcept -> Debug
+            const FloatVector<rake, stride> &x) noexcept -> Debug
     {
+        static_assert(stride >= dimension);
         std::array<FloatVector<rake, 1>, {{ccfk_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{ccfk_code_output}}> y;
 
@@ -282,11 +292,12 @@ struct {{name}}
         return output;
     }
 
-    template <std::size_t rake>
+    template <std::size_t rake, std::size_t stride = dimension>
         static inline bool fkcc(
             const vamp::collision::Environment<FloatVector<rake>> &environment,
-            const ConfigurationBlock<rake> &x) noexcept
+            const FloatVector<rake, stride> &x) noexcept
     {
+        static_assert(stride >= dimension);
         std::array<FloatVector<rake, 1>, {{ccfk_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{ccfk_code_output}}> y;
 
@@ -296,11 +307,12 @@ struct {{name}}
         return true;
     }
 
-    template <std::size_t rake>
+    template <std::size_t rake, std::size_t stride = dimension>
     static inline bool fkcc_attach(
         const vamp::collision::Environment<FloatVector<rake>> &environment,
-        const ConfigurationBlock<rake> &x) noexcept
+        const FloatVector<rake, stride> &x) noexcept
     {
+        static_assert(stride >= dimension);
         std::array<FloatVector<rake, 1>, {{ccfkee_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{ccfkee_code_output}}> y;
 
@@ -578,6 +590,10 @@ struct {{name}}
     static constexpr std::array<unsigned int, {{ length(compact_self_pair_b) }}> cc_self_pair_b = {
         {% for v in compact_self_pair_b %}{{v}}, {% endfor %}
     };
+    {% endif %}
+
+    {% if has_flask %}
+{{ flask_struct }}
     {% endif %}
 };
 }

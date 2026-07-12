@@ -274,7 +274,20 @@ int main(int argc, char **argv)
             "solve_closed_loop_error_gradient_descent");
     }
 
-    if (data.contains("flask"))
+    inja::Environment env;
+
+    for (const auto &subt : data["subtemplates"])
+    {
+        inja::Template temp = env.parse_template(parent_path / subt["template"]);
+        env.include_template(subt["name"], temp);
+    }
+
+    // FLASK flat-system (z-robot) sibling: rendered as a nested `Flask` struct inside the
+    // geometric robot struct, so a single generated header carries both. The parent robot
+    // is always the ambient position-space robot for chart-based constrained planning.
+    const bool has_flask = data.contains("flask");
+    data["has_flask"] = has_flask;
+    if (has_flask)
     {
         const auto &fl = data["flask"];
         if (not fl.contains("rho"))
@@ -288,29 +301,6 @@ int main(int argc, char **argv)
             throw std::runtime_error("flask 'rho' must be positive");
         }
         data["rho"] = rho;
-
-        if (fl.contains("module_name"))
-        {
-            data["module_name"] = fl["module_name"];
-        }
-
-        // Ambient position-space sibling robot: emits an include of its header and a nested
-        // `using Ambient = ...` alias so bindings can pair the z-robot with its constraint
-        // kernels for chart-based constrained planning.
-        data["has_ambient"] = fl.contains("ambient");
-        if (fl.contains("ambient"))
-        {
-            const auto &amb = fl["ambient"];
-            if (not (amb.contains("struct") and amb.contains("header")))
-            {
-                throw std::runtime_error(
-                    "flask 'ambient' must specify 'struct' (robot struct name) and 'header' "
-                    "(vamp/robots header stem)");
-            }
-
-            data["ambient_struct"] = amb["struct"];
-            data["ambient_header"] = amb["header"];
-        }
 
         // URDF limits emitted by RobotInfo, overridable from the flask block
         if (fl.contains("velocity_limits"))
@@ -401,14 +391,13 @@ int main(int argc, char **argv)
         auto flask_rnea_block = cricket::trace_flask_rnea_block(robot.model, language);
         data["flask_rnea_block_code"] = flask_rnea_block.code;
         data["flask_rnea_block_code_vars"] = flask_rnea_block.temp_variables;
-    }
 
-    inja::Environment env;
-
-    for (const auto &subt : data["subtemplates"])
-    {
-        inja::Template temp = env.parse_template(parent_path / subt["template"]);
-        env.include_template(subt["name"], temp);
+        // Pre-render the nested struct so the main template just splices in finished code;
+        // a parse-time `{% include %}` would fail for non-flask robots.
+        const auto flask_template =
+            fl.value("template", std::string("templates/flask_template.hh"));
+        inja::Template flask_temp = env.parse_template(parent_path / flask_template);
+        data["flask_struct"] = env.render(flask_temp, data);
     }
 
     std::string output_template;

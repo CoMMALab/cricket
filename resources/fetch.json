@@ -6,5 +6,8 @@
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
-    "output": "fetch_fk.hh"
+    "output": "fetch_fk.hh",
+    "flask": {
+        "rho": 16.0
+    }
 }
