@@ -74,10 +74,17 @@ int main(int argc, char **argv)
         srdf_path = parent_path / data["srdf"];
     }
 
-    std::optional<std::string> end_effector_name = {};
+    std::vector<std::string> end_effector_names;
     if (data.contains("end_effector"))
     {
-        end_effector_name = data["end_effector"];
+        if (data["end_effector"].is_array())
+        {
+            end_effector_names = data["end_effector"].get<std::vector<std::string>>();
+        }
+        else
+        {
+            end_effector_names.push_back(data["end_effector"].get<std::string>());
+        }
     }
 
     std::string language = "c++";
@@ -106,12 +113,24 @@ int main(int argc, char **argv)
         bounds = b;
     }
 
-    cricket::RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_name);
+    cricket::RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_names);
 
     // Preserve compact_collisions across robot.json() merge; default false.
     const bool compact_collisions = data.value("compact_collisions", false);
     data.update(robot.json(bounds));
     data["compact_collisions"] = compact_collisions;
+
+    // Python/C++ module identifier; must match the registered binding module name.
+    // Overridable from the top-level JSON (and the flask block below).
+    if (not data.contains("module_name"))
+    {
+        std::string module_name = data["name"].get<std::string>();
+        for (auto &c : module_name)
+        {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        data["module_name"] = module_name;
+    }
 
     auto traced_eefk_code = cricket::trace_sphere_cc_fk(robot, language, false, false, true);
     data["eefk_code"] = traced_eefk_code.code;
@@ -150,6 +169,45 @@ int main(int argc, char **argv)
     data["distance_code"] = dist.code;
     data["distance_code_vars"] = dist.temp_variables;
 
+    const bool constraints = data.value("constraints", false);
+    data["has_constraints"] = constraints;
+    if (constraints)
+    {
+        const auto set_trace = [&data](const cricket::Traced &traced, const std::string &key)
+        {
+            data[key + "_code"] = traced.code;
+            data[key + "_code_vars"] = traced.temp_variables;
+            data[key + "_code_output"] = traced.outputs;
+        };
+
+        using cricket::ProjMethod;
+
+        set_trace(cricket::trace_tsr_error(robot, language), "tsr_error");
+        set_trace(
+            cricket::trace_solve_tsr(robot, language, ProjMethod::InnerLM),
+            "solve_tsr_error_lm_inner");
+        set_trace(
+            cricket::trace_solve_tsr(robot, language, ProjMethod::OuterLM),
+            "solve_tsr_error_lm_outer");
+        set_trace(
+            cricket::trace_solve_tsr(robot, language, ProjMethod::GradDesc),
+            "solve_tsr_error_gradient_descent");
+
+        if (robot.end_effector_indexes.size() > 1)
+        {
+            set_trace(cricket::trace_tsr_bimanual_error(robot, language), "tsr_bimanual_error");
+            set_trace(
+                cricket::trace_solve_tsr(robot, language, ProjMethod::InnerLM, true),
+                "solve_tsr_relative_error_lm_inner");
+            set_trace(
+                cricket::trace_solve_tsr(robot, language, ProjMethod::OuterLM, true),
+                "solve_tsr_relative_error_lm_outer");
+            set_trace(
+                cricket::trace_solve_tsr(robot, language, ProjMethod::GradDesc, true),
+                "solve_tsr_relative_error_gradient_descent");
+        }
+    }
+
     if (data.contains("flask"))
     {
         const auto &fl = data["flask"];
@@ -165,13 +223,10 @@ int main(int argc, char **argv)
         }
         data["rho"] = rho;
 
-        // Python/C++ module identifier; must match the registered binding module name
-        std::string module_name = data["name"].get<std::string>();
-        for (auto &c : module_name)
+        if (fl.contains("module_name"))
         {
-            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            data["module_name"] = fl["module_name"];
         }
-        data["module_name"] = fl.value("module_name", module_name);
 
         // URDF limits emitted by RobotInfo, overridable from the flask block
         if (fl.contains("velocity_limits"))

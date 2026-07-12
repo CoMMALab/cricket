@@ -31,6 +31,7 @@ struct {{name}}
     static constexpr std::size_t resolution = {{resolution}};
     static constexpr bool euclidean = false;
     static constexpr bool flask = true;
+    static constexpr std::array<std::size_t, 0> so3_offsets = {};
     static inline float rho = {{rho}};
 
     static constexpr std::array<std::string_view, dimension> joint_names = {"{{join(z_joint_names, "\", \"")}}"};

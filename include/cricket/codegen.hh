@@ -48,6 +48,38 @@ namespace cricket
     auto trace_flask_rnea(const pinocchio::Model &model, const std::string &language) -> Traced;
     auto trace_flask_rnea_block(const pinocchio::Model &model, const std::string &language) -> Traced;
 
+    // Least-squares step used to project a configuration onto a constraint manifold.
+    enum class ProjMethod
+    {
+        InnerLM,   // J^T (J J^T + lambda I)^{-1} e: (6 n_eef)^2 factorization
+        OuterLM,   // (J^T J + lambda I)^{-1} J^T e: nq^2 factorization
+        GradDesc,  // J^T e
+    };
+
+    // TSR (task-space region) error for every end-effector of the robot.
+    // Input: q (nq), then per end-effector [rTe (7), wTr (7), lb (6), ub (6)] with transforms
+    // as wxyz quaternion + xyz translation. Output: d(err)/dq (6 n_eef x nq, row-major), then
+    // the raw un-hinged error (6 n_eef); bounds are hinged at runtime, not on the tape.
+    auto trace_tsr_error(const RobotInfo &info, const std::string &language) -> Traced;
+
+    // Relative-pose (bimanual) TSR error between two end-effectors.
+    // Input: q (nq), then the reference relative transform lTr (7), lb (6), ub (6).
+    // Output: d(err)/dq (6 x nq, row-major), then the raw error (6).
+    auto trace_tsr_bimanual_error(
+        const RobotInfo &info,
+        const std::string &language,
+        std::size_t eef1 = 0,
+        std::size_t eef2 = 1) -> Traced;
+
+    // Projection step from a TSR error and Jacobian; `relative` selects the 6-row bimanual
+    // error instead of the 6 n_eef-row per-end-effector error.
+    // Input: J (row-major), then err. Output: gradient (nq).
+    auto trace_solve_tsr(
+        const RobotInfo &info,
+        const std::string &language,
+        ProjMethod method,
+        bool relative = false) -> Traced;
+
     struct GenOptions
     {
         std::filesystem::path urdf;

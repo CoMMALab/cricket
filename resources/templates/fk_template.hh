@@ -16,7 +16,7 @@ namespace vamp::robots
 {
 struct {{name}}
 {
-    static constexpr const char *name = "{{lower(name)}}";
+    static constexpr const char *name = "{{module_name}}";
     static constexpr std::size_t dimension = {{n_q}};
     static constexpr std::size_t sample_dimension = {{n_u}};
     static constexpr std::size_t n_spheres = {{n_spheres}};
@@ -24,6 +24,7 @@ struct {{name}}
     static constexpr float max_radius = {{max_radius}};
     static constexpr std::size_t resolution = {{resolution}};
     static constexpr bool euclidean = {{euclidean}};
+    static constexpr std::array<std::size_t, {{length(so3_offsets)}}> so3_offsets = { {{join(so3_offsets, ", ")}} };
 
     static constexpr std::array<std::string_view, dimension> joint_names = {"{{join(joint_names, "\", \"")}}"};
     static constexpr const char *end_effector = "{{end_effector}}";
@@ -129,12 +130,18 @@ struct {{name}}
     static inline auto sample(const Sample &x_in) -> Configuration
     {
         {% if euclidean %}
+        // Euclidean fast path: same affine map as scale_configuration,
+        // operating on the packed FloatVector in one SIMD step. Sample and
+        // Configuration alias to the same FloatVector type when Euclidean.
         Configuration q = x_in;
         scale_configuration(q);
         return q;
         {% else %}
         {% if mapconfig_code_vars > 0 %}std::array<float, {{mapconfig_code_vars}}> v;{% endif %}
-        ConfigurationBuffer y;
+        // Value-init: pad lanes past `dimension` must be zero, since Configuration
+        // loads the full rounded width and full-width reductions (e.g. squared_l2_norm)
+        // include them.
+        ConfigurationBuffer y{};
         const auto x = x_in.to_array();
         {{mapconfig_code}}
         return Configuration(y.data());
@@ -161,7 +168,10 @@ struct {{name}}
         return a_in.interpolate(b_in, t);
         {% else %}
         {% if interpolate_code_vars > 0 %}std::array<float, {{interpolate_code_vars}}> v;{% endif %}
-        ConfigurationBuffer y;
+        // Value-init: pad lanes past `dimension` must be zero, since Configuration
+        // loads the full rounded width and full-width reductions (e.g. squared_l2_norm)
+        // include them.
+        ConfigurationBuffer y{};
         const auto a = a_in.to_array();
         const auto b = b_in.to_array();
         {{interpolate_code}}
@@ -176,6 +186,10 @@ struct {{name}}
         const FloatVector<rake> &t,
         ConfigurationBlock<rake> &out) noexcept
     {
+        // V is referenced by the SIMD-mask form emitted by LanguageCVampBlock
+        // for non-Euclidean robots; constants and operands get wrapped as
+        // V(x).blend(V(y), (V(...) CMP V(...))) so .blend() always has a
+        // vector receiver.
         using V = FloatVector<rake, 1>;
         {% if interpolate_block_code_vars > 0 %}std::array<V, {{interpolate_block_code_vars}}> v;{% endif %}
         {{interpolate_block_code}}
@@ -346,6 +360,101 @@ struct {{name}}
 
         return to_isometry(y.data());
     }
+
+    {% if has_constraints %}
+    //
+    // TSR (task-space region) constraint functions
+    //
+
+    static constexpr std::size_t n_eef = {{num_end_effectors}};
+    static constexpr std::array<std::string_view, {{num_end_effectors}}> end_effectors = {"{{join(end_effectors, "\", \"")}}"};
+
+    // Input: q (dimension), then per end-effector rTe (7), wTr (7), lb (6), ub (6); transforms
+    // are wxyz quaternion + xyz translation. Output: d(err)/dq (6 * n_eef * dimension,
+    // row-major), then the raw un-hinged error (6 * n_eef).
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto tsr_error(const InputVector &x, OutputVector &out) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{tsr_error_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{tsr_error_code_output}}> y;
+
+        {{tsr_error_code}}
+
+        for (auto i = 0U; i < {{tsr_error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Input for the solvers: J (6 * n_eef * dimension, row-major), then err (6 * n_eef).
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_error_lm_inner(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_tsr_error_lm_inner_code_vars}}> v;
+
+        {{solve_tsr_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_error_lm_outer(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_tsr_error_lm_outer_code_vars}}> v;
+
+        {{solve_tsr_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_error_gradient_descent(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_tsr_error_gradient_descent_code_vars}}> v;
+
+        {{solve_tsr_error_gradient_descent_code}}
+    }
+
+    {% if num_end_effectors > 1 %}
+    // Relative-pose TSR between the first two end-effectors.
+    // Input: q (dimension), then the reference relative transform lTr (7), lb (6), ub (6).
+    // Output: d(err)/dq (6 * dimension, row-major), then the raw un-hinged error (6).
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto tsr_bimanual_error(const InputVector &x, OutputVector &out) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{tsr_bimanual_error_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{tsr_bimanual_error_code_output}}> y;
+
+        {{tsr_bimanual_error_code}}
+
+        for (auto i = 0U; i < {{tsr_bimanual_error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Input for the relative solvers: J (6 * dimension, row-major), then err (6).
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_relative_error_lm_inner(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_tsr_relative_error_lm_inner_code_vars}}> v;
+
+        {{solve_tsr_relative_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_relative_error_lm_outer(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_tsr_relative_error_lm_outer_code_vars}}> v;
+
+        {{solve_tsr_relative_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_relative_error_gradient_descent(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_tsr_relative_error_gradient_descent_code_vars}}> v;
+
+        {{solve_tsr_relative_error_gradient_descent_code}}
+    }
+    {% endif %}
+    {% endif %}
 
     {% if compact_collisions %}
     struct CCEnvLink { unsigned int bs_array_idx; unsigned int body_start; unsigned int body_count; };

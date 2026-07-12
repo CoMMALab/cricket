@@ -65,6 +65,11 @@ namespace cricket
             const std::optional<std::filesystem::path> &srdf_file,
             const std::optional<std::string> &end_effector);
 
+        RobotInfo(
+            const std::filesystem::path &urdf_file,
+            const std::optional<std::filesystem::path> &srdf_file,
+            const std::vector<std::string> &end_effectors);
+
         auto json(const std::optional<Bounds> &bounds = std::nullopt) -> nlohmann::json;
 
         auto dof_to_joint_names() -> std::vector<std::string>;
@@ -78,8 +83,14 @@ namespace cricket
 
         pinocchio::Model model;
         pinocchio::GeometryModel collision_model;
+
+        // First end-effector; attachment and eefk code paths use this one.
         std::string end_effector_name;
         std::size_t end_effector_index;
+
+        // All end-effectors, in declaration order (constraint codegen uses every entry).
+        std::vector<std::string> end_effector_names;
+        std::vector<std::size_t> end_effector_indexes;
 
         float min_radius{std::numeric_limits<float>::max()};
         float max_radius{std::numeric_limits<float>::min()};

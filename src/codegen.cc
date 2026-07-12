@@ -177,6 +177,9 @@ namespace cricket
         data.update(robot.json(opts.bounds));
         data["compact_collisions"] = compact_collisions;
 
+        // Constraint codegen is only wired through fkcc_gen; the template needs the flag.
+        data["has_constraints"] = false;
+
         auto eefk = trace_sphere_cc_fk(robot, opts.language, false, false, true);
         data["eefk_code"] = eefk.code;
         data["eefk_code_vars"] = eefk.temp_variables;

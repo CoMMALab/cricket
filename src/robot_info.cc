@@ -54,6 +54,17 @@ namespace cricket
         const std::filesystem::path &urdf_file,
         const std::optional<std::filesystem::path> &srdf_file,
         const std::optional<std::string> &end_effector)
+      : RobotInfo(
+            urdf_file,
+            srdf_file,
+            end_effector ? std::vector<std::string>{*end_effector} : std::vector<std::string>{})
+    {
+    }
+
+    RobotInfo::RobotInfo(
+        const std::filesystem::path &urdf_file,
+        const std::optional<std::filesystem::path> &srdf_file,
+        const std::vector<std::string> &end_effectors)
     {
         if (not std::filesystem::exists(urdf_file))
         {
@@ -81,21 +92,31 @@ namespace cricket
 
         extract_spheres();
 
-        if (not end_effector)
+        if (end_effectors.empty())
         {
-            end_effector_name = model.frames[model.nframes - 1].name;
-            fmt::print("No EE provided, using distal link `{}`.\n", end_effector_name);
-        }
-        else if (not model.existFrame(*end_effector))
-        {
-            throw std::runtime_error(fmt::format("Invalid EE name {}", *end_effector));
+            end_effector_names.push_back(model.frames[model.nframes - 1].name);
+            fmt::print("No EE provided, using distal link `{}`.\n", end_effector_names.front());
         }
         else
         {
-            end_effector_name = *end_effector;
+            for (const auto &name : end_effectors)
+            {
+                if (not model.existFrame(name))
+                {
+                    throw std::runtime_error(fmt::format("Invalid EE name {}", name));
+                }
+
+                end_effector_names.push_back(name);
+            }
         }
 
-        end_effector_index = model.getFrameId(end_effector_name);
+        for (const auto &name : end_effector_names)
+        {
+            end_effector_indexes.push_back(model.getFrameId(name));
+        }
+
+        end_effector_name = end_effector_names.front();
+        end_effector_index = end_effector_indexes.front();
     }
 
     namespace
@@ -245,6 +266,24 @@ namespace cricket
             flush_lp();
             return segments;
         }
+
+        auto generate_so3_offsets(const pinocchio::Model &model) -> nlohmann::json
+        {
+            auto [_, joint_mappings] = classify_joints(model);
+            nlohmann::json offsets = nlohmann::json::array();
+            for (const auto &jm : joint_mappings)
+            {
+                if (jm.type == JointType::SO3)
+                {
+                    offsets.push_back(jm.idx_q);
+                }
+                else if (jm.type == JointType::SE3)
+                {
+                    offsets.push_back(jm.idx_q + 3);
+                }
+            }
+            return offsets;
+        }
     }  // namespace
 
     auto RobotInfo::json(const std::optional<Bounds> &bounds) -> nlohmann::json
@@ -285,6 +324,8 @@ namespace cricket
         json["measure"] = measure;
         json["end_effector"] = end_effector_name;
         json["end_effector_index"] = end_effector_index;
+        json["end_effectors"] = end_effector_names;
+        json["num_end_effectors"] = end_effector_names.size();
         json["min_radius"] = min_radius;
         json["max_radius"] = max_radius;
         json["joint_names"] = dof_to_joint_names();
@@ -296,6 +337,7 @@ namespace cricket
         json["euclidean"] = is_euclidean(model);
         json["joint_topology"] = generate_joint_topology(model);
         json["nn_segments"] = generate_nn_segments(model);
+        json["so3_offsets"] = generate_so3_offsets(model);
 
         std::vector<std::string> link_names;
         for (auto i = 0U; i < model.frames.size(); ++i)
