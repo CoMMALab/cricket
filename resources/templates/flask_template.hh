@@ -6,6 +6,7 @@
 #include <vamp/collision/validity.hh>
 #include <vamp/planning/flask.hh>
 #include <vamp/planning/nn.hh>
+{% if has_ambient %}#include <vamp/robots/{{ambient_header}}.hh>{% endif %}
 
 #include <Eigen/Geometry>
 #include <nigh/so3_space.hpp>
@@ -33,6 +34,11 @@ struct {{name}}
     static constexpr bool flask = true;
     static constexpr std::array<std::size_t, 0> so3_offsets = {};
     static inline float rho = {{rho}};
+{% if has_ambient %}
+    // Ambient position-space sibling (same kinematic structure, dimension = flat_dimension)
+    // whose constraint kernels define manifolds for chart-based constrained planning.
+    using Ambient = {{ambient_struct}};
+{% endif %}
 
     static constexpr std::array<std::string_view, dimension> joint_names = {"{{join(z_joint_names, "\", \"")}}"};
     static constexpr const char *end_effector = "{{end_effector}}";

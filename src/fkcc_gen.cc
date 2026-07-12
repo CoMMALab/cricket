@@ -169,19 +169,19 @@ int main(int argc, char **argv)
     data["distance_code"] = dist.code;
     data["distance_code_vars"] = dist.temp_variables;
 
+    const auto set_trace = [&data](const cricket::Traced &traced, const std::string &key)
+    {
+        data[key + "_code"] = traced.code;
+        data[key + "_code_vars"] = traced.temp_variables;
+        data[key + "_code_output"] = traced.outputs;
+    };
+
+    using cricket::ProjMethod;
+
     const bool constraints = data.value("constraints", false);
     data["has_constraints"] = constraints;
     if (constraints)
     {
-        const auto set_trace = [&data](const cricket::Traced &traced, const std::string &key)
-        {
-            data[key + "_code"] = traced.code;
-            data[key + "_code_vars"] = traced.temp_variables;
-            data[key + "_code_output"] = traced.outputs;
-        };
-
-        using cricket::ProjMethod;
-
         set_trace(cricket::trace_tsr_error(robot, language), "tsr_error");
         set_trace(
             cricket::trace_solve_tsr(robot, language, ProjMethod::InnerLM),
@@ -208,6 +208,72 @@ int main(int argc, char **argv)
         }
     }
 
+    // Center-of-mass kinematics: "com": true (world frame) or an object with optional
+    // "reference_frames" (com expressed relative to the mean position of those frames).
+    // The support-polygon error consuming these is 2D (xy), hence err_size 2 solvers.
+    bool has_com = false;
+    std::vector<std::string> com_reference_frames;
+    if (data.contains("com"))
+    {
+        const auto &cm = data["com"];
+        if (cm.is_boolean())
+        {
+            has_com = cm.get<bool>();
+        }
+        else
+        {
+            has_com = true;
+            if (cm.contains("reference_frames"))
+            {
+                com_reference_frames = cm["reference_frames"].get<std::vector<std::string>>();
+            }
+        }
+    }
+
+    data["has_com"] = has_com;
+    if (has_com)
+    {
+        data["com_reference_frames"] = com_reference_frames;
+        set_trace(cricket::trace_com_jacobian(robot, com_reference_frames, language), "com_jacobian");
+        set_trace(
+            cricket::trace_solve_jacobian(robot, language, ProjMethod::InnerLM, 2),
+            "solve_com_error_lm_inner");
+        set_trace(
+            cricket::trace_solve_jacobian(robot, language, ProjMethod::OuterLM, 2),
+            "solve_com_error_lm_outer");
+        set_trace(
+            cricket::trace_solve_jacobian(robot, language, ProjMethod::GradDesc, 2),
+            "solve_com_error_gradient_descent");
+    }
+
+    // Loop-closure distance constraints: "closed_loops" is a list of
+    // {"start_frame", "end_frame", "length"} objects.
+    const bool has_closed_loops = data.contains("closed_loops");
+    data["has_closed_loops"] = has_closed_loops;
+    if (has_closed_loops)
+    {
+        std::vector<cricket::ClosedLoop> loops;
+        for (const auto &cl : data["closed_loops"])
+        {
+            loops.push_back(
+                {cl["start_frame"].get<std::string>(),
+                 cl["end_frame"].get<std::string>(),
+                 cl["length"].get<double>()});
+        }
+
+        data["num_closed_loops"] = loops.size();
+        set_trace(cricket::trace_closed_loop_error(robot, loops, language), "closed_loop_error");
+        set_trace(
+            cricket::trace_solve_jacobian(robot, language, ProjMethod::InnerLM, loops.size()),
+            "solve_closed_loop_error_lm_inner");
+        set_trace(
+            cricket::trace_solve_jacobian(robot, language, ProjMethod::OuterLM, loops.size()),
+            "solve_closed_loop_error_lm_outer");
+        set_trace(
+            cricket::trace_solve_jacobian(robot, language, ProjMethod::GradDesc, loops.size()),
+            "solve_closed_loop_error_gradient_descent");
+    }
+
     if (data.contains("flask"))
     {
         const auto &fl = data["flask"];
@@ -226,6 +292,24 @@ int main(int argc, char **argv)
         if (fl.contains("module_name"))
         {
             data["module_name"] = fl["module_name"];
+        }
+
+        // Ambient position-space sibling robot: emits an include of its header and a nested
+        // `using Ambient = ...` alias so bindings can pair the z-robot with its constraint
+        // kernels for chart-based constrained planning.
+        data["has_ambient"] = fl.contains("ambient");
+        if (fl.contains("ambient"))
+        {
+            const auto &amb = fl["ambient"];
+            if (not (amb.contains("struct") and amb.contains("header")))
+            {
+                throw std::runtime_error(
+                    "flask 'ambient' must specify 'struct' (robot struct name) and 'header' "
+                    "(vamp/robots header stem)");
+            }
+
+            data["ambient_struct"] = amb["struct"];
+            data["ambient_header"] = amb["header"];
         }
 
         // URDF limits emitted by RobotInfo, overridable from the flask block

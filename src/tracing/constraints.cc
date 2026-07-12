@@ -4,10 +4,13 @@
 #include "se3_ops.hh"
 #include "cholesky.hh"
 
+#include <pinocchio/algorithm/center-of-mass.hpp>
 #include <pinocchio/algorithm/frames.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
 
 #include <Eigen/Geometry>
+
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <iterator>
@@ -194,10 +197,19 @@ namespace cricket
         ProjMethod method,
         bool relative) -> Traced
     {
+        return trace_solve_jacobian(
+            info, language, method, task_dim * (relative ? 1 : info.end_effector_indexes.size()));
+    }
+
+    auto trace_solve_jacobian(
+        const RobotInfo &info,
+        const std::string &language,
+        ProjMethod method,
+        std::size_t err_size) -> Traced
+    {
         constexpr double damp = 1e-6;
 
         const auto nq = static_cast<std::size_t>(info.model.nq);
-        const std::size_t err_size = task_dim * (relative ? 1 : info.end_effector_indexes.size());
 
         // Input layout (must match vamp's JacobianProjectInp::operator[]):
         // J (err_size x nq, row-major), then err (err_size)
@@ -264,5 +276,126 @@ namespace cricket
             generate_code(handler, result, language),
             handler.getTemporaryVariableCount(),
             result.size()};
+    }
+
+    auto trace_com_jacobian(
+        const RobotInfo &info,
+        const std::vector<std::string> &reference_frames,
+        const std::string &language) -> Traced
+    {
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+
+        ADModel ad_model = info.model.cast<ADCG>();
+        ADData ad_data(ad_model);
+
+        std::vector<FrameIndex> reference_ids;
+        for (const auto &name : reference_frames)
+        {
+            if (not ad_model.existFrame(name, BODY))
+            {
+                throw std::runtime_error(
+                    fmt::format("CoM reference frame `{}` does not exist in the model", name));
+            }
+
+            reference_ids.push_back(ad_model.getFrameId(name, BODY));
+        }
+
+        ADVectorXs ad_inp(nq);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            ad_inp[i] = ADCG(0.0);
+        }
+
+        Independent(ad_inp);
+
+        ADVectorXs ad_q(nq);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            ad_q[i] = ad_inp[i];
+        }
+
+        forwardKinematics(ad_model, ad_data, ad_q);
+        updateFramePlacements(ad_model, ad_data);
+        const auto com = centerOfMass(ad_model, ad_data, ad_q, true);
+
+        Eigen::Vector3<ADCG> reference = Eigen::Vector3<ADCG>::Zero();
+        for (const auto id : reference_ids)
+        {
+            reference += ad_data.oMf[id].translation();
+        }
+
+        if (not reference_ids.empty())
+        {
+            reference /= ADCG(static_cast<double>(reference_ids.size()));
+        }
+
+        ADVectorXs data(3);
+        for (auto i = 0U; i < 3; ++i)
+        {
+            data[i] = com[i] - reference[i];
+        }
+
+        ADFun<CGD> com_func(ad_inp, data);
+        return emit_error_and_jacobian(com_func, nq, nq, 3, language);
+    }
+
+    auto trace_closed_loop_error(
+        const RobotInfo &info,
+        const std::vector<ClosedLoop> &loops,
+        const std::string &language) -> Traced
+    {
+        if (loops.empty())
+        {
+            throw std::runtime_error("trace_closed_loop_error requires at least one loop");
+        }
+
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+
+        ADModel ad_model = info.model.cast<ADCG>();
+        ADData ad_data(ad_model);
+
+        std::vector<std::pair<FrameIndex, FrameIndex>> frame_ids;
+        for (const auto &loop : loops)
+        {
+            for (const auto &name : {loop.start_frame, loop.end_frame})
+            {
+                if (not ad_model.existFrame(name, BODY))
+                {
+                    throw std::runtime_error(
+                        fmt::format("Closed-loop frame `{}` does not exist in the model", name));
+                }
+            }
+
+            frame_ids.emplace_back(
+                ad_model.getFrameId(loop.start_frame, BODY), ad_model.getFrameId(loop.end_frame, BODY));
+        }
+
+        ADVectorXs ad_inp(nq);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            ad_inp[i] = ADCG(0.0);
+        }
+
+        Independent(ad_inp);
+
+        ADVectorXs ad_q(nq);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            ad_q[i] = ad_inp[i];
+        }
+
+        forwardKinematics(ad_model, ad_data, ad_q);
+        updateFramePlacements(ad_model, ad_data);
+
+        ADVectorXs data(loops.size());
+        for (auto i = 0U; i < loops.size(); ++i)
+        {
+            const auto &start = ad_data.oMf[frame_ids[i].first].translation();
+            const auto &end = ad_data.oMf[frame_ids[i].second].translation();
+            data[i] = (end - start).norm() - ADCG(loops[i].length);
+        }
+
+        ADFun<CGD> error_func(ad_inp, data);
+        return emit_error_and_jacobian(error_func, nq, nq, loops.size(), language);
     }
 }  // namespace cricket

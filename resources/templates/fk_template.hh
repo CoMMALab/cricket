@@ -456,6 +456,107 @@ struct {{name}}
     {% endif %}
     {% endif %}
 
+    {% if has_com %}
+    //
+    // Center-of-mass kinematics
+    //
+
+    static constexpr bool has_com = true;
+
+    // Input: q (dimension). Output: d(com)/dq (3 * dimension, row-major), then the center of
+    // mass (3){% if length(com_reference_frames) > 0 %}, relative to the mean position of: {{join(com_reference_frames, ", ")}}{% endif %}.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto com_jacobian(const InputVector &x, OutputVector &out) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{com_jacobian_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{com_jacobian_code_output}}> y;
+
+        {{com_jacobian_code}}
+
+        for (auto i = 0U; i < {{com_jacobian_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Input for the solvers: J (2 * dimension, row-major), then err (2), the xy
+    // support-polygon error of the center of mass.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_com_error_lm_inner(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_com_error_lm_inner_code_vars}}> v;
+
+        {{solve_com_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_com_error_lm_outer(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_com_error_lm_outer_code_vars}}> v;
+
+        {{solve_com_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_com_error_gradient_descent(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_com_error_gradient_descent_code_vars}}> v;
+
+        {{solve_com_error_gradient_descent_code}}
+    }
+    {% endif %}
+
+    {% if has_closed_loops %}
+    //
+    // Loop-closure distance constraints
+    //
+
+    static constexpr std::size_t n_closed_loops = {{num_closed_loops}};
+
+    // Input: q (dimension). Output: d(err)/dq (n_closed_loops * dimension, row-major), then
+    // err (n_closed_loops), where each row is the deviation of the distance between the
+    // loop's cut frames from its fixed length.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto closed_loop_error(const InputVector &x, OutputVector &out) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{closed_loop_error_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{closed_loop_error_code_output}}> y;
+
+        {{closed_loop_error_code}}
+
+        for (auto i = 0U; i < {{closed_loop_error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Input for the solvers: J (n_closed_loops * dimension, row-major), then err
+    // (n_closed_loops).
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_closed_loop_error_lm_inner(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_closed_loop_error_lm_inner_code_vars}}> v;
+
+        {{solve_closed_loop_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_closed_loop_error_lm_outer(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_closed_loop_error_lm_outer_code_vars}}> v;
+
+        {{solve_closed_loop_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_closed_loop_error_gradient_descent(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_closed_loop_error_gradient_descent_code_vars}}> v;
+
+        {{solve_closed_loop_error_gradient_descent_code}}
+    }
+    {% endif %}
+
     {% if compact_collisions %}
     struct CCEnvLink { unsigned int bs_array_idx; unsigned int body_start; unsigned int body_count; };
     struct CCSelfPair { unsigned int bs1_idx; unsigned int bs2_idx; unsigned int pair_start; unsigned int pair_count; };

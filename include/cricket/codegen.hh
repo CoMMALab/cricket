@@ -80,6 +80,38 @@ namespace cricket
         ProjMethod method,
         bool relative = false) -> Traced;
 
+    // Projection step from an arbitrary stacked error and Jacobian with err_size rows.
+    // Input: J (err_size x nq, row-major), then err (err_size). Output: gradient (nq).
+    auto trace_solve_jacobian(
+        const RobotInfo &info,
+        const std::string &language,
+        ProjMethod method,
+        std::size_t err_size) -> Traced;
+
+    // Center-of-mass position and Jacobian, optionally expressed relative to the mean
+    // position of a set of reference (body) frames, e.g. the feet of a standing humanoid so
+    // that a support polygon can be stated in the stance frame.
+    // Input: q (nq). Output: d(com)/dq (3 x nq, row-major), then com (3).
+    auto trace_com_jacobian(
+        const RobotInfo &info,
+        const std::vector<std::string> &reference_frames,
+        const std::string &language) -> Traced;
+
+    // Loop-closure distance constraint: the distance between two (body) frames must equal a
+    // fixed length, e.g. a rigid rod cut from a closed kinematic chain.
+    struct ClosedLoop
+    {
+        std::string start_frame;
+        std::string end_frame;
+        double length;
+    };
+
+    // Input: q (nq). Output: d(err)/dq (n_loops x nq, row-major), then err (n_loops).
+    auto trace_closed_loop_error(
+        const RobotInfo &info,
+        const std::vector<ClosedLoop> &loops,
+        const std::string &language) -> Traced;
+
     struct GenOptions
     {
         std::filesystem::path urdf;

@@ -9,6 +9,7 @@
     "output": "panda_flask.hh",
     "flask": {
         "rho": 16.0,
-        "module_name": "panda_flask"
+        "module_name": "panda_flask",
+        "ambient": {"struct": "Panda", "header": "panda"}
     }
 }

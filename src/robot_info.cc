@@ -101,7 +101,7 @@ namespace cricket
         {
             for (const auto &name : end_effectors)
             {
-                if (not model.existFrame(name))
+                if (not model.existFrame(name, BODY))
                 {
                     throw std::runtime_error(fmt::format("Invalid EE name {}", name));
                 }
@@ -112,7 +112,7 @@ namespace cricket
 
         for (const auto &name : end_effector_names)
         {
-            end_effector_indexes.push_back(model.getFrameId(name));
+            end_effector_indexes.push_back(model.getFrameId(name, BODY));
         }
 
         end_effector_name = end_effector_names.front();

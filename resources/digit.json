@@ -1,0 +1,18 @@
+{
+    "name": "Digit",
+    "urdf": "digit/digit_model_floating_spherized.urdf",
+    "srdf": "digit/digit_spherized.srdf",
+    "bounds": {"upper": [2.0, 2.0, 2.0], "lower": [-2.0, -2.0, -2.0]},
+    "end_effector": ["left_arm_eef", "right_arm_eef", "left_toe_roll", "right_toe_roll"],
+    "constraints": true,
+    "com": {"reference_frames": ["left_toe_roll", "right_toe_roll"]},
+    "closed_loops": [
+        {"start_frame": "left_l1_start", "end_frame": "left_l1_end", "length": 0.503},
+        {"start_frame": "right_l1_start", "end_frame": "right_l1_end", "length": 0.503}
+    ],
+    "resolution": 32,
+    "compact_collisions": true,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "digit_fk.hh"
+}
