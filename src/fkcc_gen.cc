@@ -302,6 +302,12 @@ int main(int argc, char **argv)
         }
         data["rho"] = rho;
 
+        // Flask edge validation may need finer sampling than the geometric parent: the
+        // z-space cubics bow away from the straight line their endpoints suggest.
+        data["flask_resolution"] = fl.contains("resolution") ?
+                                       fl["resolution"].get<std::size_t>() :
+                                       data["resolution"].get<std::size_t>();
+
         // URDF limits emitted by RobotInfo, overridable from the flask block
         if (fl.contains("velocity_limits"))
         {

@@ -9,6 +9,7 @@
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
     "output": "panda_fk.hh",
     "flask": {
-        "rho": 32.0
+        "rho": 32.0,
+        "resolution": 64
     }
 }

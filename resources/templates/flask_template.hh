@@ -13,7 +13,7 @@
         static constexpr std::size_t n_spheres = {{n_spheres}};
         static constexpr float min_radius = {{min_radius}};
         static constexpr float max_radius = {{max_radius}};
-        static constexpr std::size_t resolution = {{resolution}};
+        static constexpr std::size_t resolution = {{flask_resolution}};
         static constexpr bool euclidean = false;
         static constexpr bool flask = true;
         static constexpr std::array<std::size_t, 0> so3_offsets = {};
