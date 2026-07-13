@@ -392,6 +392,22 @@ int main(int argc, char **argv)
         data["flask_rnea_block_code"] = flask_rnea_block.code;
         data["flask_rnea_block_code_vars"] = flask_rnea_block.temp_variables;
 
+        auto flask_ke = cricket::trace_flask_kinetic_energy(robot.model, language);
+        data["flask_kinetic_energy_code"] = flask_ke.code;
+        data["flask_kinetic_energy_code_vars"] = flask_ke.temp_variables;
+
+        auto flask_ke_block = cricket::trace_flask_kinetic_energy_block(robot.model, language);
+        data["flask_kinetic_energy_block_code"] = flask_ke_block.code;
+        data["flask_kinetic_energy_block_code_vars"] = flask_ke_block.temp_variables;
+
+        auto flask_eev = cricket::trace_flask_eef_velocity(robot, language);
+        data["flask_eef_velocity_code"] = flask_eev.code;
+        data["flask_eef_velocity_code_vars"] = flask_eev.temp_variables;
+
+        auto flask_eev_block = cricket::trace_flask_eef_velocity_block(robot, language);
+        data["flask_eef_velocity_block_code"] = flask_eev_block.code;
+        data["flask_eef_velocity_block_code_vars"] = flask_eev_block.temp_variables;
+
         // Pre-render the nested struct so the main template just splices in finished code;
         // a parse-time `{% include %}` would fail for non-flask robots.
         const auto flask_template =

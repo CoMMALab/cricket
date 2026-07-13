@@ -48,6 +48,18 @@ namespace cricket
     auto trace_flask_rnea(const pinocchio::Model &model, const std::string &language) -> Traced;
     auto trace_flask_rnea_block(const pinocchio::Model &model, const std::string &language) -> Traced;
 
+    // Kinetic energy (1/2) v^T M(q) v; input x = [q; v] (2n rows), 1 output. Requires link
+    // masses in the URDF.
+    auto trace_flask_kinetic_energy(const pinocchio::Model &model, const std::string &language)
+        -> Traced;
+    auto trace_flask_kinetic_energy_block(const pinocchio::Model &model, const std::string &language)
+        -> Traced;
+
+    // World-aligned linear velocity of every end-effector origin; input x = [q; v] (2n rows),
+    // 3 outputs per end-effector.
+    auto trace_flask_eef_velocity(const RobotInfo &info, const std::string &language) -> Traced;
+    auto trace_flask_eef_velocity_block(const RobotInfo &info, const std::string &language) -> Traced;
+
     // Least-squares step used to project a configuration onto a constraint manifold.
     enum class ProjMethod
     {

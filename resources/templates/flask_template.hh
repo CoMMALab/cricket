@@ -170,6 +170,49 @@
             return y;
         }
 
+        // Kinetic energy (1/2) qd^T M(q) qd of a flat state x = [q; qd]
+        static inline auto kinetic_energy(const std::array<float, dimension> &x) noexcept -> float
+        {
+            {% if flask_kinetic_energy_code_vars > 0 %}std::array<float, {{flask_kinetic_energy_code_vars}}> v;{% endif %}
+            std::array<float, 1> y;
+            {{flask_kinetic_energy_code}}
+            return y[0];
+        }
+
+        // Per-lane kinetic energy; reads only the [q; qd] rows of the block
+        template <std::size_t rake>
+        static inline auto kinetic_energy_block(const ConfigurationBlock<rake> &x) noexcept
+            -> FloatVector<rake, 1>
+        {
+            {% if flask_kinetic_energy_block_code_vars > 0 %}std::array<FloatVector<rake, 1>, {{flask_kinetic_energy_block_code_vars}}> v;{% endif %}
+            std::array<FloatVector<rake, 1>, 1> ke;
+            {{flask_kinetic_energy_block_code}}
+            return ke[0];
+        }
+
+        // Named to avoid n_eef, which the bindings detect as "has TSR constraint kernels".
+        static constexpr std::size_t n_end_effectors = {{num_end_effectors}};
+
+        // World-aligned linear velocity of each end-effector origin for a flat state x = [q; qd]
+        static inline auto eef_velocity(const std::array<float, dimension> &x) noexcept
+            -> std::array<float, 3 * {{num_end_effectors}}>
+        {
+            {% if flask_eef_velocity_code_vars > 0 %}std::array<float, {{flask_eef_velocity_code_vars}}> v;{% endif %}
+            std::array<float, 3 * {{num_end_effectors}}> y;
+            {{flask_eef_velocity_code}}
+            return y;
+        }
+
+        // Per-lane world-aligned end-effector linear velocities; reads only the [q; qd] rows
+        template <std::size_t rake>
+        static inline void eef_velocity_block(
+            const ConfigurationBlock<rake> &x,
+            std::array<FloatVector<rake, 1>, 3 * {{num_end_effectors}}> &eev) noexcept
+        {
+            {% if flask_eef_velocity_block_code_vars > 0 %}std::array<FloatVector<rake, 1>, {{flask_eef_velocity_block_code_vars}}> v;{% endif %}
+            {{flask_eef_velocity_block_code}}
+        }
+
         static inline auto interpolate(const Configuration &a_in, const Configuration &b_in, float t) -> Configuration
         {
             {% if flask_interpolate_code_vars > 0 %}std::array<float, {{flask_interpolate_code_vars}}> v;{% endif %}

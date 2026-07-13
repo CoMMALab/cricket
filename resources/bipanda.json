@@ -8,5 +8,8 @@
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
-    "output": "bimanual_panda_fk.hh"
+    "output": "bimanual_panda_fk.hh",
+    "flask": {
+        "rho": 32.0
+    }
 }
