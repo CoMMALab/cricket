@@ -15,5 +15,16 @@ int main()
         std::cout << "y[" << i << "] = " << y[i] << '\n';
     }
 
+    // also test the SE3 parameterization
+    Eigen::VectorXd ad_inp_se3(6 + 1 + 1 + 1 + 1);  // 6 for the pose, 1 for psi, 3 for GC2, GC4, GC6
+    ad_inp_se3 << 0.65, -0.0650002, 0.44, 0.3582994, -0.6095064, 0.6096571, 0.3583876, 1.45, 1.0, 1.0, -1.0;  
+
+    const auto y_se3 = IiwaSE3Parameterization<double, Eigen::VectorXd>(ad_inp_se3);
+
+    for (std::size_t i = 0; i < y_se3.size(); ++i)
+    {
+        std::cout << "y_se3[" << i << "] = " << y_se3[i] << '\n';
+    }
+
     return 0;
 }

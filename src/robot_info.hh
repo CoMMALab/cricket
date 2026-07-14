@@ -120,16 +120,20 @@ struct RobotInfo
         // const Eigen::VectorXd bound_range = upper_bound - lower_bound;
         // const Eigen::VectorXd bound_descale = bound_range.cwiseInverse();
 
-        const size_t sampling_dimension = model.nq / 2 + 1;
-        Eigen::VectorXd lower_bound(sampling_dimension);
-        Eigen::VectorXd upper_bound(sampling_dimension);
+        // const size_t sampling_dimension = model.nq / 2 + 1;
+        // Eigen::VectorXd lower_bound(sampling_dimension);
+        // Eigen::VectorXd upper_bound(sampling_dimension);
 
 
         // fill the first model.nq/2 dimensions of lower bound 
         // with model.lowerPositionLimit and similarly upper bound
 
-        lower_bound.head(model.nq / 2) = model.lowerPositionLimit.head(model.nq / 2); lower_bound(model.nq / 2) = 0.0;
-        upper_bound.head(model.nq / 2) = model.upperPositionLimit.head(model.nq / 2); upper_bound(model.nq / 2) = 2.0 * M_PI;
+        // lower_bound.head(model.nq / 2) = model.lowerPositionLimit.head(model.nq / 2); lower_bound(model.nq / 2) = 0.0;
+        // upper_bound.head(model.nq / 2) = model.upperPositionLimit.head(model.nq / 2); upper_bound(model.nq / 2) = 2.0 * M_PI;
+        const size_t sampling_dimension = model.nq;
+        Eigen::VectorXd lower_bound(sampling_dimension);
+        Eigen::VectorXd upper_bound(sampling_dimension);
+        //
 
         const Eigen::VectorXd bound_range = upper_bound - lower_bound;
         const Eigen::VectorXd bound_descale = bound_range.cwiseInverse();

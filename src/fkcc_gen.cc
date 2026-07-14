@@ -238,10 +238,20 @@ int main(int argc, char **argv)
 
     if (data.contains("generate_param_ik") && data["generate_param_ik"].get<bool>())
     {
-        auto traced_iiwa_param_code = IiwaBimanualParameterizationCG<ADCG>(language, false);
-        data["param_ik_code"] = traced_iiwa_param_code.code;
-        data["param_ik_code_vars"] = traced_iiwa_param_code.temp_variables;
-        data["param_ik_code_output"] = traced_iiwa_param_code.outputs;
+        if (data["name"].contains("Bimanual") == true)
+        {
+            auto traced_iiwa_param_code = IiwaBimanualParameterizationCG<ADCG>(language, false);
+            data["param_ik_code"] = traced_iiwa_param_code.code;
+            data["param_ik_code_vars"] = traced_iiwa_param_code.temp_variables;
+            data["param_ik_code_output"] = traced_iiwa_param_code.outputs;
+        }
+        else
+        {
+            auto traced_iiwa_param_code = IiwaSE3ParameterizationCG<ADCG>(language, false);
+            data["param_ik_code"] = traced_iiwa_param_code.code;
+            data["param_ik_code_vars"] = traced_iiwa_param_code.temp_variables;
+            data["param_ik_code_output"] = traced_iiwa_param_code.outputs;
+        }
     }
 
 

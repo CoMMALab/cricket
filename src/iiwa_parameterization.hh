@@ -146,6 +146,8 @@ auto IiwaBimanualParameterization(
     tf_goal.template block<3, 1>(0, 3) = p_fk + R_fk * Eigen::Matrix<T, 3, 1>(rel_x, rel_y, rel_z);
 
     tf_goal.template block<3, 1>(0, 3) += base_translation.cast<T>();
+    std::cout << "Transformed FK result: " << std::endl;
+    std::cout << tf_goal << std::endl;
 
     // Do the IK!!!!
     Eigen::Matrix<T, 3, 1> p_02((T)0.0, (T)0.0, (T)d_bs);
@@ -243,4 +245,177 @@ auto IiwaBimanualParameterization(
 
     q_full.tail(7) = q_subordinate;
     return q_full;
+}
+template <typename T, typename InputVector>
+auto IiwaSE3Parameterization(
+    InputVector &ad_inp
+) {
+    /*
+    Get the IIWA joint angles from the end-effector pose and a free parameter psi. 
+    The input is a vector of size 11, 
+        where the first 7 elements are the end-effector pose (x, y, z, qx, qy, qz, qw) and 
+        the 8th element is psi. The next 3 elements are the GC2, GC4, and GC6 parameters.
+        which are shoulder, elbow, and wrist configuration parameters.
+    The output is a vector of size 7 containing the joint angles.
+    @param ad_inp: Input vector of size 11, containing the end-effector pose and psi.
+    @return q_subordinate: Output vector of size 7, containing the joint angles.
+    */
+    const T x = ad_inp[0];
+    const T y = ad_inp[1];
+    const T z = ad_inp[2];
+    const T qx = ad_inp[3];
+    const T qy = ad_inp[4];
+    const T qz = ad_inp[5];
+    const T qw = ad_inp[6];
+    const T psi = ad_inp[7];
+    const T clip = (T) (1.0 - 1e-4);
+
+
+    Eigen::Matrix4<T> tf_goal;
+    // First create a rotation matrix from the quaternion
+    // const T q_norm = sqrt(qx * qx + qy * qy + qz * qz + qw * qw + static_cast<T>(1e-12));
+    // const T qx = qx / q_norm;
+    // const T qy = qy / q_norm;
+    // const T qz = qz / q_norm;
+    // const T qw = qw / q_norm;
+
+    Eigen::Matrix3<T> R;
+    const T one = static_cast<T>(1);
+    const T two = static_cast<T>(2);
+    R << one - two * (qy * qy + qz * qz), two * (qx * qy - qw * qz),       two * (qx * qz + qw * qy),
+         two * (qx * qy + qw * qz),       one - two * (qx * qx + qz * qz), two * (qy * qz - qw * qx),
+         two * (qx * qz - qw * qy),       two * (qy * qz + qw * qx),       one - two * (qx * qx + qy * qy);
+
+    Eigen::Matrix<T, 3, 1> p(x, y, z);
+    tf_goal.template block<3, 3>(0, 0) = R;
+    tf_goal.template block<3, 1>(0, 3) = p;
+
+    // // It is
+    const auto GC2 = ad_inp[8];
+    const auto GC4 = ad_inp[9];
+    const auto GC6 = ad_inp[10];
+
+
+    Eigen::VectorX<T> q_subordinate(7);
+
+    // iiwa kinematic parameters.
+    Eigen::VectorX<T> iiwa_alpha(7);
+    iiwa_alpha(0) = -M_PI_2;
+    iiwa_alpha(1) = M_PI_2;
+    iiwa_alpha(2) = M_PI_2;
+    iiwa_alpha(3) = -M_PI_2;
+    iiwa_alpha(4) = -M_PI_2;
+    iiwa_alpha(5) = M_PI_2;
+    iiwa_alpha(6) = 0.0;
+    // iiwa_alpha << -M_PI_2, M_PI_2, M_PI_2, -M_PI_2, -M_PI_2, M_PI_2, 0.0;
+    Eigen::VectorX<T> iiwa_d(7);
+    iiwa_d(0) = 0.36;
+    iiwa_d(1) = 0.0;
+    iiwa_d(2) = 0.42;
+    iiwa_d(3) = 0.0;
+    iiwa_d(4) = 0.4;
+    iiwa_d(5) = 0.0;
+    iiwa_d(6) = 0.126 - 0.045;
+
+    const T d_bs = iiwa_d[0];
+    const T d_se = iiwa_d[2];
+    const T d_ew = iiwa_d[4];
+    const T d_wf = iiwa_d[6];
+
+
+    // Do the IK!!!!
+    Eigen::Matrix<T, 3, 1> p_02((T)0.0, (T)0.0, (T)d_bs);
+    Eigen::Matrix<T, 3, 1> p_24((T)0.0, (T)d_se, (T)0.0);
+    Eigen::Matrix<T, 3, 1> p_46((T)0.0, (T)0.0, (T)d_ew);
+    Eigen::Matrix<T, 3, 1> p_67((T)0.0, (T)0.0, (T)d_wf);
+
+    Eigen::Matrix<T, 3, 1> p_07 = tf_goal.template block<3, 1>(0, 3);
+    Eigen::Matrix3<T> R_07 = tf_goal.template block<3, 3>(0, 0);
+
+    // EQ (3)
+    Eigen::Matrix<T, 3, 1> p_26 = p_07 - p_02 - R_07 * p_67;
+    // normalized has branching statements, so we write a custom version of it that is differentiable.
+    Eigen::Matrix<T, 3, 1> p_26_hat = p_26 / (p_26.norm() + static_cast<T>(1e-8));
+
+    // EQ (5)
+    T theta_1v = atan2(p_26(1), p_26(0));
+
+    // EQ (7)
+    T p_26_norm = p_26.norm();
+    T p_26_dot = p_26.dot(p_26);  // = ||p_26||²
+
+    T arccos_in = (d_se * d_se + p_26_dot - d_ew * d_ew) / (2.0 * d_se * p_26_norm);
+    // if (unclipped_vals != nullptr) {
+    //   (*unclipped_vals)(0) = arccos_in;
+    // }
+
+    T phi = SafeArccos(arccos_in, -clip, clip);
+    T theta_2v = atan2(p_26.template head<2>().norm(), p_26(2)) + GC4 * phi;
+
+    T theta_3v = T(0);  // This joint is fixed
+
+    // EQ (4)
+    arccos_in = (p_26_dot - d_se * d_se - d_ew * d_ew) / (2.0 * d_se * d_ew);
+    // if (unclipped_vals != nullptr) {
+    //   (*unclipped_vals)(1) = arccos_in;
+    // }
+
+    T theta_4v = GC4 * SafeArccos(arccos_in, -clip, clip);
+    q_subordinate[3] = theta_4v;
+
+    // Build list of transforms T_01, T_12, T_23 using Ts[0], Ts[1], Ts[2] and
+    // theta_[0:3]
+    std::vector<Eigen::Matrix4<T>> T_vs;
+    T_vs.push_back(ComputeDHMatrix(theta_1v, iiwa_alpha(0), iiwa_d(0)));
+    T_vs.push_back(ComputeDHMatrix(theta_2v, iiwa_alpha(1), iiwa_d(1)));
+    T_vs.push_back(ComputeDHMatrix(theta_3v, iiwa_alpha(2), iiwa_d(2)));
+
+    Eigen::Matrix4<T> T_03_v = T_vs[0] * T_vs[1] * T_vs[2];
+    Eigen::Matrix3<T> R_03_v = T_03_v.template block<3, 3>(0, 0);
+
+    // EQ (15)
+    Eigen::Matrix3<T> cprod_p_26 = CrossProductMatrix(p_26_hat);
+    Eigen::Matrix3<T> A_s = cprod_p_26 * R_03_v;
+    Eigen::Matrix3<T> B_s = -cprod_p_26 * cprod_p_26 * R_03_v;
+    Eigen::Matrix3<T> C_s = p_26_hat * p_26_hat.transpose() * R_03_v;
+
+    // EQ (17)-(19)
+    q_subordinate(0) = atan2(
+        GC2 * (A_s(1, 1) * sin(psi) + B_s(1, 1) * cos(psi) + C_s(1, 1)),
+        GC2 * (A_s(0, 1) * sin(psi) + B_s(0, 1) * cos(psi) + C_s(0, 1)));
+
+    arccos_in = A_s(2, 1) * sin(psi) + B_s(2, 1) * cos(psi) + C_s(2, 1);
+    // if (unclipped_vals != nullptr) {
+    //   (*unclipped_vals)(2) = arccos_in;
+    // }
+    q_subordinate(1) = GC2 * SafeArccos(arccos_in, -clip, clip);
+
+    q_subordinate(2) = atan2(
+        GC2 * (-A_s(2, 2) * sin(psi) - B_s(2, 2) * cos(psi) - C_s(2, 2)),
+        GC2 * (-A_s(2, 0) * sin(psi) - B_s(2, 0) * cos(psi) - C_s(2, 0)));
+
+    // EQ (20)
+    Eigen::Matrix4<T> T_34 = ComputeDHMatrix(theta_4v, iiwa_alpha(3), iiwa_d(3));
+    Eigen::Matrix3<T> R_34 = T_34.template block<3, 3>(0, 0);
+
+    Eigen::Matrix3<T> A_w = R_34.transpose() * A_s.transpose() * R_07;
+    Eigen::Matrix3<T> B_w = R_34.transpose() * B_s.transpose() * R_07;
+    Eigen::Matrix3<T> C_w = R_34.transpose() * C_s.transpose() * R_07;
+
+    // EQ (22)-(24)
+    q_subordinate(4) = atan2(
+        GC6 * (A_w(1, 2) * sin(psi) + B_w(1, 2) * cos(psi) + C_w(1, 2)),
+        GC6 * (A_w(0, 2) * sin(psi) + B_w(0, 2) * cos(psi) + C_w(0, 2)));
+
+    arccos_in = A_w(2, 2) * sin(psi) + B_w(2, 2) * cos(psi) + C_w(2, 2);
+    // if (unclipped_vals != nullptr) {
+    //   (*unclipped_vals)(3) = arccos_in;
+    // }
+    q_subordinate(5) = GC6 * SafeArccos(arccos_in, -clip, clip);
+
+    q_subordinate(6) = atan2(
+        GC6 * (A_w(2, 1) * sin(psi) + B_w(2, 1) * cos(psi) + C_w(2, 1)),
+        GC6 * (-A_w(2, 0) * sin(psi) - B_w(2, 0) * cos(psi) - C_w(2, 0)));
+
+    return q_subordinate;
 }
