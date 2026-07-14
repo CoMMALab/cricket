@@ -4,7 +4,7 @@
 #include <vamp/vector/math.hh>
 #include <vamp/collision/environment.hh>
 #include <vamp/collision/validity.hh>
-#include <vamp/planning/nn.hh>
+#include <vamp/planning/nn/nn.hh>
 {% if has_flask %}#include <vamp/planning/flask.hh>{% endif %}
 
 #include <Eigen/Geometry>
