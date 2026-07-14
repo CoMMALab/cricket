@@ -274,6 +274,38 @@ int main(int argc, char **argv)
             "solve_closed_loop_error_gradient_descent");
     }
 
+    // Lead-screw coupling: "lead_screw": true generates the scalar screw invariant h(q)
+    // of the first end-effector (axial advance minus pitch-scaled rotation about a
+    // reference frame's z-axis) with err_size-1 projection solvers. dh/dq serves as the
+    // Pfaffian row of the coupling; the solvers serve its integrable (holonomic)
+    // representation.
+    const bool has_lead_screw = data.value("lead_screw", false);
+    data["has_lead_screw"] = has_lead_screw;
+    if (has_lead_screw)
+    {
+        set_trace(cricket::trace_lead_screw_error(robot, language), "lead_screw_error");
+        set_trace(
+            cricket::trace_solve_jacobian(robot, language, ProjMethod::InnerLM, 1),
+            "solve_lead_screw_error_lm_inner");
+        set_trace(
+            cricket::trace_solve_jacobian(robot, language, ProjMethod::OuterLM, 1),
+            "solve_lead_screw_error_lm_outer");
+        set_trace(
+            cricket::trace_solve_jacobian(robot, language, ProjMethod::GradDesc, 1),
+            "solve_lead_screw_error_gradient_descent");
+    }
+
+    // Twist Jacobians: "twist": true generates the reference-frame and body-frame twist
+    // Jacobians of the first end-effector's offset frame, combined at runtime with
+    // constant coefficients into Pfaffian velocity-constraint rows (lead screw,
+    // knife-edge, no-slip) without further codegen.
+    const bool has_twist = data.value("twist", false);
+    data["has_twist"] = has_twist;
+    if (has_twist)
+    {
+        set_trace(cricket::trace_twist_jacobians(robot, language), "twist_jacobians");
+    }
+
     inja::Environment env;
 
     for (const auto &subt : data["subtemplates"])

@@ -6,6 +6,7 @@
 
 #include <pinocchio/algorithm/center-of-mass.hpp>
 #include <pinocchio/algorithm/frames.hpp>
+#include <pinocchio/algorithm/jacobian.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
 
 #include <Eigen/Geometry>
@@ -397,5 +398,141 @@ namespace cricket
 
         ADFun<CGD> error_func(ad_inp, data);
         return emit_error_and_jacobian(error_func, nq, nq, loops.size(), language);
+    }
+
+    auto trace_lead_screw_error(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+
+        ADModel ad_model = info.model.cast<ADCG>();
+        ADData ad_data(ad_model);
+
+        // Input layout (must match vamp's LeadScrewConstraint::Input::operator[]):
+        // q (nq), then rTe (7), wTr (7), pitch (1)
+        const std::size_t num_inp = nq + 2 * tf_dim + 1;
+
+        ADVectorXs ad_inp(num_inp);
+        for (auto i = 0U; i < num_inp; ++i)
+        {
+            ad_inp[i] = ADCG(0.0);
+        }
+
+        Independent(ad_inp);
+
+        ADVectorXs ad_q(nq);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            ad_q[i] = ad_inp[i];
+        }
+
+        forwardKinematics(ad_model, ad_data, ad_q);
+        updateFramePlacements(ad_model, ad_data);
+
+        const auto rTe = read_transform(ad_inp, nq);
+        const auto wTr = read_transform(ad_inp, nq + tf_dim);
+
+        constexpr double two_pi = 6.283185307179586476925287;
+        const ADCG advance_per_radian = ad_inp[nq + 2 * tf_dim] / ADCG(two_pi);
+
+        // Same relative pose as the TSR error: the offset end-effector frame expressed
+        // in the reference frame. Its se(3) displacement's z-translation is the axial
+        // advance and its z-log-rotation the axial angle, so the screw invariant is a
+        // scalar combination of the displacement rows.
+        const auto wTobj = ad_data.oMf[info.end_effector_indexes[0]] * rTe.inverse();
+        const auto rTobj = wTr.inverse() * wTobj;
+        const auto displacement = se3_displacement(rTobj);
+
+        ADVectorXs data(1);
+        data[0] = displacement[2] - advance_per_radian * displacement[5];
+
+        ADFun<CGD> error_func(ad_inp, data);
+        return emit_error_and_jacobian(error_func, num_inp, nq, 1, language);
+    }
+
+    auto trace_twist_jacobians(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+
+        ADModel ad_model = info.model.cast<ADCG>();
+        ADData ad_data(ad_model);
+
+        // Input layout (must match vamp's TwistConstraint::Input::operator[]):
+        // q (nq), then rTe (7), wTr (7)
+        const std::size_t num_inp = nq + 2 * tf_dim;
+
+        ADVectorXs ad_inp(num_inp);
+        for (auto i = 0U; i < num_inp; ++i)
+        {
+            ad_inp[i] = ADCG(0.0);
+        }
+
+        Independent(ad_inp);
+
+        ADVectorXs ad_q(nq);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            ad_q[i] = ad_inp[i];
+        }
+
+        computeJointJacobians(ad_model, ad_data, ad_q);
+        updateFramePlacements(ad_model, ad_data);
+
+        const auto rTe = read_transform(ad_inp, nq);
+        const auto wTr = read_transform(ad_inp, nq + tf_dim);
+
+        const auto frame = info.end_effector_indexes[0];
+
+        // World-aligned frame Jacobian of the end-effector: linear rows are the velocity
+        // of the frame origin, angular rows the angular velocity, both in world axes.
+        ADData::Matrix6x jac(6, ad_model.nv);
+        jac.setZero();
+        getFrameJacobian(ad_model, ad_data, frame, LOCAL_WORLD_ALIGNED, jac);
+
+        const auto wTobj = ad_data.oMf[frame] * rTe.inverse();
+
+        // Shift the linear rows to the offset frame's origin: v_obj = v_eef + w x r.
+        const Eigen::Vector3<ADCG> r =
+            wTobj.translation_impl() - ad_data.oMf[frame].translation_impl();
+        ADMatrixXs lin(3, nq);
+        ADMatrixXs ang(3, nq);
+        for (auto k = 0U; k < nq; ++k)
+        {
+            const Eigen::Vector3<ADCG> jw = jac.col(k).tail(3);
+            ang.col(k) = jw;
+            lin.col(k) = Eigen::Vector3<ADCG>(jac.col(k).head(3)) + jw.cross(r);
+        }
+
+        // Twist of the offset frame expressed in the reference frame's axes, then in the
+        // offset frame's own (body) axes.
+        const Eigen::Matrix3<ADCG> ref_rotation = wTr.rotation_impl().transpose();
+        const Eigen::Matrix3<ADCG> loc_rotation = wTobj.rotation_impl().transpose();
+
+        ADMatrixXs rows(2 * task_dim, nq);
+        rows.topRows(3) = ref_rotation * lin;
+        rows.middleRows(3, 3) = ref_rotation * ang;
+        rows.middleRows(6, 3) = loc_rotation * lin;
+        rows.bottomRows(3) = loc_rotation * ang;
+
+        ADVectorXs data(2 * task_dim * nq);
+        for (auto i = 0U; i < 2 * task_dim; ++i)
+        {
+            for (auto j = 0U; j < nq; ++j)
+            {
+                data[i * nq + j] = rows(i, j);
+            }
+        }
+
+        ADFun<CGD> func(ad_inp, data);
+
+        CodeHandler<double> handler;
+        CppAD::vector<CGD> ind_vars(num_inp);
+        handler.makeVariables(ind_vars);
+
+        CppAD::vector<CGD> result = func.Forward(0, ind_vars);
+
+        return Traced{
+            generate_code(handler, result, language),
+            handler.getTemporaryVariableCount(),
+            2 * task_dim * nq};
     }
 }  // namespace cricket

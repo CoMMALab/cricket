@@ -71,7 +71,7 @@ namespace cricket
     // TSR (task-space region) error for every end-effector of the robot.
     // Input: q (nq), then per end-effector [rTe (7), wTr (7), lb (6), ub (6)] with transforms
     // as wxyz quaternion + xyz translation. Output: d(err)/dq (6 n_eef x nq, row-major), then
-    // the raw un-hinged error (6 n_eef); bounds are hinged at runtime, not on the tape.
+    // the raw error (6 n_eef); bounds are hinged at runtime, not on the tape.
     auto trace_tsr_error(const RobotInfo &info, const std::string &language) -> Traced;
 
     // Relative-pose (bimanual) TSR error between two end-effectors.
@@ -123,6 +123,23 @@ namespace cricket
         const RobotInfo &info,
         const std::vector<ClosedLoop> &loops,
         const std::string &language) -> Traced;
+
+    // Lead-screw coupling of the first end-effector: axial advance along the reference
+    // frame's z-axis locked to rotation about it. h(q) is the conserved quantity of the
+    // coupling and dh/dq its Pfaffian row (the velocity form is dh/dq qdot = 0).
+    // Input: q (nq), then rTe (7), wTr (7), pitch (1) with transforms as wxyz quaternion +
+    // xyz translation. Output: d(h)/dq (1 x nq, row-major), then h (1).
+    auto trace_lead_screw_error(const RobotInfo &info, const std::string &language) -> Traced;
+
+    // Twist Jacobians of the first end-effector's offset frame, for constant-coefficient
+    // Pfaffian velocity constraints c_ref^T twist_ref + c_loc^T twist_loc = 0 whose rows
+    // are combined at runtime in vamp. Input: q (nq), then rTe (7), wTr (7); transforms
+    // are wxyz quaternion + xyz translation. Output (12 x nq, row-major): the twist
+    // Jacobian [linear; angular] of the offset frame (eef * rTe^-1) expressed in the
+    // reference frame wTr's axes, then the same expressed in the offset frame's own
+    // (body) axes. Purely geometric (no log map), so rows are smooth for unbounded
+    // rotation.
+    auto trace_twist_jacobians(const RobotInfo &info, const std::string &language) -> Traced;
 
     struct GenOptions
     {
