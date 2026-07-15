@@ -96,13 +96,14 @@ endif()
 # Load FK templates into embedded strings
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/resources/templates/fk_template.hh"   CRICKET_FK_TEMPLATE)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/resources/templates/ccfk_template.hh" CRICKET_CCFK_TEMPLATE)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/resources/templates/flask_template.hh" CRICKET_FLASK_TEMPLATE)
 configure_file(
     include/cricket/embedded_templates.hh.in
     ${CMAKE_CURRENT_BINARY_DIR}/generated/cricket/embedded_templates.hh
     @ONLY
 )
 
-add_library(cricket
+add_library(cricket SHARED
     src/robot_info.cc
     src/codegen.cc
     src/tracing/mapping.cc
@@ -172,8 +173,14 @@ target_compile_definitions(fkcc_gen PRIVATE
     ${pinocchio_CFLAGS_OTHER}
 )
 
+# Since the split (cricket -> SHARED), the fkcc_gen CLI has a DT_NEEDED on libcricket.so.
+# bin/ and lib/ are siblings in both install layouts, so resolve it relative to the executable.
+set_target_properties(fkcc_gen PROPERTIES
+    INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+)
+
 if(CRICKET_BUILD_JIT)
-  add_library(cricket_jit
+  add_library(cricket_jit SHARED
       src/jit/compiler.cc
       src/jit/object_cache.cc
       src/jit/session.cc
@@ -214,6 +221,10 @@ if(CRICKET_BUILD_PYTHON)
   target_link_libraries(_core_ext PRIVATE cricket::cricket)
   target_include_directories(_core_ext PRIVATE
       third_party/nanobind_json/include
+  )
+
+  set_target_properties(_core_ext PROPERTIES
+      INSTALL_RPATH "$ORIGIN/lib"
   )
 endif()
 

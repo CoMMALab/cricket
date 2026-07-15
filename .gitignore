@@ -10,5 +10,7 @@
 /*.hh
 /*.rs
 /.cpm-cache/
+/install
+/resources/*.hh
 
 __pycache__

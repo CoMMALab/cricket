@@ -9,11 +9,11 @@
 #include <cxxopts.hpp>
 
 #include <cctype>
-#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -169,142 +169,28 @@ int main(int argc, char **argv)
     data["distance_code"] = dist.code;
     data["distance_code_vars"] = dist.temp_variables;
 
-    const auto set_trace = [&data](const cricket::Traced &traced, const std::string &key)
+    cricket::derive_constraint_traces(robot, data, language);
+
+    // FLASK flat-system (z-robot) sibling: the offline path reads the flask template from
+    // the recipe directory (overridable via the flask block's "template" key), so template
+    // edits take effect without rebuilding cricket.
+    std::string flask_template;
+    if (data.contains("flask"))
     {
-        data[key + "_code"] = traced.code;
-        data[key + "_code_vars"] = traced.temp_variables;
-        data[key + "_code_output"] = traced.outputs;
-    };
-
-    using cricket::ProjMethod;
-
-    const bool constraints = data.value("constraints", false);
-    data["has_constraints"] = constraints;
-    if (constraints)
-    {
-        set_trace(cricket::trace_tsr_error(robot, language), "tsr_error");
-        set_trace(
-            cricket::trace_solve_tsr(robot, language, ProjMethod::InnerLM),
-            "solve_tsr_error_lm_inner");
-        set_trace(
-            cricket::trace_solve_tsr(robot, language, ProjMethod::OuterLM),
-            "solve_tsr_error_lm_outer");
-        set_trace(
-            cricket::trace_solve_tsr(robot, language, ProjMethod::GradDesc),
-            "solve_tsr_error_gradient_descent");
-
-        if (robot.end_effector_indexes.size() > 1)
+        const auto template_path =
+            parent_path /
+            data["flask"].value("template", std::string("templates/flask_template.hh"));
+        std::ifstream template_file(template_path);
+        if (not template_file)
         {
-            set_trace(cricket::trace_tsr_bimanual_error(robot, language), "tsr_bimanual_error");
-            set_trace(
-                cricket::trace_solve_tsr(robot, language, ProjMethod::InnerLM, true),
-                "solve_tsr_relative_error_lm_inner");
-            set_trace(
-                cricket::trace_solve_tsr(robot, language, ProjMethod::OuterLM, true),
-                "solve_tsr_relative_error_lm_outer");
-            set_trace(
-                cricket::trace_solve_tsr(robot, language, ProjMethod::GradDesc, true),
-                "solve_tsr_relative_error_gradient_descent");
+            throw std::runtime_error(
+                fmt::format("flask template {} does not exist!", template_path.string()));
         }
+        std::stringstream buffer;
+        buffer << template_file.rdbuf();
+        flask_template = buffer.str();
     }
-
-    // Center-of-mass kinematics: "com": true (world frame) or an object with optional
-    // "reference_frames" (com expressed relative to the mean position of those frames).
-    // The support-polygon error consuming these is 2D (xy), hence err_size 2 solvers.
-    bool has_com = false;
-    std::vector<std::string> com_reference_frames;
-    if (data.contains("com"))
-    {
-        const auto &cm = data["com"];
-        if (cm.is_boolean())
-        {
-            has_com = cm.get<bool>();
-        }
-        else
-        {
-            has_com = true;
-            if (cm.contains("reference_frames"))
-            {
-                com_reference_frames = cm["reference_frames"].get<std::vector<std::string>>();
-            }
-        }
-    }
-
-    data["has_com"] = has_com;
-    if (has_com)
-    {
-        data["com_reference_frames"] = com_reference_frames;
-        set_trace(cricket::trace_com_jacobian(robot, com_reference_frames, language), "com_jacobian");
-        set_trace(
-            cricket::trace_solve_jacobian(robot, language, ProjMethod::InnerLM, 2),
-            "solve_com_error_lm_inner");
-        set_trace(
-            cricket::trace_solve_jacobian(robot, language, ProjMethod::OuterLM, 2),
-            "solve_com_error_lm_outer");
-        set_trace(
-            cricket::trace_solve_jacobian(robot, language, ProjMethod::GradDesc, 2),
-            "solve_com_error_gradient_descent");
-    }
-
-    // Loop-closure distance constraints: "closed_loops" is a list of
-    // {"start_frame", "end_frame", "length"} objects.
-    const bool has_closed_loops = data.contains("closed_loops");
-    data["has_closed_loops"] = has_closed_loops;
-    if (has_closed_loops)
-    {
-        std::vector<cricket::ClosedLoop> loops;
-        for (const auto &cl : data["closed_loops"])
-        {
-            loops.push_back(
-                {cl["start_frame"].get<std::string>(),
-                 cl["end_frame"].get<std::string>(),
-                 cl["length"].get<double>()});
-        }
-
-        data["num_closed_loops"] = loops.size();
-        set_trace(cricket::trace_closed_loop_error(robot, loops, language), "closed_loop_error");
-        set_trace(
-            cricket::trace_solve_jacobian(robot, language, ProjMethod::InnerLM, loops.size()),
-            "solve_closed_loop_error_lm_inner");
-        set_trace(
-            cricket::trace_solve_jacobian(robot, language, ProjMethod::OuterLM, loops.size()),
-            "solve_closed_loop_error_lm_outer");
-        set_trace(
-            cricket::trace_solve_jacobian(robot, language, ProjMethod::GradDesc, loops.size()),
-            "solve_closed_loop_error_gradient_descent");
-    }
-
-    // Lead-screw coupling: "lead_screw": true generates the scalar screw invariant h(q)
-    // of the first end-effector (axial advance minus pitch-scaled rotation about a
-    // reference frame's z-axis) with err_size-1 projection solvers. dh/dq serves as the
-    // Pfaffian row of the coupling; the solvers serve its integrable (holonomic)
-    // representation.
-    const bool has_lead_screw = data.value("lead_screw", false);
-    data["has_lead_screw"] = has_lead_screw;
-    if (has_lead_screw)
-    {
-        set_trace(cricket::trace_lead_screw_error(robot, language), "lead_screw_error");
-        set_trace(
-            cricket::trace_solve_jacobian(robot, language, ProjMethod::InnerLM, 1),
-            "solve_lead_screw_error_lm_inner");
-        set_trace(
-            cricket::trace_solve_jacobian(robot, language, ProjMethod::OuterLM, 1),
-            "solve_lead_screw_error_lm_outer");
-        set_trace(
-            cricket::trace_solve_jacobian(robot, language, ProjMethod::GradDesc, 1),
-            "solve_lead_screw_error_gradient_descent");
-    }
-
-    // Twist Jacobians: "twist": true generates the reference-frame and body-frame twist
-    // Jacobians of the first end-effector's offset frame, combined at runtime with
-    // constant coefficients into Pfaffian velocity-constraint rows (lead screw,
-    // knife-edge, no-slip) without further codegen.
-    const bool has_twist = data.value("twist", false);
-    data["has_twist"] = has_twist;
-    if (has_twist)
-    {
-        set_trace(cricket::trace_twist_jacobians(robot, language), "twist_jacobians");
-    }
+    cricket::derive_flask_traces(robot, data, language, flask_template);
 
     inja::Environment env;
 
@@ -312,146 +198,6 @@ int main(int argc, char **argv)
     {
         inja::Template temp = env.parse_template(parent_path / subt["template"]);
         env.include_template(subt["name"], temp);
-    }
-
-    // FLASK flat-system (z-robot) sibling: rendered as a nested `Flask` struct inside the
-    // geometric robot struct, so a single generated header carries both. The parent robot
-    // is always the ambient position-space robot for chart-based constrained planning.
-    const bool has_flask = data.contains("flask");
-    data["has_flask"] = has_flask;
-    if (has_flask)
-    {
-        const auto &fl = data["flask"];
-        if (not fl.contains("rho"))
-        {
-            throw std::runtime_error("flask configuration must specify 'rho' (LQMT time-effort weight)");
-        }
-
-        const double rho = fl["rho"].get<double>();
-        if (not (rho > 0.))
-        {
-            throw std::runtime_error("flask 'rho' must be positive");
-        }
-        data["rho"] = rho;
-
-        // Flask edge validation may need finer sampling than the geometric parent: the
-        // z-space cubics bow away from the straight line their endpoints suggest.
-        data["flask_resolution"] = fl.contains("resolution") ?
-                                       fl["resolution"].get<std::size_t>() :
-                                       data["resolution"].get<std::size_t>();
-
-        // URDF limits emitted by RobotInfo, overridable from the flask block
-        if (fl.contains("velocity_limits"))
-        {
-            data["velocity_limits"] = fl["velocity_limits"];
-        }
-        if (fl.contains("effort_limits"))
-        {
-            data["effort_limits"] = fl["effort_limits"];
-        }
-
-        const auto nq = static_cast<std::size_t>(robot.model.nq);
-        const auto velocity_limits = data["velocity_limits"].get<std::vector<double>>();
-        const auto effort_limits = data["effort_limits"].get<std::vector<double>>();
-        if (velocity_limits.size() != nq or effort_limits.size() != nq)
-        {
-            throw std::runtime_error(
-                fmt::format("flask velocity/effort limits must have {} entries", nq));
-        }
-
-        for (std::size_t i = 0; i < nq; ++i)
-        {
-            if (not std::isfinite(velocity_limits[i]) or velocity_limits[i] <= 0. or
-                not std::isfinite(effort_limits[i]) or effort_limits[i] <= 0.)
-            {
-                throw std::runtime_error(
-                    fmt::format(
-                        "flask limits must be finite and positive (joint {}: velocity {}, effort "
-                        "{}); override via the 'flask' block if the URDF lacks them",
-                        i,
-                        velocity_limits[i],
-                        effort_limits[i]));
-            }
-        }
-
-        data["n_z"] = 2 * nq;
-        data["n_x"] = 3 * nq;
-
-        // Flat-state box: z = (q, qdot) in [q_lower, q_upper] x [-v_max, v_max]
-        const auto q_lower = data["lower"].get<std::vector<double>>();
-        const auto q_upper = data["upper"].get<std::vector<double>>();
-
-        std::vector<double> z_lower(2 * nq);
-        std::vector<double> z_upper(2 * nq);
-        std::vector<double> z_range(2 * nq);
-        std::vector<double> z_descale(2 * nq);
-        double z_measure = 1.;
-        for (std::size_t i = 0; i < nq; ++i)
-        {
-            z_lower[i] = q_lower[i];
-            z_upper[i] = q_upper[i];
-            z_lower[nq + i] = -velocity_limits[i];
-            z_upper[nq + i] = velocity_limits[i];
-        }
-
-        for (std::size_t i = 0; i < 2 * nq; ++i)
-        {
-            z_range[i] = z_upper[i] - z_lower[i];
-            z_descale[i] = 1. / z_range[i];
-            z_measure *= z_range[i];
-        }
-
-        data["z_lower"] = z_lower;
-        data["z_upper"] = z_upper;
-        data["z_range"] = z_range;
-        data["z_descale"] = z_descale;
-        data["z_measure"] = z_measure;
-
-        auto z_joint_names = data["joint_names"].get<std::vector<std::string>>();
-        for (std::size_t i = 0; i < nq; ++i)
-        {
-            z_joint_names.emplace_back(z_joint_names[i] + "_vel");
-        }
-        data["z_joint_names"] = z_joint_names;
-
-        auto flask_interp = cricket::trace_flask_interpolate(robot.model, language);
-        data["flask_interpolate_code"] = flask_interp.code;
-        data["flask_interpolate_code_vars"] = flask_interp.temp_variables;
-
-        auto flask_interp_block = cricket::trace_flask_interpolate_block(robot.model, language);
-        data["flask_interpolate_block_code"] = flask_interp_block.code;
-        data["flask_interpolate_block_code_vars"] = flask_interp_block.temp_variables;
-
-        auto flask_rnea = cricket::trace_flask_rnea(robot.model, language);
-        data["flask_rnea_code"] = flask_rnea.code;
-        data["flask_rnea_code_vars"] = flask_rnea.temp_variables;
-
-        auto flask_rnea_block = cricket::trace_flask_rnea_block(robot.model, language);
-        data["flask_rnea_block_code"] = flask_rnea_block.code;
-        data["flask_rnea_block_code_vars"] = flask_rnea_block.temp_variables;
-
-        auto flask_ke = cricket::trace_flask_kinetic_energy(robot.model, language);
-        data["flask_kinetic_energy_code"] = flask_ke.code;
-        data["flask_kinetic_energy_code_vars"] = flask_ke.temp_variables;
-
-        auto flask_ke_block = cricket::trace_flask_kinetic_energy_block(robot.model, language);
-        data["flask_kinetic_energy_block_code"] = flask_ke_block.code;
-        data["flask_kinetic_energy_block_code_vars"] = flask_ke_block.temp_variables;
-
-        auto flask_eev = cricket::trace_flask_eef_velocity(robot, language);
-        data["flask_eef_velocity_code"] = flask_eev.code;
-        data["flask_eef_velocity_code_vars"] = flask_eev.temp_variables;
-
-        auto flask_eev_block = cricket::trace_flask_eef_velocity_block(robot, language);
-        data["flask_eef_velocity_block_code"] = flask_eev_block.code;
-        data["flask_eef_velocity_block_code_vars"] = flask_eev_block.temp_variables;
-
-        // Pre-render the nested struct so the main template just splices in finished code;
-        // a parse-time `{% include %}` would fail for non-flask robots.
-        const auto flask_template =
-            fl.value("template", std::string("templates/flask_template.hh"));
-        inja::Template flask_temp = env.parse_template(parent_path / flask_template);
-        data["flask_struct"] = env.render(flask_temp, data);
     }
 
     std::string output_template;

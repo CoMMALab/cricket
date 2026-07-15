@@ -11,6 +11,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace cricket
@@ -141,11 +142,32 @@ namespace cricket
     // rotation.
     auto trace_twist_jacobians(const RobotInfo &info, const std::string &language) -> Traced;
 
+    // Derive every JSON-gated constraint kernel (TSR, bimanual TSR, center-of-mass,
+    // closed loops, lead screw, twist Jacobians) from the recipe keys already present in
+    // `data` ("constraints", "com", "closed_loops", "lead_screw", "twist"), tracing the
+    // kernels and setting the has_* template gates. Shared by the offline generator
+    // (fkcc_gen) and the JIT path (generate_robot_source) so both accept the same keys.
+    auto derive_constraint_traces(const RobotInfo &robot, nlohmann::json &data, const std::string &language)
+        -> void;
+
+    // Derive the FLASK flat-system (z-robot) kernels when the recipe has a "flask" block
+    // in `data`, setting the has_flask template gate either way: validates rho and the
+    // velocity/effort limits, derives the flat-state box, traces the flask kernels, and
+    // pre-renders the nested `Flask` struct into data["flask_struct"]. A non-empty
+    // `flask_template` overrides the embedded flask template source. Shared by the
+    // offline generator (fkcc_gen) and the JIT path (generate_robot_source) so both
+    // accept the same keys.
+    auto derive_flask_traces(
+        const RobotInfo &robot,
+        nlohmann::json &data,
+        const std::string &language,
+        std::string_view flask_template = {}) -> void;
+
     struct GenOptions
     {
         std::filesystem::path urdf;
         std::optional<std::filesystem::path> srdf;
-        std::optional<std::string> end_effector;
+        std::vector<std::string> end_effectors;
         std::filesystem::path template_path;
         std::map<std::string, std::filesystem::path> subtemplates;
         std::string language = "c++";

@@ -52,7 +52,7 @@ NB_MODULE(_core_ext, m)
             [](cricket::GenOptions *self,
                const std::filesystem::path &urdf,
                const std::optional<std::filesystem::path> &srdf,
-               const std::optional<std::string> &end_effector,
+               nb::object end_effector,
                const std::optional<std::filesystem::path> &template_path,
                const std::map<std::string, std::filesystem::path> &subtemplates,
                const std::string &language,
@@ -61,7 +61,22 @@ NB_MODULE(_core_ext, m)
                 new (self) cricket::GenOptions{};
                 self->urdf = urdf;
                 self->srdf = srdf;
-                self->end_effector = end_effector;
+                // GenOptions carries multiple end effectors; accept a single str or a list.
+                if (not end_effector.is_none())
+                {
+                    if (nb::isinstance<nb::str>(end_effector))
+                    {
+                        auto s = nb::cast<std::string>(end_effector);
+                        if (not s.empty())
+                        {
+                            self->end_effectors.push_back(std::move(s));
+                        }
+                    }
+                    else
+                    {
+                        self->end_effectors = nb::cast<std::vector<std::string>>(end_effector);
+                    }
+                }
                 if (template_path)
                 {
                     self->template_path = *template_path;
@@ -82,7 +97,7 @@ NB_MODULE(_core_ext, m)
             "data"_a = nb::dict())
         .def_rw("urdf", &cricket::GenOptions::urdf)
         .def_rw("srdf", &cricket::GenOptions::srdf)
-        .def_rw("end_effector", &cricket::GenOptions::end_effector)
+        .def_rw("end_effectors", &cricket::GenOptions::end_effectors)
         .def_rw("template_path", &cricket::GenOptions::template_path)
         .def_rw("subtemplates", &cricket::GenOptions::subtemplates)
         .def_rw("language", &cricket::GenOptions::language);

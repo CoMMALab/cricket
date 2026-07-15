@@ -6,4 +6,5 @@ namespace cricket::embedded
 {
     inline constexpr std::string_view kFkTemplate   = R"INJA_DELIM(@CRICKET_FK_TEMPLATE@)INJA_DELIM";
     inline constexpr std::string_view kCcfkTemplate = R"INJA_DELIM(@CRICKET_CCFK_TEMPLATE@)INJA_DELIM";
+    inline constexpr std::string_view kFlaskTemplate = R"INJA_DELIM(@CRICKET_FLASK_TEMPLATE@)INJA_DELIM";
 }  // namespace cricket::embedded
