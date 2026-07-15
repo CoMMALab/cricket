@@ -1,10 +1,15 @@
 {
     "name": "IiwaMarker",
     "urdf": "iiwa_marker/iiwa_marker_spherized.urdf",
-    "end_effectors": ["panda_tip"],
+    "srdf": "iiwa_marker/moveit/config/iiwa.srdf",
+    "end_effector": "iiwa_tip",
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
     "output": "iiwa_marker_fk.hh",
-    "generate_param_ik" : true
+    "generate_param_ik" : true,
+    "bounds": {
+        "upper": [2, 2, 2],
+        "lower": [-2, -2, -2]
+    }
 }

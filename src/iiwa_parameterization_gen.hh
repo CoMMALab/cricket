@@ -99,8 +99,8 @@ auto IiwaSE3ParameterizationCG(
 )
 {
 
-    std::cout << "Generating parameterized IK code for iiwa..." << std::endl;
-    const size_t num_inp = 6 + 1 + 1 + 1 + 1; // 6 for the pose, 1 for psi, 3 for GC2, GC4, GC6
+    std::cout << "Generating task parameterized IK code for iiwa..." << std::endl;
+    const size_t num_inp = 7 + 1 + 1 + 1 + 1; // 6 for the pose, 1 for psi, 3 for GC2, GC4, GC6
 
     ADVectorXs ad_inp(num_inp);
     for (auto i = 0U; i < num_inp; ++i)

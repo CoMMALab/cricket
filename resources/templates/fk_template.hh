@@ -12,6 +12,8 @@ struct {{name}}
 {
     static constexpr char* name = "{{lower(name)}}";
     static constexpr std::size_t dimension = {{n_q}};
+    static constexpr std::size_t sample_dimension = {{6}};
+    
     static constexpr std::size_t n_spheres = {{n_spheres}};
     static constexpr float min_radius = {{min_radius}};
     static constexpr float max_radius = {{max_radius}};
@@ -30,6 +32,8 @@ struct {{name}}
 
     using Configuration = FloatVector<dimension>;
     using ConfigurationArray = std::array<FloatT, dimension>;
+
+    using Sample = FloatVector<sample_dimension>;
 
     struct alignas(FloatVectorAlignment) ConfigurationBuffer
         : std::array<float, Configuration::num_scalars_rounded>
@@ -94,6 +98,65 @@ struct {{name}}
     inline static auto space_measure() noexcept -> float
     {
         return {{measure}};
+    }
+
+    using NNKey = std::tuple<vamp::planning::NNFloatArray<3>, Eigen::Quaternion<float>>;
+
+    using NNSpace = unc::robotics::nigh::metric::CartesianSpace<
+    unc::robotics::nigh::metric::Space<vamp::planning::NNFloatArray<3>, unc::robotics::nigh::metric::LP<2>>,
+    unc::robotics::nigh::metric::Space<Eigen::Quaternion<float>, unc::robotics::nigh::metric::SO3>>;
+
+    static inline auto nn_key(float *cfg_ptr) noexcept -> NNKey
+    {
+        return NNKey{
+            vamp::planning::NNFloatArray<3>{cfg_ptr},
+            Eigen::Quaternion<float>(cfg_ptr[6], cfg_ptr[3], cfg_ptr[4], cfg_ptr[5])};
+    }
+
+    static inline auto sample(const Sample &x_in) -> Configuration
+    {
+        ConfigurationBuffer y;
+        const auto x = x_in.to_array();
+        {{se3_sampler_code}}
+        return Configuration(y.data());
+    }
+
+    static inline auto in_bounds(const Configuration &x) -> bool
+    {
+        return (x <= Configuration(upper_bound)).all() and (x >= Configuration(lower_bound)).all();
+    }
+
+
+    static inline auto distance(const Configuration &a_in, const Configuration &b_in) -> float
+    {
+        std::array<float, {{distance_code_vars}}> v;
+        std::array<float, 1> y;
+        const auto a = a_in.to_array();
+        const auto b = b_in.to_array();
+        {{distance_code}}
+        return y[0];
+    }
+
+    static inline auto interpolate(const Configuration &a_in, const Configuration &b_in, float t) -> Configuration
+    {
+        std::array<float, {{interpolate_code_vars}}> v;
+        ConfigurationBuffer y;
+        const auto a = a_in.to_array();
+        const auto b = b_in.to_array();
+        {{interpolate_code}}
+        return Configuration(y.data());
+    }
+
+    template <std::size_t rake>
+    static inline void interpolate_block(
+        const Configuration &a,
+        const Configuration &b,
+        const FloatVector<rake> &t,
+        ConfigurationBlock<rake> &out) noexcept
+    {
+        using V = FloatVector<rake, 1>;
+        {% if interpolate_block_code_vars > 0 %}std::array<V, {{interpolate_block_code_vars}}> v;{% endif %}
+        {{interpolate_block_code}}
     }
 
     template <std::size_t rake>
@@ -259,26 +322,7 @@ struct {{name}}
 
         // Check if y are within joint limits
         {% for index in range(n_q - 1) %}
-        if ((y[{{index + n_q - 1}}] < {{ at(bound_lower, index) }}).any() || (y[{{index + n_q - 1}}] > {{ at(bound_lower, index) }} + {{ at(bound_range, index) }}).any())
-        {
-            return {false, y};
-        }
-        {% endfor %}
-
-        return {true, y};
-    }
-
-    static inline auto parameterized_ik(const std::array<float, {{n_q + 10}}> &x) noexcept -> std::pair<bool, std::array<float, {{param_ik_code_output}}>>
-    {
-        // We expect x to be of size dimension + some addition parameters to specify the self-motion manifold.
-        std::array<float, {{param_ik_code_vars}}> v;
-        std::array<float, {{param_ik_code_output}}> y;
-
-        {{param_ik_code}}
-
-        // Check if y are within joint limits
-        {% for index in range(n_q - 1) %}
-        if ((y[{{index + n_q - 1}}] < {{ at(bound_lower, index) }}) || (y[{{index + n_q - 1}}] > {{ at(bound_lower, index) }} + {{ at(bound_range, index) }}))
+        if ((y[{{index}}] < {{ at(bound_lower, index) }}).any() || (y[{{index}}] > {{ at(bound_lower, index) }} + {{ at(bound_range, index) }}).any())
         {
             return {false, y};
         }

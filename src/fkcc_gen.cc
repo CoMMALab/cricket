@@ -12,7 +12,7 @@
 #include "housekeeping.hh"
 #include "tracer_utils.hh"
 #include "iiwa_parameterization_gen.hh"
-
+#include "se3_tracer.hh"
 
 auto trace_sphere(const SphereInfo &sphere, const ADData &ad_data, ADVectorXs &data, std::size_t index)
 {
@@ -212,9 +212,51 @@ int main(int argc, char **argv)
         language = data["language"];
     }
 
+    std::optional<Bounds> bounds;
+    if (data.contains("bounds"))
+    {
+        const auto &bd = data["bounds"];
+        if (not bd.contains("lower") or not bd.contains("upper"))
+        {
+            throw std::runtime_error("bounds must contain both 'lower' and 'upper' arrays");
+        }
+        const auto lower = bd["lower"].get<std::vector<double>>();
+        const auto upper = bd["upper"].get<std::vector<double>>();
+        if (lower.size() < 2 or lower.size() > 3 or upper.size() < 2 or upper.size() > 3)
+        {
+            throw std::runtime_error("bounds arrays must have 2 or 3 elements");
+        }
+        Bounds b;
+        b.lower = Eigen::Vector3d(lower[0], lower[1], lower.size() == 3 ? lower[2] : 0.0);
+        b.upper = Eigen::Vector3d(upper[0], upper[1], upper.size() == 3 ? upper[2] : 0.0);
+        bounds = b;
+    }
+
     RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_name);
 
     data.update(robot.json());
+
+    auto traced_se3_sampler_code = trace_map_to_se3(robot.model, language, bounds);
+    data["se3_sampler_code"] = traced_se3_sampler_code.code;
+    data["se3_sampler_code_vars"] = traced_se3_sampler_code.temp_variables;
+    data["se3_sampler_code_output"] = traced_se3_sampler_code.outputs;
+
+    std::cout << "Going to interpolate code generation..." << std::endl;
+    auto traced_interpolate_code = trace_interpolate(language);
+    data["interpolate_code"] = traced_interpolate_code.code;
+    data["interpolate_code_vars"] = traced_interpolate_code.temp_variables;
+    data["interpolate_code_output"] = traced_interpolate_code.outputs;
+
+    std::cout << "Going to interpolate block code generation..." << std::endl;
+    auto interp_block = trace_interpolate_block(language);
+    data["interpolate_block_code"] = interp_block.code;
+    data["interpolate_block_code_vars"] = interp_block.temp_variables;
+
+    std::cout << "Going to distance code generation..." << std::endl;
+    auto dist = trace_SE3_distance(language);
+    data["distance_code"] = dist.code;
+    data["distance_code_vars"] = dist.temp_variables;
+
 
     auto traced_eefk_code = trace_sphere_cc_fk(robot, language, false, false, true);
     data["eefk_code"] = traced_eefk_code.code;

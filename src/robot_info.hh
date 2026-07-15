@@ -9,10 +9,6 @@
 #include <pinocchio/multibody/geometry.hpp>
 #include <pinocchio/collision/collision.hpp>
 
-
-// #include "pinocchio/multibody/model.hpp"
-// #include "pinocchio/multibody/data.hpp"
-// #include "pinocchio/algorithm/compute-all-terms.hpp"
 #include "pinocchio/algorithm/center-of-mass.hpp"
 
 
@@ -37,6 +33,12 @@ struct SphereInfo
     std::size_t parent_joint;
     std::size_t parent_frame;
     SE3 relative;
+};
+
+struct Bounds
+{
+    Eigen::Vector3d lower;
+    Eigen::Vector3d upper;
 };
 
 auto min_sphere_of_spheres(const std::vector<SphereInfo> &info) -> std::array<float, 4>
@@ -115,25 +117,13 @@ struct RobotInfo
 
     auto json() -> nlohmann::json
     {
-        // const Eigen::VectorXd lower_bound = model.lowerPositionLimit;
-        // const Eigen::VectorXd upper_bound = model.upperPositionLimit;
-        // const Eigen::VectorXd bound_range = upper_bound - lower_bound;
-        // const Eigen::VectorXd bound_descale = bound_range.cwiseInverse();
 
-        // const size_t sampling_dimension = model.nq / 2 + 1;
-        // Eigen::VectorXd lower_bound(sampling_dimension);
-        // Eigen::VectorXd upper_bound(sampling_dimension);
-
-
-        // fill the first model.nq/2 dimensions of lower bound 
-        // with model.lowerPositionLimit and similarly upper bound
-
-        // lower_bound.head(model.nq / 2) = model.lowerPositionLimit.head(model.nq / 2); lower_bound(model.nq / 2) = 0.0;
-        // upper_bound.head(model.nq / 2) = model.upperPositionLimit.head(model.nq / 2); upper_bound(model.nq / 2) = 2.0 * M_PI;
         const size_t sampling_dimension = model.nq;
-        Eigen::VectorXd lower_bound(sampling_dimension);
-        Eigen::VectorXd upper_bound(sampling_dimension);
-        //
+        Eigen::VectorXd lower_bound(model.nq);
+        Eigen::VectorXd upper_bound(model.nq);
+
+        lower_bound = model.lowerPositionLimit;
+        upper_bound = model.upperPositionLimit;
 
         const Eigen::VectorXd bound_range = upper_bound - lower_bound;
         const Eigen::VectorXd bound_descale = bound_range.cwiseInverse();

@@ -27,7 +27,7 @@
 	<material name="White">
 		<color rgba="1.0 1.0 1.0 1.0"></color>
 	</material>
-	<material name="panda_white">
+	<material name="iiwa_white">
 		<color rgba="1.0 1.0 1.0 1.0"></color>
 	</material>
 	<material name="marker_black">
@@ -420,7 +420,7 @@
 	<link name="iiwa_link_ee_kuka"></link>
 	<link name="iiwa_link_ee"></link>
 	<link name="marker_attach"></link>
-	<link name="panda_marker_holder">
+	<link name="iiwa_marker_holder">
 		<inertial>
 			<origin rpy="0 0 0" xyz="0 0 0.02"></origin>
 			<mass value="0.2"></mass>
@@ -430,7 +430,7 @@
 			<geometry>
 				<mesh filename="marker/meshes/visual/marker_holder.obj"></mesh>
 			</geometry>
-			<material name="panda_white"></material>
+			<material name="iiwa_white"></material>
 		</visual>
 		<collision>
 			<geometry>
@@ -463,7 +463,7 @@
 			<origin xyz="0.011355666443705559 0.03241541609168053 0.05990520492196083" rpy="0 0 0"></origin>
 		</collision>
 	</link>
-	<link name="panda_marker">
+	<link name="iiwa_marker">
 		<inertial>
 			<origin rpy="0 0 0" xyz="0 0 0.05"></origin>
 			<mass value="0.05"></mass>
@@ -560,7 +560,7 @@
 			<origin xyz="0.08383316546678543 0.09473492205142975 0.006035874597728252" rpy="0 0 0"></origin>
 		</collision>
 	</link>
-	<link name="panda_tip">
+	<link name="iiwa_tip">
 		<inertial>
 			<origin rpy="0 0 0" xyz="0 0 0.02"></origin>
 			<mass value="0.01"></mass>
@@ -670,19 +670,19 @@
 		<child link="iiwa_link_ee"></child>
 		<origin rpy="0 -1.570796326794897 0" xyz="0 0 0.045"></origin>
 	</joint>
-	<joint name="panda_marker_holder_joint" type="fixed">
+	<joint name="iiwa_marker_holder_joint" type="fixed">
 		<parent link="marker_attach"></parent>
-		<child link="panda_marker_holder"></child>
+		<child link="iiwa_marker_holder"></child>
 		<origin rpy="0 0 0" xyz="-0.01 -0.032 0.065"></origin>
 	</joint>
-	<joint name="panda_marker_joint" type="fixed">
-		<parent link="panda_marker_holder"></parent>
-		<child link="panda_marker"></child>
+	<joint name="iiwa_marker_joint" type="fixed">
+		<parent link="iiwa_marker_holder"></parent>
+		<child link="iiwa_marker"></child>
 		<origin rpy="-1.57079632679 0 0" xyz="-0.075 0.0285 0.15"></origin>
 	</joint>
-	<joint name="panda_tip_joint" type="fixed">
-		<parent link="panda_marker"></parent>
-		<child link="panda_tip"></child>
+	<joint name="iiwa_tip_joint" type="fixed">
+		<parent link="iiwa_marker"></parent>
+		<child link="iiwa_tip"></child>
 		<origin rpy="0 0 0" xyz="0.08125 0.0035 0.003625"></origin>
 	</joint>
 	<joint name="iiwa_weld" type="fixed">
