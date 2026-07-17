@@ -4,15 +4,19 @@
 #include <vamp/vector/math.hh>
 #include <vamp/collision/environment.hh>
 #include <vamp/collision/validity.hh>
+#include <vamp/planning/nn.hh>
 
+#include <Eigen/Geometry>
+#include <nigh/so3_space.hpp>
+#include <nigh/cartesian_space.hpp>
 // NOLINTBEGIN(*-magic-numbers)
 namespace vamp::robots
 {
 struct {{name}}
 {
     static constexpr char* name = "{{lower(name)}}";
-    static constexpr std::size_t dimension = {{n_q}};
-    static constexpr std::size_t sample_dimension = {{6}};
+    static constexpr std::size_t dimension = {{7 + 1}};
+    static constexpr std::size_t sample_dimension = {{6 + 1}};
     
     static constexpr std::size_t n_spheres = {{n_spheres}};
     static constexpr float min_radius = {{min_radius}};
@@ -22,8 +26,13 @@ struct {{name}}
     static constexpr std::size_t ambient_dimension = {{ambient_nq}};
 
     static constexpr bool use_parameterized_ik = true;
-    static constexpr std::size_t num_ik_parameters = 3 + 7;
-    inline static thread_local std::array<float, num_ik_parameters> ik_parameters = {1.0, 1.0, -1.0, 0.0, 0.0, 0.6, 0.927184, -0.374607, 0.0, 0.0};
+
+    // Self-motion-manifold selector (GC2, GC4, GC6): picks the shoulder/
+    // elbow/wrist IK branch for the redundant arm. Fixed for the whole
+    // planning problem, so it lives here instead of being threaded through
+    // parameterized_ik's input.
+    static constexpr std::size_t num_smm_parameters = 3;
+    inline static thread_local std::array<float, num_smm_parameters> smm = {1.0, 1.0, -1.0};
 
 
 
@@ -116,14 +125,10 @@ struct {{name}}
     static inline auto sample(const Sample &x_in) -> Configuration
     {
         ConfigurationBuffer y;
+        std::array<float, {{se3_sampler_code_vars}}> v;
         const auto x = x_in.to_array();
         {{se3_sampler_code}}
         return Configuration(y.data());
-    }
-
-    static inline auto in_bounds(const Configuration &x) -> bool
-    {
-        return (x <= Configuration(upper_bound)).all() and (x >= Configuration(lower_bound)).all();
     }
 
 
@@ -301,7 +306,7 @@ struct {{name}}
         return true;
     }
 
-    static inline auto eefk(const std::array<float, {{n_q}}> &x) noexcept -> Eigen::Isometry3f
+    static inline auto eefk(const std::array<float, {{ambient_nq}}> &x) noexcept -> Eigen::Isometry3f
     {
         std::array<float, {{eefk_code_vars}}> v;
         std::array<float, {{eefk_code_output}}> y;
@@ -314,7 +319,11 @@ struct {{name}}
     template <typename InputVector, std::size_t rake>
     static inline auto parameterized_ik(const InputVector &x) noexcept -> std::pair<bool, AmbientConfigurationBlock<rake>>
     {
-        // We expect x to be of size dimension + some addition parameters to specify the self-motion manifold.
+        using V = FloatVector<rake, 1>;
+        // x is the pose (+psi); the self-motion-manifold selector comes from `smm`.
+        const auto &pose = x;
+        const auto psi = x[7];
+
         FloatVector<rake, {{param_ik_code_vars}}> v;
         FloatVector<rake, {{param_ik_code_output}}> y;
 

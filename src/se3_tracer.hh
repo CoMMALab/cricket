@@ -92,10 +92,10 @@ auto trace_map_to_se3(
     const std::optional<Bounds> &bounds) -> Traced
 {
 
-    ADVectorXs ad_u(6);
-    ADVectorXs ad_se3(7);
+    ADVectorXs ad_u(7);
+    ADVectorXs ad_se3(8);
 
-    for (auto i = 0U; i < 6; ++i)
+    for (auto i = 0U; i < 7; ++i)
     {
         ad_u[i] = ADCG(0.0);
     }
@@ -114,11 +114,12 @@ auto trace_map_to_se3(
     ad_se3[4] = y;
     ad_se3[5] = z;
     ad_se3[6] = w;
+    ad_se3[7] = map_bounded(ad_u[6], 0.0, 2 * M_PI); // psi is bounded between 0 and 2*pi
 
     CppAD::ADFun<CGD> map_func(ad_u, ad_se3);
 
     CppAD::cg::CodeHandler<double> handler;
-    CppAD::vector<CGD> ind_vars(6);
+    CppAD::vector<CGD> ind_vars(7);
     handler.makeVariables(ind_vars);
 
     CppAD::vector<CGD> result = map_func.Forward(0, ind_vars);
@@ -202,11 +203,11 @@ auto trace_interpolate_impl(
     std::vector<VarSegment> input_segments,
     std::vector<VarSegment> output_segments) -> Traced
 {
-    const std::size_t n_input = 2 * 7 + 1;  // a, b, t
+    const std::size_t n_input = 2 * 8 + 1;  // a, b, t
 
 
     ADVectorXs ad_input(n_input);
-    ADVectorXs ad_out(7);
+    ADVectorXs ad_out(8);
 
     for (std::size_t i = 0U; i < n_input; ++i)
     {
@@ -215,11 +216,15 @@ auto trace_interpolate_impl(
 
     CppAD::Independent(ad_input);
 
-    ADVectorXs ad_a = ad_input.head(7);
-    ADVectorXs ad_b = ad_input.segment(7, 7);
-    ADCG t = ad_input[2 * 7];
+    ADVectorXs ad_a = ad_input.head(7); // first 7 elements are a
+    ADVectorXs ad_b = ad_input.segment(8, 7); // elements 8-14 are b
+    ADCG t = ad_input[2 * 8];
+
+    auto psi_a = ad_input[7];
+    auto psi_b = ad_input[15];
 
     slerp_se3(ad_a, ad_b, t, ad_out);
+    ad_out[7] = (1.0 - t) * psi_a + t * psi_b; // linear interpolation of psi
 
     CppAD::ADFun<CGD> interp_func(ad_input, ad_out);
 
@@ -241,7 +246,7 @@ auto trace_interpolate_impl(
 auto trace_interpolate(const std::string &language) -> Traced
 {
     return trace_interpolate_impl(
-        language, {{"a", 7, true}, {"b", 7, true}, {"t", 1, false}}, {});
+        language, {{"a", 8, true}, {"b", 8, true}, {"t", 1, false}}, {});
 }
 
     auto trace_interpolate_block(const std::string &language) -> Traced
@@ -249,8 +254,8 @@ auto trace_interpolate(const std::string &language) -> Traced
     const std::string lang = (language == "c++") ? "c++_block" : language;
     return trace_interpolate_impl(
         lang,
-        {{"a", 7, true, ".broadcast(", ")"}, {"b", 7, true, ".broadcast(", ")"}, {"t", 1, false}},
-        {{"out", 7, true}});
+        {{"a", 8, true, ".broadcast(", ")"}, {"b", 8, true, ".broadcast(", ")"}, {"t", 1, false}},
+        {{"out", 8, true}});
 }
 
 auto read_transform(const ADVectorXs &inp, std::size_t offset) -> SE3Tpl<ADCG>
@@ -277,7 +282,7 @@ auto se3_displacement(const SE3Tpl<ADCG> &transform) -> ADVectorXs
 
 auto trace_SE3_distance(const std::string &language) -> Traced {
 
-    const std::size_t n_input = 2 * 7;  // a, b, t
+    const std::size_t n_input = 2 * 8;  // a, b, t
     ADVectorXs ad_input(n_input);
     ADVectorXs out(1);
     for (std::size_t i = 0U; i < n_input; ++i)
@@ -287,7 +292,7 @@ auto trace_SE3_distance(const std::string &language) -> Traced {
     CppAD::Independent(ad_input);
 
     const auto a = read_transform(ad_input, 0);
-    const auto b = read_transform(ad_input, 7);
+    const auto b = read_transform(ad_input, 8);
 
     SE3Tpl<ADCG> R_rel = a.inverse() * b;
 
@@ -299,7 +304,11 @@ auto trace_SE3_distance(const std::string &language) -> Traced {
 
     auto displacement = se3_displacement(R_rel);
 
-    out[0] = displacement.norm();
+    ADVectorXs total_displacement(7);
+    total_displacement.head(6) = displacement;
+    total_displacement[6] = ad_input[7] - ad_input[15];
+
+    out[0] = total_displacement.norm();
 
     CppAD::ADFun<CGD> dist_func(ad_input, out);
 
@@ -310,7 +319,7 @@ auto trace_SE3_distance(const std::string &language) -> Traced {
     CppAD::vector<CGD> result = dist_func.Forward(0, ind_vars);
 
     // const auto nq_size = static_cast<std::size_t>(nq);
-    SegmentedVariableNameGenerator<double> nameGen({{"a", 7, true}, {"b", 7, true}});
+    SegmentedVariableNameGenerator<double> nameGen({{"a", 8, true}, {"b", 8, true}});
 
     return Traced{
         generate_code(handler, result, language, nameGen),

@@ -696,6 +696,14 @@
 		<origin rpy="0 0 0" xyz="0 0 0.0"></origin>
 	</joint>
 	<frame link="iiwa_link_ee" name="iiwa_frame_ee" rpy="3.141592653589793 0 1.570796326794897" xyz="0.09 0 0"></frame>
+	<!-- adding a dummy link called iiwa_frame_link_ee so pinocchio likes it -->
+	<link name="iiwa_frame_link_ee"></link>
+	<joint name="iiwa_frame_ee_joint" type="fixed">
+		<parent link="iiwa_link_ee"></parent>
+		<child link="iiwa_frame_link_ee"></child>
+		<origin rpy="3.141592653589793 0 1.570796326794897" xyz="0.09 0 0"></origin>
+	</joint>
+
 	<gazebo>
 		<plugin filename="libgazebo_ros_control.so" name="gazebo_ros_controller">
 			<robotNamespace>/iiwa</robotNamespace>

@@ -8,6 +8,7 @@
 #include "robot_info.hh"
 #include "tracer_utils.hh"
 #include "iiwa_parameterization.hh"
+#include "internal.hh"
 
 #include <Eigen/Dense>
 #include <algorithm>
@@ -140,28 +141,27 @@ auto IiwaSE3ParameterizationCG(
     //       for (auto j = 0U; j < nq; j++)
     //           jac_e_q[i * nq + j] = jac[i * num_inp + j];
 
-      std::move(jac_e_q.begin(), jac_e_q.end(), std::back_inserter(result));              
+      std::move(jac_e_q.begin(), jac_e_q.end(), std::back_inserter(result));
     }
 
-    LangCDefaultVariableNameGenerator<double> nameGen;
+    // `pose` already varies per-lane (it's the block itself), so it's
+    // indexed normally like any other block array. GC2/GC4/GC6 (self-motion-
+    // manifold selectors) are fixed for the whole planning problem, so
+    // instead of being read from the input they're read off the `smm` class
+    // member directly: this segment occupies the same 3 tape positions that
+    // used to be GC2/GC4/GC6, but is named "smm" so the generated code emits
+    // `smm[0]`, `smm[1]`, `smm[2]`. Output keeps the default `y[i]` naming,
+    // matching the `y` variable already declared in parameterized_ik.
+    const std::string lang = (language == "c++") ? "c++_block" : language;
 
-    std::ostringstream function_code;
-
-    if (language == "c++")
-    {
-        LanguageCCustom<double> langC("double");
-        handler.generateCode(function_code, langC, result, nameGen);
-    }
-    else if (language == "rust")
-    {
-        LanguageRust<double> langRust("double");
-        handler.generateCode(function_code, langRust, result, nameGen);
-    }
-    else
-    {
-        throw std::runtime_error(fmt::format("unsupported language {}", language));
-    }
+    SegmentedVariableNameGenerator<double> nameGen(
+        {{"pose", 7, true},
+         {"psi", 1, false},
+         {"smm", 3, true}});
 
     std::cout << "Generated the parameterized IK code." << std::endl;
-    return Traced{function_code.str(), handler.getTemporaryVariableCount(), result.size()};    
+    return Traced{
+        generate_code(handler, result, lang, nameGen),
+        handler.getTemporaryVariableCount(),
+        result.size()};
 }

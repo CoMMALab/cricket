@@ -2,7 +2,7 @@
     "name": "IiwaMarker",
     "urdf": "iiwa_marker/iiwa_marker_spherized.urdf",
     "srdf": "iiwa_marker/moveit/config/iiwa.srdf",
-    "end_effector": "iiwa_tip",
+    "end_effector": "iiwa_link_ee_kuka",
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],

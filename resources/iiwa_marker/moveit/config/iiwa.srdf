@@ -30,6 +30,7 @@
     <disable_collisions link1="iiwa_link_4" link2="panda_marker_holder" reason="Never"/>
     <disable_collisions link1="iiwa_link_4" link2="panda_tip" reason="Never"/>
     <disable_collisions link1="iiwa_link_5" link2="iiwa_link_6" reason="Adjacent"/>
+    <disable_collisions link1="iiwa_link_5" link2="iiwa_link_7" reason="Always"/>
     <disable_collisions link1="iiwa_link_5" link2="panda_marker" reason="Never"/>
     <disable_collisions link1="iiwa_link_5" link2="panda_marker_holder" reason="Never"/>
     <disable_collisions link1="iiwa_link_5" link2="panda_tip" reason="Never"/>
