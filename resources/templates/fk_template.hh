@@ -4,12 +4,9 @@
 #include <vamp/vector/math.hh>
 #include <vamp/collision/environment.hh>
 #include <vamp/collision/validity.hh>
-#include <vamp/planning/nn/nn.hh>
 {% if has_flask %}#include <vamp/planning/flask.hh>{% endif %}
 
 #include <Eigen/Geometry>
-#include <nigh/so3_space.hpp>
-#include <nigh/cartesian_space.hpp>
 {% if has_flask %}
 #include <algorithm>
 #include <cmath>
@@ -41,24 +38,6 @@ struct {{name}}
     {
     };
     using Sample = FloatVector<sample_dimension>;
-
-    using NNKey = std::tuple<
-        {% for seg in nn_segments -%}
-        {% if seg.type == "LP" %}vamp::planning::NNFloatArray<{{seg.size}}>{% else %}Eigen::Quaternion<float>{% endif %}{% if not loop.is_last %},{% endif %}
-        {% endfor %}>;
-
-    using NNSpace = unc::robotics::nigh::metric::CartesianSpace<
-        {% for seg in nn_segments -%}
-        {% if seg.type == "LP" %}unc::robotics::nigh::metric::Space<vamp::planning::NNFloatArray<{{seg.size}}>, unc::robotics::nigh::metric::LP<2>>{% else %}unc::robotics::nigh::metric::Space<Eigen::Quaternion<float>, unc::robotics::nigh::metric::SO3>{% endif %}{% if not loop.is_last %},{% endif %}
-        {% endfor %}>;
-
-    static inline auto nn_key(float *cfg_ptr) noexcept -> NNKey
-    {
-        return NNKey{
-            {% for seg in nn_segments -%}
-            {% if seg.type == "LP" %}vamp::planning::NNFloatArray<{{seg.size}}>{cfg_ptr + {{seg.offset}}}{% else %}Eigen::Quaternion<float>(cfg_ptr[{{seg.offset + 3}}], cfg_ptr[{{seg.offset}}], cfg_ptr[{{seg.offset + 1}}], cfg_ptr[{{seg.offset + 2}}]){% endif %}{% if not loop.is_last %},{% endif %}
-            {% endfor %}};
-    }
 
     struct alignas(FloatVectorAlignment) ConfigurationBuffer
         : std::array<float, Configuration::num_scalars_rounded>

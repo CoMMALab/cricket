@@ -42,16 +42,6 @@
         };
         using Sample = FloatVector<sample_dimension>;
 
-        using NNKey = std::tuple<vamp::planning::NNFloatArray<dimension>>;
-
-        using NNSpace = unc::robotics::nigh::metric::CartesianSpace<
-            unc::robotics::nigh::metric::Space<vamp::planning::NNFloatArray<dimension>, unc::robotics::nigh::metric::LP<2>>>;
-
-        static inline auto nn_key(float *cfg_ptr) noexcept -> NNKey
-        {
-            return NNKey{vamp::planning::NNFloatArray<dimension>{cfg_ptr}};
-        }
-
         struct alignas(FloatVectorAlignment) ConfigurationBuffer
             : std::array<float, Configuration::num_scalars_rounded>
         {
