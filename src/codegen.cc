@@ -460,7 +460,7 @@ namespace cricket
                     opts.template_path.string()));
         }
 
-        RobotInfo robot(opts.urdf, opts.srdf, opts.end_effectors);
+        RobotInfo robot(opts.urdf, opts.srdf, opts.end_effectors, JointSelection::from_json(opts.data));
 
         nlohmann::json data = opts.data;
         const bool compact_collisions = opts.data.value("compact_collisions", false);

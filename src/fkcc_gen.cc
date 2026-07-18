@@ -113,7 +113,11 @@ int main(int argc, char **argv)
         bounds = b;
     }
 
-    cricket::RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_names);
+    cricket::RobotInfo robot(
+        parent_path / data["urdf"],
+        srdf_path,
+        end_effector_names,
+        cricket::JointSelection::from_json(data));
 
     // Preserve compact_collisions across robot.json() merge; default false.
     const bool compact_collisions = data.value("compact_collisions", false);

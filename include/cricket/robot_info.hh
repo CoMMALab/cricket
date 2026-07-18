@@ -57,6 +57,21 @@ namespace cricket
         std::size_t nu;
     };
 
+    // Plan over a subset of joints: every joint not named in `active_joints` is locked at
+    // its value in `default_configuration` (pinocchio::neutral if unnamed) and
+    // constant-folded out of the model before spheres or tapes are derived.
+    struct JointSelection
+    {
+        std::vector<std::string> active_joints;
+
+        // Joint name -> configuration values. A single value for a continuous joint is
+        // the angle (mapped to cos/sin); otherwise the length must match the joint's nq.
+        std::map<std::string, std::vector<double>> default_configuration;
+
+        // Reads the "active_joints" / "default_configuration" recipe keys; nullopt if absent.
+        static auto from_json(const nlohmann::json &data) -> std::optional<JointSelection>;
+    };
+
     class RobotInfo
     {
     public:
@@ -68,9 +83,12 @@ namespace cricket
         RobotInfo(
             const std::filesystem::path &urdf_file,
             const std::optional<std::filesystem::path> &srdf_file,
-            const std::vector<std::string> &end_effectors);
+            const std::vector<std::string> &end_effectors,
+            const std::optional<JointSelection> &joint_selection = std::nullopt);
 
         auto json(const std::optional<Bounds> &bounds = std::nullopt) -> nlohmann::json;
+
+        auto reduce_model(const JointSelection &selection) -> void;
 
         auto dof_to_joint_names() -> std::vector<std::string>;
         auto get_frames_colliding_end_effector() -> std::vector<std::size_t>;

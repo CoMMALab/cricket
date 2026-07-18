@@ -8,6 +8,7 @@
 #include <pinocchio/algorithm/frames.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
 #include <pinocchio/algorithm/geometry.hpp>
+#include <pinocchio/algorithm/model.hpp>
 #include <pinocchio/collision/collision.hpp>
 
 #include <coal/shape/geometric_shapes.h>
@@ -61,10 +62,39 @@ namespace cricket
     {
     }
 
+    auto JointSelection::from_json(const nlohmann::json &data) -> std::optional<JointSelection>
+    {
+        if (not data.contains("active_joints"))
+        {
+            return std::nullopt;
+        }
+
+        JointSelection selection;
+        selection.active_joints = data["active_joints"].get<std::vector<std::string>>();
+
+        if (data.contains("default_configuration"))
+        {
+            for (const auto &[name, value] : data["default_configuration"].items())
+            {
+                if (value.is_array())
+                {
+                    selection.default_configuration[name] = value.get<std::vector<double>>();
+                }
+                else
+                {
+                    selection.default_configuration[name] = {value.get<double>()};
+                }
+            }
+        }
+
+        return selection;
+    }
+
     RobotInfo::RobotInfo(
         const std::filesystem::path &urdf_file,
         const std::optional<std::filesystem::path> &srdf_file,
-        const std::vector<std::string> &end_effectors)
+        const std::vector<std::string> &end_effectors,
+        const std::optional<JointSelection> &joint_selection)
     {
         if (not std::filesystem::exists(urdf_file))
         {
@@ -73,6 +103,11 @@ namespace cricket
 
         pinocchio::urdf::buildModel(urdf_file, model, false, true);
         pinocchio::urdf::buildGeom(model, urdf_file, COLLISION, collision_model);
+
+        if (joint_selection and not joint_selection->active_joints.empty())
+        {
+            reduce_model(*joint_selection);
+        }
 
         if (srdf_file and not std::filesystem::exists(*srdf_file))
         {
@@ -117,6 +152,83 @@ namespace cricket
 
         end_effector_name = end_effector_names.front();
         end_effector_index = end_effector_indexes.front();
+    }
+
+    auto RobotInfo::reduce_model(const JointSelection &selection) -> void
+    {
+        const std::set<std::string> active(
+            selection.active_joints.begin(), selection.active_joints.end());
+        for (const auto &name : active)
+        {
+            if (not model.existJointName(name))
+            {
+                throw std::runtime_error(fmt::format("Active joint `{}` does not exist!", name));
+            }
+        }
+
+        std::vector<JointIndex> joints_to_lock;
+        for (JointIndex i = 1; i < static_cast<JointIndex>(model.njoints); ++i)
+        {
+            if (active.count(model.names[i]) == 0)
+            {
+                joints_to_lock.push_back(i);
+            }
+        }
+
+        if (joints_to_lock.empty())
+        {
+            return;
+        }
+
+        Eigen::VectorXd q_ref = pinocchio::neutral(model);
+        for (const auto &[name, values] : selection.default_configuration)
+        {
+            if (not model.existJointName(name))
+            {
+                throw std::runtime_error(
+                    fmt::format("Default configuration joint `{}` does not exist!", name));
+            }
+
+            // Values for still-active joints are irrelevant to reduction.
+            if (active.count(name) != 0)
+            {
+                continue;
+            }
+
+            const auto joint_id = model.getJointId(name);
+            const auto idx_q = model.joints[joint_id].idx_q();
+            const auto nq = static_cast<std::size_t>(model.joints[joint_id].nq());
+
+            if (values.size() == nq)
+            {
+                for (std::size_t i = 0; i < nq; ++i)
+                {
+                    q_ref[idx_q + static_cast<Eigen::Index>(i)] = values[i];
+                }
+            }
+            else if (values.size() == 1 and nq == 2)
+            {
+                // Continuous joint: a single value is the angle, stored as cos/sin.
+                q_ref[idx_q] = std::cos(values[0]);
+                q_ref[idx_q + 1] = std::sin(values[0]);
+            }
+            else
+            {
+                throw std::runtime_error(
+                    fmt::format(
+                        "Joint `{}` default configuration has {} values, expected {}!",
+                        name,
+                        values.size(),
+                        nq));
+            }
+        }
+
+        pinocchio::Model reduced_model;
+        pinocchio::GeometryModel reduced_collision;
+        pinocchio::buildReducedModel(
+            model, collision_model, joints_to_lock, q_ref, reduced_model, reduced_collision);
+        model = reduced_model;
+        collision_model = reduced_collision;
     }
 
     namespace
