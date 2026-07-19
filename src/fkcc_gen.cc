@@ -54,6 +54,70 @@ auto trace_frame(std::size_t ee_index, const ADData &ad_data, ADVectorXs &data, 
     data[index + 11] = R(2, 2);
 }
 
+// Traces the spheres rigidly attached to the end effector's parent joint
+// (e.g. a mounted tool/marker -- see RobotInfo::get_end_effector_frames) as a
+// function of a candidate SE3 pose (x, y, z, qx, qy, qz, qw) for that joint,
+// instead of the ambient joint configuration. The per-sphere local offsets
+// and radii are baked in as constants (they don't depend on q), so this is
+// just a quaternion rotate + translate per sphere -- no forwardKinematics
+// needed. Lets fk_template's check_if_ik_valid reject an infeasible
+// candidate pose before solving parameterized_ik for the rest of the arm.
+auto trace_check_ik_valid(const RobotInfo &info, const std::string &language) -> Traced
+{
+    ADVectorXs ad_pose(7);  // x, y, z, qx, qy, qz, qw
+    for (auto i = 0U; i < 7; ++i)
+    {
+        ad_pose[i] = ADCG(0.0);
+    }
+
+    Independent(ad_pose);
+
+    Eigen::Matrix<ADCG, 3, 1> translation(ad_pose[0], ad_pose[1], ad_pose[2]);
+    Eigen::Quaternion<ADCG> rotation(ad_pose[6], ad_pose[3], ad_pose[4], ad_pose[5]);  // w, x, y, z
+
+    const auto end_effector_joint = info.model.frames[info.end_effector_index].parentJoint;
+
+    std::vector<const SphereInfo *> ee_spheres;
+    for (const auto &sphere : info.spheres)
+    {
+        if (sphere.parent_joint == end_effector_joint)
+        {
+            ee_spheres.emplace_back(&sphere);
+        }
+    }
+
+    ADVectorXs data(ee_spheres.size() * 4);
+    for (auto i = 0U; i < ee_spheres.size(); ++i)
+    {
+        const auto &sphere = *ee_spheres[i];
+
+        Eigen::Matrix<ADCG, 3, 1> local(
+            ADCG(sphere.relative.translation()[0]),
+            ADCG(sphere.relative.translation()[1]),
+            ADCG(sphere.relative.translation()[2]));
+
+        Eigen::Matrix<ADCG, 3, 1> world = rotation * local + translation;
+
+        data[i * 4 + 0] = world[0];
+        data[i * 4 + 1] = world[1];
+        data[i * 4 + 2] = world[2];
+        data[i * 4 + 3] = ADCG(sphere.radius);
+    }
+
+    ADFun<CGD> check_ik_valid_func(ad_pose, data);
+
+    CodeHandler<double> handler;
+    CppAD::vector<CGD> ind_vars(7);
+    handler.makeVariables(ind_vars);
+
+    CppAD::vector<CGD> result = check_ik_valid_func.Forward(0, ind_vars);
+
+    return Traced{
+        generate_code(handler, result, language),
+        handler.getTemporaryVariableCount(),
+        static_cast<std::size_t>(data.size())};
+}
+
 auto trace_sphere_cc_fk(
     const RobotInfo &info,
     const std::string &language,
@@ -293,6 +357,11 @@ int main(int argc, char **argv)
     data["ccfkee_code"] = traced_ccfkee_code.code;
     data["ccfkee_code_vars"] = traced_ccfkee_code.temp_variables;
     data["ccfkee_code_output"] = traced_ccfkee_code.outputs;
+
+    auto traced_check_ik_valid_code = trace_check_ik_valid(robot, language);
+    data["check_ik_valid_code"] = traced_check_ik_valid_code.code;
+    data["check_ik_valid_code_vars"] = traced_check_ik_valid_code.temp_variables;
+    data["check_ik_valid_code_output"] = traced_check_ik_valid_code.outputs;
 
     if (data.contains("generate_param_ik") && data["generate_param_ik"].get<bool>())
     {

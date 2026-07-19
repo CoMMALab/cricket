@@ -205,3 +205,57 @@ fn eefk<const L: usize>(x: &ConfigurationBlock<L>) -> Isometry<Simd<f32, L>, 3>
 
     Isometry::from_carom_buf(y)
 }
+
+// Spheres rigidly attached to the end effector's parent joint (e.g. a
+// mounted tool/marker), expressed in that joint's local frame.
+const N_EE_LOCAL_SPHERES: usize = {{n_end_effector_local_spheres}};
+const EE_LOCAL_SPHERES: [f32; N_EE_LOCAL_SPHERES * 4] = [{{join(end_effector_local_spheres_flat, ", ")}}];
+
+/// Cheap early-reject check for a candidate SE3 pose (x, y, z, qx, qy, qz,
+/// qw) of the end effector's parent joint -- the pose used as input to
+/// `parameterized_ik` -- without solving IK for the rest of the arm. Walks
+/// the spheres rigidly attached to that joint from last to first and checks
+/// each against the environment.
+///
+/// A `false` result means the pose is definitely invalid. A `true` result is
+/// only inconclusive -- the rest of the arm could still land in collision
+/// once the full IK solution is computed.
+pub fn check_if_ik_valid(se3_pose: [f32; 7], environment: &impl Collide3<f32>) -> bool {
+    let [px, py, pz, qx, qy, qz, qw] = se3_pose;
+
+    let mut i = N_EE_LOCAL_SPHERES;
+    while i > 0 {
+        i -= 1;
+
+        let lx = EE_LOCAL_SPHERES[i * 4];
+        let ly = EE_LOCAL_SPHERES[i * 4 + 1];
+        let lz = EE_LOCAL_SPHERES[i * 4 + 2];
+        let r = EE_LOCAL_SPHERES[i * 4 + 3];
+
+        // Rotate (lx, ly, lz) by the quaternion (qx, qy, qz, qw), then translate.
+        let wx = (1.0 - 2.0 * (qy * qy + qz * qz)) * lx
+            + 2.0 * (qx * qy - qw * qz) * ly
+            + 2.0 * (qx * qz + qw * qy) * lz
+            + px;
+        let wy = 2.0 * (qx * qy + qw * qz) * lx
+            + (1.0 - 2.0 * (qx * qx + qz * qz)) * ly
+            + 2.0 * (qy * qz - qw * qx) * lz
+            + py;
+        let wz = 2.0 * (qx * qz - qw * qy) * lx
+            + 2.0 * (qy * qz + qw * qx) * ly
+            + (1.0 - 2.0 * (qx * qx + qy * qy)) * lz
+            + pz;
+
+        if sphere_environment_in_collision(
+            environment,
+            Simd::splat(wx),
+            Simd::splat(wy),
+            Simd::splat(wz),
+            Simd::splat(r),
+        ) {
+            return false;
+        }
+    }
+
+    true
+}

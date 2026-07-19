@@ -330,6 +330,48 @@ struct {{name}}
         return true;
     }
 
+    // Number of spheres rigidly attached to the end effector's parent joint
+    // (e.g. a mounted tool/marker -- see RobotInfo::get_end_effector_frames).
+    // check_ik_valid_code (traced in fkcc_gen.cc's trace_check_ik_valid) maps
+    // a candidate SE3 pose (x, y, z, qx, qy, qz, qw) for that joint to the
+    // world-space (x, y, z, r) of each of these spheres; their local offsets
+    // and radii are baked into that generated code as constants.
+    static constexpr std::size_t n_ee_local_spheres = {{n_end_effector_local_spheres}};
+
+    // Cheap early-reject check for a candidate SE3 pose of the end
+    // effector's parent joint (i.e. the pose used as input to
+    // parameterized_ik), without solving IK for the rest of the arm. Walks
+    // the spheres rigidly attached to that joint from last to first and
+    // checks each against the environment.
+    //
+    // A `false` result means the pose is definitely invalid. A `true` result
+    // is only inconclusive -- the rest of the arm could still land in
+    // collision once the full IK solution is computed.
+
+    // Block (rake-wide) form of check_if_ik_valid: checks `rake` candidate
+    // poses -- one per lane -- against the environment simultaneously.
+    template <std::size_t rake>
+    static inline auto check_if_ik_valid_block(
+        const vamp::collision::Environment<FloatVector<rake>> &environment,
+        const ConfigurationBlock<rake> &pose) noexcept -> bool
+    {
+        std::array<FloatVector<rake, 1>, {{check_ik_valid_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{check_ik_valid_code_output}}> y;
+        const auto &x = pose;
+
+        {{check_ik_valid_code}}
+
+        for (auto i = n_ee_local_spheres; i-- > 0;)
+        {
+            if (sphere_environment_in_collision(environment, y[i * 4 + 0], y[i * 4 + 1], y[i * 4 + 2], y[i * 4 + 3]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     template <typename InputVector, std::size_t rake>
     static inline auto parameterized_ik(const InputVector &x) noexcept -> std::pair<bool, AmbientConfigurationBlock<rake>>
     {

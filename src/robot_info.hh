@@ -147,6 +147,33 @@ struct RobotInfo
         json["bounding_sphere_index"] = bounding_sphere_index;
         json["end_effector_collisions"] = get_frames_colliding_end_effector();
 
+        // Spheres rigidly attached to the end effector's parent joint,
+        // expressed in that joint's local frame (x, y, z, r flattened).
+        // Used for a cheap pre-IK collision reject: transform these by a
+        // candidate SE3 pose for that joint and check against the
+        // environment, without needing to solve for the rest of the arm.
+        std::size_t end_effector_joint = model.frames[end_effector_index].parentJoint;
+        fmt::print(
+            "end_effector `{}` -> parentJoint `{}` (index {})\n",
+            end_effector_name,
+            model.names[end_effector_joint],
+            end_effector_joint);
+        std::vector<float> end_effector_local_spheres_flat;
+        std::size_t n_end_effector_local_spheres = 0;
+        for (const auto &s : spheres)
+        {
+            if (s.parent_joint == end_effector_joint)
+            {
+                end_effector_local_spheres_flat.push_back(static_cast<float>(s.relative.translation()[0]));
+                end_effector_local_spheres_flat.push_back(static_cast<float>(s.relative.translation()[1]));
+                end_effector_local_spheres_flat.push_back(static_cast<float>(s.relative.translation()[2]));
+                end_effector_local_spheres_flat.push_back(s.radius);
+                n_end_effector_local_spheres++;
+            }
+        }
+        json["end_effector_local_spheres_flat"] = end_effector_local_spheres_flat;
+        json["n_end_effector_local_spheres"] = n_end_effector_local_spheres;
+
         std::vector<std::string> link_names;
         for (auto i = 0U; i < model.frames.size(); ++i)
         {
@@ -181,7 +208,11 @@ struct RobotInfo
         return dof_to_joint_name;
     }
 
-    auto get_frames_colliding_end_effector() -> std::vector<std::size_t>
+    // Every frame that is rigidly attached to the end effector's parent
+    // joint (i.e. reachable from it via fixed joints only, such as a mounted
+    // tool or marker) and that has a bounding sphere. This is robot-agnostic:
+    // it falls entirely out of whatever frame is declared as `end_effector`.
+    auto get_end_effector_frames() -> std::vector<std::size_t>
     {
         std::size_t end_effector_joint = model.frames[end_effector_index].parentJoint;
 
@@ -196,6 +227,13 @@ struct RobotInfo
                 }
             }
         }
+
+        return frames;
+    }
+
+    auto get_frames_colliding_end_effector() -> std::vector<std::size_t>
+    {
+        auto frames = get_end_effector_frames();
 
         std::set<std::size_t> end_effector_allowed_collisions;
         for (const auto &[first, second] : allowed_link_pairs)
