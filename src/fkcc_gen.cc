@@ -232,6 +232,22 @@ int main(int argc, char **argv)
         bounds = b;
     }
 
+    // Expose the sampler's end-effector position bounds to the template as
+    // sample_position_lower / sample_position_upper. Defaults to zero when
+    // "bounds" is absent from the input JSON.
+    std::array<double, 3> sample_position_lower = {0.0, 0.0, 0.0};
+    std::array<double, 3> sample_position_upper = {0.0, 0.0, 0.0};
+    if (bounds)
+    {
+        for (int i = 0; i < 3; ++i)
+        {
+            sample_position_lower[i] = bounds->lower[i];
+            sample_position_upper[i] = bounds->upper[i];
+        }
+    }
+    data["sample_position_lower"] = sample_position_lower;
+    data["sample_position_upper"] = sample_position_upper;
+
     RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_name);
 
     data.update(robot.json());
@@ -280,19 +296,26 @@ int main(int argc, char **argv)
 
     if (data.contains("generate_param_ik") && data["generate_param_ik"].get<bool>())
     {
+        // param_ik_code emits two output arrays: `y` (joint angles, sized
+        // param_ik_code_output) and `u` (the 4 pre-clip SafeArccos arguments,
+        // sized param_ik_num_unclipped), used by parameterized_ik to reject
+        // poses that SafeArccos would have silently clipped.
+        const size_t param_ik_num_unclipped = 4;
         if (data["name"].contains("Bimanual") == true)
         {
             auto traced_iiwa_param_code = IiwaBimanualParameterizationCG<ADCG>(language, false);
             data["param_ik_code"] = traced_iiwa_param_code.code;
             data["param_ik_code_vars"] = traced_iiwa_param_code.temp_variables;
-            data["param_ik_code_output"] = traced_iiwa_param_code.outputs;
+            data["param_ik_code_output"] = traced_iiwa_param_code.outputs - param_ik_num_unclipped;
+            data["param_ik_num_unclipped"] = param_ik_num_unclipped;
         }
         else
         {
             auto traced_iiwa_param_code = IiwaSE3ParameterizationCG<ADCG>(language, false);
             data["param_ik_code"] = traced_iiwa_param_code.code;
             data["param_ik_code_vars"] = traced_iiwa_param_code.temp_variables;
-            data["param_ik_code_output"] = traced_iiwa_param_code.outputs;
+            data["param_ik_code_output"] = traced_iiwa_param_code.outputs - param_ik_num_unclipped;
+            data["param_ik_num_unclipped"] = param_ik_num_unclipped;
         }
     }
 

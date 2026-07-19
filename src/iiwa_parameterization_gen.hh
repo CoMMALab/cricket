@@ -33,13 +33,23 @@ auto IiwaBimanualParameterizationCG(
     }
     Independent(ad_inp);
 
-    auto q_full = IiwaBimanualParameterization<T>(ad_inp);
-    
-    const size_t n_out = 14;
+    auto ik_result = IiwaBimanualParameterization<T>(ad_inp);
+
+    // Output layout: first n_q joint angles ("y"), followed by the 4 pre-clip
+    // SafeArccos arguments ("u"). A |u[i]| > 1 means the pose/psi/GC
+    // combination has no valid IK solution on this branch -- SafeArccos would
+    // have silently clipped it -- so callers must reject rather than trust y.
+    const size_t n_q = 14;
+    const size_t n_unclipped = 4;
+    const size_t n_out = n_q + n_unclipped;
     ADVectorXs data(n_out);
-    for (int i = 0; i < n_out; ++i)
+    for (int i = 0; i < n_q; ++i)
     {
-        data[i] = q_full[i];
+        data[i] = ik_result.q[i];
+    }
+    for (int i = 0; i < n_unclipped; ++i)
+    {
+        data[n_q + i] = ik_result.unclipped[i];
     }
 
     std::cout << "Copied to data." << std::endl;
@@ -65,31 +75,22 @@ auto IiwaBimanualParameterizationCG(
     //       for (auto j = 0U; j < nq; j++)
     //           jac_e_q[i * nq + j] = jac[i * num_inp + j];
 
-      std::move(jac_e_q.begin(), jac_e_q.end(), std::back_inserter(result));              
+      std::move(jac_e_q.begin(), jac_e_q.end(), std::back_inserter(result));
     }
 
-    LangCDefaultVariableNameGenerator<double> nameGen;
+    // Codegen needs the block-oriented language for fk_template.hh's
+    // FloatVector-based parameterized_ik, same remap used by the SE3 path.
+    const std::string lang = (language == "c++") ? "c++_block" : language;
 
-    std::ostringstream function_code;
-
-    if (language == "c++")
-    {
-        LanguageCCustom<double> langC("double");
-        handler.generateCode(function_code, langC, result, nameGen);
-    }
-    else if (language == "rust")
-    {
-        LanguageRust<double> langRust("double");
-        handler.generateCode(function_code, langRust, result, nameGen);
-    }
-    else
-    {
-        throw std::runtime_error(fmt::format("unsupported language {}", language));
-    }
+    SegmentedVariableNameGenerator<double> nameGen(
+        {},
+        {{"y", n_q, true}, {"u", n_unclipped, true}});
 
     std::cout << "Generated the parameterized IK code." << std::endl;
-    return Traced{function_code.str(), handler.getTemporaryVariableCount(), result.size()};    
-
+    return Traced{
+        generate_code(handler, result, lang, nameGen),
+        handler.getTemporaryVariableCount(),
+        result.size()};
 }
 
 
@@ -110,13 +111,23 @@ auto IiwaSE3ParameterizationCG(
     }
     Independent(ad_inp);
 
-    auto q_out = IiwaSE3Parameterization<T>(ad_inp);
-    
-    const size_t n_out = 7;
+    auto ik_result = IiwaSE3Parameterization<T>(ad_inp);
+
+    // Output layout: first n_q joint angles ("y"), followed by the 4 pre-clip
+    // SafeArccos arguments ("u"). A |u[i]| > 1 means the pose/psi/GC
+    // combination has no valid IK solution on this branch -- SafeArccos would
+    // have silently clipped it -- so callers must reject rather than trust y.
+    const size_t n_q = 7;
+    const size_t n_unclipped = 4;
+    const size_t n_out = n_q + n_unclipped;
     ADVectorXs data(n_out);
-    for (int i = 0; i < n_out; ++i)
+    for (int i = 0; i < n_q; ++i)
     {
-        data[i] = q_out[i];
+        data[i] = ik_result.q[i];
+    }
+    for (int i = 0; i < n_unclipped; ++i)
+    {
+        data[n_q + i] = ik_result.unclipped[i];
     }
 
     ADFun<CGD> iiwa_param_func(ad_inp, data);
@@ -150,14 +161,18 @@ auto IiwaSE3ParameterizationCG(
     // instead of being read from the input they're read off the `smm` class
     // member directly: this segment occupies the same 3 tape positions that
     // used to be GC2/GC4/GC6, but is named "smm" so the generated code emits
-    // `smm[0]`, `smm[1]`, `smm[2]`. Output keeps the default `y[i]` naming,
-    // matching the `y` variable already declared in parameterized_ik.
+    // `smm[0]`, `smm[1]`, `smm[2]`. Output is split into `y[i]` (joint
+    // angles, matching the `y` variable already declared in
+    // parameterized_ik) and `u[i]` (pre-clip SafeArccos arguments, matching
+    // the `u` variable declared there for the joint-limit-style rejection
+    // check).
     const std::string lang = (language == "c++") ? "c++_block" : language;
 
     SegmentedVariableNameGenerator<double> nameGen(
         {{"pose", 7, true},
          {"psi", 1, false},
-         {"smm", 3, true}});
+         {"smm", 3, true}},
+        {{"y", n_q, true}, {"u", n_unclipped, true}});
 
     std::cout << "Generated the parameterized IK code." << std::endl;
     return Traced{

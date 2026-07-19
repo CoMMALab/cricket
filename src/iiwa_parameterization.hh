@@ -57,6 +57,20 @@ T SafeArccos(const T &val, U a, U b)
     return acos(ScalarClip<T,U>(val, a, b));
 }
 
+// Result of a parameterization: the joint configuration `q`, plus the 4
+// pre-clip arguments that were fed to SafeArccos (in call order: phi,
+// theta_4v, shoulder q_subordinate(1), wrist q_subordinate(5)). A value
+// outside [-1, 1] here means the requested pose/psi/GC combination has no
+// valid IK solution on this branch -- SafeArccos silently clips it instead
+// of failing, so callers must check `unclipped` themselves to detect and
+// reject those cases.
+template <typename T>
+struct IKParamResult
+{
+    Eigen::VectorX<T> q;
+    Eigen::Vector4<T> unclipped;
+};
+
 template <typename T, typename InputVector>
 auto IiwaBimanualParameterization(
     InputVector &ad_inp
@@ -87,6 +101,8 @@ auto IiwaBimanualParameterization(
     Eigen::VectorX<T> q_subordinate(7);
     Eigen::VectorX<T> q_full(14);
     q_full.head(7) = q_controlled;
+
+    Eigen::Vector4<T> unclipped;
 
     // iiwa kinematic parameters.
     Eigen::VectorX<T> iiwa_alpha(7);
@@ -171,9 +187,7 @@ auto IiwaBimanualParameterization(
     T p_26_dot = p_26.dot(p_26);  // = ||p_26||²
 
     T arccos_in = (d_se * d_se + p_26_dot - d_ew * d_ew) / (2.0 * d_se * p_26_norm);
-    // if (unclipped_vals != nullptr) {
-    //   (*unclipped_vals)(0) = arccos_in;
-    // }
+    unclipped(0) = arccos_in;
 
     T phi = SafeArccos(arccos_in, -clip, clip);
     T theta_2v = atan2(p_26.template head<2>().norm(), p_26(2)) + GC4 * phi;
@@ -182,9 +196,7 @@ auto IiwaBimanualParameterization(
 
     // EQ (4)
     arccos_in = (p_26_dot - d_se * d_se - d_ew * d_ew) / (2.0 * d_se * d_ew);
-    // if (unclipped_vals != nullptr) {
-    //   (*unclipped_vals)(1) = arccos_in;
-    // }
+    unclipped(1) = arccos_in;
 
     T theta_4v = GC4 * SafeArccos(arccos_in, -clip, clip);
     q_subordinate[3] = theta_4v;
@@ -211,9 +223,7 @@ auto IiwaBimanualParameterization(
         GC2 * (A_s(0, 1) * sin(psi) + B_s(0, 1) * cos(psi) + C_s(0, 1)));
 
     arccos_in = A_s(2, 1) * sin(psi) + B_s(2, 1) * cos(psi) + C_s(2, 1);
-    // if (unclipped_vals != nullptr) {
-    //   (*unclipped_vals)(2) = arccos_in;
-    // }
+    unclipped(2) = arccos_in;
     q_subordinate(1) = GC2 * SafeArccos(arccos_in, -clip, clip);
 
     q_subordinate(2) = atan2(
@@ -234,9 +244,7 @@ auto IiwaBimanualParameterization(
         GC6 * (A_w(0, 2) * sin(psi) + B_w(0, 2) * cos(psi) + C_w(0, 2)));
 
     arccos_in = A_w(2, 2) * sin(psi) + B_w(2, 2) * cos(psi) + C_w(2, 2);
-    // if (unclipped_vals != nullptr) {
-    //   (*unclipped_vals)(3) = arccos_in;
-    // }
+    unclipped(3) = arccos_in;
     q_subordinate(5) = GC6 * SafeArccos(arccos_in, -clip, clip);
 
     q_subordinate(6) = atan2(
@@ -244,7 +252,7 @@ auto IiwaBimanualParameterization(
         GC6 * (-A_w(2, 0) * sin(psi) - B_w(2, 0) * cos(psi) - C_w(2, 0)));
 
     q_full.tail(7) = q_subordinate;
-    return q_full;
+    return IKParamResult<T>{q_full, unclipped};
 }
 template <typename T, typename InputVector>
 auto IiwaSE3Parameterization(
@@ -297,6 +305,7 @@ auto IiwaSE3Parameterization(
 
 
     Eigen::VectorX<T> q_subordinate(7);
+    Eigen::Vector4<T> unclipped;
 
     // iiwa kinematic parameters.
     Eigen::VectorX<T> iiwa_alpha(7);
@@ -345,9 +354,7 @@ auto IiwaSE3Parameterization(
     T p_26_dot = p_26.dot(p_26);  // = ||p_26||²
 
     T arccos_in = (d_se * d_se + p_26_dot - d_ew * d_ew) / (2.0 * d_se * p_26_norm);
-    // if (unclipped_vals != nullptr) {
-    //   (*unclipped_vals)(0) = arccos_in;
-    // }
+    unclipped(0) = arccos_in;
 
     T phi = SafeArccos(arccos_in, -clip, clip);
     T theta_2v = atan2(p_26.template head<2>().norm(), p_26(2)) + GC4 * phi;
@@ -356,9 +363,7 @@ auto IiwaSE3Parameterization(
 
     // EQ (4)
     arccos_in = (p_26_dot - d_se * d_se - d_ew * d_ew) / (2.0 * d_se * d_ew);
-    // if (unclipped_vals != nullptr) {
-    //   (*unclipped_vals)(1) = arccos_in;
-    // }
+    unclipped(1) = arccos_in;
 
     T theta_4v = GC4 * SafeArccos(arccos_in, -clip, clip);
     q_subordinate[3] = theta_4v;
@@ -385,9 +390,7 @@ auto IiwaSE3Parameterization(
         GC2 * (A_s(0, 1) * sin(psi) + B_s(0, 1) * cos(psi) + C_s(0, 1)));
 
     arccos_in = A_s(2, 1) * sin(psi) + B_s(2, 1) * cos(psi) + C_s(2, 1);
-    // if (unclipped_vals != nullptr) {
-    //   (*unclipped_vals)(2) = arccos_in;
-    // }
+    unclipped(2) = arccos_in;
     q_subordinate(1) = GC2 * SafeArccos(arccos_in, -clip, clip);
 
     q_subordinate(2) = atan2(
@@ -408,14 +411,12 @@ auto IiwaSE3Parameterization(
         GC6 * (A_w(0, 2) * sin(psi) + B_w(0, 2) * cos(psi) + C_w(0, 2)));
 
     arccos_in = A_w(2, 2) * sin(psi) + B_w(2, 2) * cos(psi) + C_w(2, 2);
-    // if (unclipped_vals != nullptr) {
-    //   (*unclipped_vals)(3) = arccos_in;
-    // }
+    unclipped(3) = arccos_in;
     q_subordinate(5) = GC6 * SafeArccos(arccos_in, -clip, clip);
 
     q_subordinate(6) = atan2(
         GC6 * (A_w(2, 1) * sin(psi) + B_w(2, 1) * cos(psi) + C_w(2, 1)),
         GC6 * (-A_w(2, 0) * sin(psi) - B_w(2, 0) * cos(psi) - C_w(2, 0)));
 
-    return q_subordinate;
+    return IKParamResult<T>{q_subordinate, unclipped};
 }

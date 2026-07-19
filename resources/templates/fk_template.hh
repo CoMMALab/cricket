@@ -34,6 +34,14 @@ struct {{name}}
     static constexpr std::size_t num_smm_parameters = 3;
     inline static thread_local std::array<float, num_smm_parameters> smm = {1.0, 1.0, -1.0};
 
+    // End-effector position bounds used by the SE3 sampler (`sample()`).
+    static constexpr std::array<float, 3> sample_position_lower = {
+        {{join(sample_position_lower, ", ")}}
+    };
+    static constexpr std::array<float, 3> sample_position_upper = {
+        {{join(sample_position_upper, ", ")}}
+    };
+
 
 
     static constexpr std::array<std::string_view, ambient_dimension> joint_names = {"{{join(joint_names, "\", \"")}}"};
@@ -316,6 +324,12 @@ struct {{name}}
         return to_isometry(y.data());
     }
 
+    static inline auto is_eef_collision_free(Eigen::Isometry3f eef_pose, const vamp::collision::Environment<float> &environment) noexcept -> bool
+    {
+        // dummy function now
+        return true;
+    }
+
     template <typename InputVector, std::size_t rake>
     static inline auto parameterized_ik(const InputVector &x) noexcept -> std::pair<bool, AmbientConfigurationBlock<rake>>
     {
@@ -323,11 +337,27 @@ struct {{name}}
         // x is the pose (+psi); the self-motion-manifold selector comes from `smm`.
         const auto &pose = x;
         const auto psi = x[7];
+        // Matches the clip bound passed to SafeArccos in IiwaSE3Parameterization
+        // / IiwaBimanualParameterization -- values beyond this were clipped,
+        // not validly computed.
+        constexpr float kArccosClip = 1.0f - 1e-4f;
 
         FloatVector<rake, {{param_ik_code_vars}}> v;
         FloatVector<rake, {{param_ik_code_output}}> y;
+        FloatVector<rake, {{param_ik_num_unclipped}}> u;
 
         {{param_ik_code}}
+
+        // Reject if a SafeArccos argument fell outside [-1, 1] before
+        // clipping -- that means the requested pose/psi/GC combination has
+        // no valid IK solution on this branch, even though SafeArccos itself
+        // silently clips and returns a (wrong) angle for it.
+        {% for index in range(param_ik_num_unclipped) %}
+        if ((u[{{index}}] < -kArccosClip).any() || (u[{{index}}] > kArccosClip).any())
+        {
+            return {false, y};
+        }
+        {% endfor %}
 
         // Check if y are within joint limits
         {% for index in range(n_q - 1) %}
