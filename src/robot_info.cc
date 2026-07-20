@@ -793,8 +793,8 @@ namespace cricket
         // min/max_radius cover the fine spheres queried against the environment, restricted to
         // links that actually get environment checks (mobile links under skip_static_environment).
         // The per-link bounding spheres that gate fine-sphere checks in fkcc are deliberately
-        // excluded: CAPT answers queries above max_radius conservatively, so the gate stays sound
-        // without inflating the build contract.
+        // excluded so the build contract is not inflated; bounding-gate queries above max_radius
+        // are a known approximation (rare false negatives accepted).
         if (not environment_links.empty())
         {
             json["min_radius"] = env_min_radius;
