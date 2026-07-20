@@ -1,0 +1,27 @@
+{
+    "name": "BimanualPanda",
+    "module_name": "bimanual_panda",
+    "parts": [
+        {
+            "prefix": "left",
+            "urdf": "panda/panda_spherized.urdf",
+            "srdf": "panda/panda.srdf",
+            "xyz": [0.0, -0.2875, 0.0]
+        },
+        {
+            "prefix": "right",
+            "urdf": "panda/panda_spherized.urdf",
+            "srdf": "panda/panda.srdf",
+            "xyz": [0.0, 0.2875, 0.0]
+        }
+    ],
+    "end_effector": ["left_panda_grasptarget", "right_panda_grasptarget"],
+    "constraints": true,
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "bimanual_panda_composite_fk.hh",
+    "flask": {
+        "rho": 32.0
+    }
+}

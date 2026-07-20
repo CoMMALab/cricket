@@ -215,14 +215,15 @@ struct {{name}}
 
         Debug output;
 
-        {% for i in range(n_spheres) %}
+        {% for i in range(n_spheres) %}{% if at(sphere_env_skip, i) %}
+        output.first.emplace_back();{% else %}
         output.first.emplace_back(
             sphere_environment_get_collisions<decltype(x[0])>(
                 environment,
                 y[{{ i * 4 + 0 }}],
                 y[{{ i * 4 + 1 }}],
                 y[{{ i * 4 + 2 }}],
-                y[{{ i * 4 + 3 }}]));
+                y[{{ i * 4 + 3 }}]));{% endif %}
         {% endfor %}
 
         {% if compact_collisions %}
@@ -298,8 +299,10 @@ struct {{name}}
         {{ccfkee_code}}
         {% include "ccfk" %}
 
-        // attaching at {{ end_effector }}
-        set_attachment_pose(environment, to_isometry(&y[{{ccfkee_code_output - 12}}]));
+        {% for k in range(num_end_effectors) %}
+        // attaching at {{ at(end_effectors, k) }}
+        set_attachment_pose(environment, {{k}}, to_isometry(&y[{{ccfkee_code_output - 12 * (num_end_effectors - k)}}]));
+        {% endfor %}
 
         //
         // attachment vs. environment collisions
@@ -308,18 +311,30 @@ struct {{name}}
         {
             return false;
         }
+        {% if num_end_effectors > 1 %}
+
+        //
+        // attachment vs. attachment collisions (across end-effectors)
+        //
+        if (attachment_attachment_collision(environment)) [[unlikely]]
+        {
+            return false;
+        }
+        {% endif %}
 
         //
         // attachment vs. robot collisions
         //
 
-        {% for i in range(length(end_effector_collisions)) %}
-        {% set link_index = at(end_effector_collisions, i) %}
+        {% for k in range(num_end_effectors) %}
+        {% set eef_collisions = at(end_effector_collisions, k) %}
+        {% for i in range(length(eef_collisions)) %}
+        {% set link_index = at(eef_collisions, i) %}
         {% set link_bs = at(bounding_sphere_index, link_index) %}
         {% set link_spheres = at(per_link_spheres, link_index) %}
 
-        // Attachment vs. {{ at(link_names, link_index )}}
-        if (attachment_sphere_collision<decltype(x[0])>(environment,
+        // {{ at(end_effectors, k) }} attachments vs. {{ at(link_names, link_index )}}
+        if (attachment_sphere_collision<decltype(x[0])>(environment, {{k}},
                                                         y[{{(n_spheres + link_bs) * 4 + 0}}],
                                                         y[{{(n_spheres + link_bs) * 4 + 1}}],
                                                         y[{{(n_spheres + link_bs) * 4 + 2}}],
@@ -327,7 +342,7 @@ struct {{name}}
         {
             {% for j in range(length(link_spheres)) %}
             {% set sphere_index = at(link_spheres, j) %}
-            if (attachment_sphere_collision<decltype(x[0])>(environment,
+            if (attachment_sphere_collision<decltype(x[0])>(environment, {{k}},
                                                             y[{{sphere_index * 4 + 0}}],
                                                             y[{{sphere_index * 4 + 1}}],
                                                             y[{{sphere_index * 4 + 2}}],
@@ -338,18 +353,19 @@ struct {{name}}
             {% endfor %}
         }
         {% endfor %}
+        {% endfor %}
 
         return true;
     }
 
-    static inline auto eefk(const std::array<float, {{n_q}}> &x) noexcept -> Eigen::Isometry3f
+    static inline auto eefk(const std::array<float, {{n_q}}> &x, std::size_t eef_index = 0) noexcept -> Eigen::Isometry3f
     {
         std::array<float, {{eefk_code_vars}}> v;
         std::array<float, {{eefk_code_output}}> y;
 
         {{eefk_code}}
 
-        return to_isometry(y.data());
+        return to_isometry(y.data() + 12 * eef_index);
     }
 
     {% if has_constraints %}

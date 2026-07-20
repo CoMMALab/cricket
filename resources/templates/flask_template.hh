@@ -288,10 +288,11 @@
             return limits_check<rake>(x) and Ambient::fkcc_attach<rake>(environment, x);
         }
 
-        static inline auto eefk(const std::array<float, dimension> &x) noexcept -> Eigen::Isometry3f
+        static inline auto eefk(const std::array<float, dimension> &x, std::size_t eef_index = 0) noexcept
+            -> Eigen::Isometry3f
         {
             std::array<float, flat_dimension> q;
             std::copy_n(x.begin(), flat_dimension, q.begin());
-            return Ambient::eefk(q);
+            return Ambient::eefk(q, eef_index);
         }
     };

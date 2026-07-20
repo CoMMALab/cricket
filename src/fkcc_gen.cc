@@ -68,6 +68,8 @@ int main(int argc, char **argv)
         throw std::runtime_error(fmt::format("Failed to parse JSON file! Error: \n{}", e.what()));
     }
 
+    cricket::validate_recipe(data);
+
     std::optional<std::filesystem::path> srdf_path = {};
     if (data.contains("srdf"))
     {
@@ -113,15 +115,22 @@ int main(int argc, char **argv)
         bounds = b;
     }
 
-    cricket::RobotInfo robot(
-        parent_path / data["urdf"],
-        srdf_path,
-        end_effector_names,
-        cricket::JointSelection::from_json(data));
+    const auto joint_selection = cricket::JointSelection::from_json(data);
+    const auto composite = cricket::CompositeSpec::from_json(data, parent_path);
+
+    if (not composite and not data.contains("urdf"))
+    {
+        throw std::runtime_error("Recipe must contain either `urdf` or `parts`!");
+    }
+
+    cricket::RobotInfo robot =
+        composite ?
+            cricket::RobotInfo(*composite, end_effector_names, joint_selection) :
+            cricket::RobotInfo(parent_path / data["urdf"], srdf_path, end_effector_names, joint_selection);
 
     // Preserve compact_collisions across robot.json() merge; default false.
     const bool compact_collisions = data.value("compact_collisions", false);
-    data.update(robot.json(bounds));
+    data.update(robot.json(bounds, data.value("skip_static_environment_collisions", false)));
     data["compact_collisions"] = compact_collisions;
 
     // Python/C++ module identifier; must match the registered binding module name.

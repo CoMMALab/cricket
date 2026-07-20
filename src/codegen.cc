@@ -9,13 +9,18 @@
 #include <pinocchio/algorithm/kinematics.hpp>
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 #include <inja/inja.hpp>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
+#include <vector>
 
 namespace cricket
 {
@@ -99,7 +104,7 @@ namespace cricket
 
         std::size_t n_spheres_data = (spheres) ? info.spheres.size() * 4 : 0;
         std::size_t n_bounding_spheres_data = (bounding_spheres) ? info.bounding_spheres.size() * 4 : 0;
-        std::size_t n_fk_data = (fk) ? 12 : 0;
+        std::size_t n_fk_data = (fk) ? 12 * info.end_effector_indexes.size() : 0;
         std::size_t n_out = n_spheres_data + n_bounding_spheres_data + n_fk_data;
 
         ADVectorXs data(n_out);
@@ -128,7 +133,14 @@ namespace cricket
 
         if (fk)
         {
-            trace_frame(info.end_effector_index, ad_data, data, n_spheres_data + n_bounding_spheres_data);
+            for (auto i = 0U; i < info.end_effector_indexes.size(); ++i)
+            {
+                trace_frame(
+                    info.end_effector_indexes[i],
+                    ad_data,
+                    data,
+                    n_spheres_data + n_bounding_spheres_data + i * 12);
+            }
         }
 
         // Create the AD function
@@ -449,6 +461,142 @@ namespace cricket
         data["flask_struct"] = env.render(flask_temp, data);
     }
 
+    namespace
+    {
+        auto edit_distance(std::string_view a, std::string_view b) -> std::size_t
+        {
+            std::vector<std::size_t> prev(b.size() + 1);
+            std::vector<std::size_t> curr(b.size() + 1);
+            for (std::size_t j = 0; j <= b.size(); ++j)
+            {
+                prev[j] = j;
+            }
+            for (std::size_t i = 1; i <= a.size(); ++i)
+            {
+                curr[0] = i;
+                for (std::size_t j = 1; j <= b.size(); ++j)
+                {
+                    const std::size_t subst = prev[j - 1] + ((a[i - 1] == b[j - 1]) ? 0 : 1);
+                    curr[j] = std::min({prev[j] + 1, curr[j - 1] + 1, subst});
+                }
+                std::swap(prev, curr);
+            }
+            return prev[b.size()];
+        }
+
+        auto check_keys(
+            const nlohmann::json &object,
+            const std::vector<std::string_view> &allowed,
+            const std::string &context,
+            std::vector<std::string> &problems) -> void
+        {
+            for (const auto &[key, _] : object.items())
+            {
+                if ((not key.empty() and key.front() == '_') or
+                    std::find(allowed.begin(), allowed.end(), key) != allowed.end())
+                {
+                    continue;
+                }
+
+                std::string_view best;
+                std::size_t best_distance = std::numeric_limits<std::size_t>::max();
+                for (const auto &candidate : allowed)
+                {
+                    const auto d = edit_distance(key, candidate);
+                    if (d < best_distance)
+                    {
+                        best_distance = d;
+                        best = candidate;
+                    }
+                }
+
+                auto problem = fmt::format("unknown key \"{}\" in {}", key, context);
+                if (best_distance <= std::max<std::size_t>(2, key.size() / 3))
+                {
+                    problem += fmt::format(" (did you mean \"{}\"?)", best);
+                }
+                problems.emplace_back(std::move(problem));
+            }
+        }
+    }  // namespace
+
+    auto validate_recipe(const nlohmann::json &data) -> void
+    {
+        static const std::vector<std::string_view> top_level = {
+            "name",
+            "module_name",
+            "urdf",
+            "srdf",
+            "end_effector",
+            "language",
+            "bounds",
+            "resolution",
+            "template",
+            "subtemplates",
+            "output",
+            "flask",
+            "constraints",
+            "compact_collisions",
+            "skip_static_environment_collisions",
+            "active_joints",
+            "default_configuration",
+            "parts",
+            "disabled_collisions",
+            "com",
+            "closed_loops",
+            "lead_screw",
+            "twist",
+        };
+        static const std::vector<std::string_view> bounds_keys = {"lower", "upper"};
+        static const std::vector<std::string_view> flask_keys = {
+            "rho", "resolution", "velocity_limits", "effort_limits", "template"};
+        static const std::vector<std::string_view> com_keys = {"reference_frames"};
+        static const std::vector<std::string_view> loop_keys = {"start_frame", "end_frame", "length"};
+        static const std::vector<std::string_view> part_keys = {
+            "prefix", "urdf", "srdf", "parent", "xyz", "rpy", "quat"};
+        static const std::vector<std::string_view> subtemplate_keys = {"name", "template"};
+
+        std::vector<std::string> problems;
+        check_keys(data, top_level, "recipe", problems);
+
+        const auto check_object = [&](const char *key, const std::vector<std::string_view> &allowed)
+        {
+            if (data.contains(key) and data[key].is_object())
+            {
+                check_keys(data[key], allowed, fmt::format("\"{}\"", key), problems);
+            }
+        };
+        const auto check_array = [&](const char *key, const std::vector<std::string_view> &allowed)
+        {
+            if (not data.contains(key) or not data[key].is_array())
+            {
+                return;
+            }
+            std::size_t i = 0;
+            for (const auto &entry : data[key])
+            {
+                if (entry.is_object())
+                {
+                    check_keys(entry, allowed, fmt::format("\"{}\"[{}]", key, i), problems);
+                }
+                ++i;
+            }
+        };
+
+        check_object("bounds", bounds_keys);
+        check_object("flask", flask_keys);
+        check_object("com", com_keys);
+        check_array("closed_loops", loop_keys);
+        check_array("parts", part_keys);
+        check_array("subtemplates", subtemplate_keys);
+
+        if (not problems.empty())
+        {
+            throw std::runtime_error(
+                fmt::format("Invalid recipe:\n  {}", fmt::join(problems, "\n  ")));
+        }
+    }
+
     auto generate_robot_source(const GenOptions &opts) -> GenResult
     {
         const bool use_embedded = opts.template_path.empty();
@@ -460,11 +608,20 @@ namespace cricket
                     opts.template_path.string()));
         }
 
-        RobotInfo robot(opts.urdf, opts.srdf, opts.end_effectors, JointSelection::from_json(opts.data));
+        validate_recipe(opts.data);
+
+        // A "parts" key in the recipe data selects composite assembly; part paths are
+        // resolved against the URDF's directory (or as given when no URDF is set).
+        const auto composite = CompositeSpec::from_json(opts.data, opts.urdf.parent_path());
+        RobotInfo robot =
+            composite ?
+                RobotInfo(*composite, opts.end_effectors, JointSelection::from_json(opts.data)) :
+                RobotInfo(opts.urdf, opts.srdf, opts.end_effectors, JointSelection::from_json(opts.data));
 
         nlohmann::json data = opts.data;
         const bool compact_collisions = opts.data.value("compact_collisions", false);
-        data.update(robot.json(opts.bounds));
+        data.update(robot.json(
+            opts.bounds, opts.data.value("skip_static_environment_collisions", false)));
         data["compact_collisions"] = compact_collisions;
 
         // Python/C++ module identifier; must match the registered binding module name.

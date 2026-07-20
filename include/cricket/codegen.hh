@@ -163,6 +163,12 @@ namespace cricket
         const std::string &language,
         std::string_view flask_template = {}) -> void;
 
+    // Strict recipe validation: throws if `data` contains keys cricket does not read
+    // (typos otherwise fail silently, e.g. a misspelled flag defaulting to false), with a
+    // nearest-match suggestion. Keys starting with '_' are ignored as comments. Checks
+    // nested blocks (bounds, flask, com, closed_loops, parts, subtemplates) too.
+    auto validate_recipe(const nlohmann::json &data) -> void;
+
     struct GenOptions
     {
         std::filesystem::path urdf;

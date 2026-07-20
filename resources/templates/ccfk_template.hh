@@ -46,8 +46,8 @@ for (const auto &sp : cc_self_pairs)
     }
 }
 {% else %}
-{% for i in range(length(links_with_geometry)) %}
-{% set array_index = length(links_with_geometry) - i - 1 %}
+{% for i in range(length(environment_links)) %}
+{% set array_index = at(environment_links, i) %}
 {% set link_index = at(links_with_geometry, array_index) %}
 {% set link_spheres = at(per_link_spheres, link_index) %}
 {% set bs_loc = (n_spheres + array_index) * 4 %}
