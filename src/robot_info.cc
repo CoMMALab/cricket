@@ -765,6 +765,8 @@ namespace cricket
         nlohmann::json env_body_idx = nlohmann::json::array();
         const std::size_t n_links = links_with_geometry.size();
         std::size_t body_offset = 0;
+        float env_min_radius = std::numeric_limits<float>::max();
+        float env_max_radius = std::numeric_limits<float>::lowest();
         for (std::size_t i = 0; i < n_links; ++i)
         {
             const std::size_t array_index = n_links - 1 - i;
@@ -779,12 +781,25 @@ namespace cricket
             for (const auto &s : body)
             {
                 env_body_idx.push_back(s);
+                env_min_radius = std::min(env_min_radius, spheres[s].radius);
+                env_max_radius = std::max(env_max_radius, spheres[s].radius);
             }
             body_offset += body.size();
         }
         json["environment_links"] = environment_links;
         json["compact_env_entries"] = env_entries;
         json["compact_env_body_idx"] = env_body_idx;
+
+        // min/max_radius cover the fine spheres queried against the environment, restricted to
+        // links that actually get environment checks (mobile links under skip_static_environment).
+        // The per-link bounding spheres that gate fine-sphere checks in fkcc are deliberately
+        // excluded: CAPT answers queries above max_radius conservatively, so the gate stays sound
+        // without inflating the build contract.
+        if (not environment_links.empty())
+        {
+            json["min_radius"] = env_min_radius;
+            json["max_radius"] = env_max_radius;
+        }
 
         // Per-sphere skip markers so fkcc_debug's per-sphere environment queries stay
         // consistent with fkcc (skipped spheres get an empty collision list).
