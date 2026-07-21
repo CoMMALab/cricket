@@ -57,33 +57,107 @@ inline auto sinc_smooth(Scalar x) -> Scalar
 {
     const Scalar x2 = x * x;
     const Scalar taylor = 1.0 - x2 / 6.0 * (1.0 - x2 / 20.0);
-    const Scalar full = sin(x) / x;
+
+    // Guard the divisor itself, not just the blend weight: at x == 0 this is a
+    // literal 0/0 -> NaN, and since both branches of a CondExp-free blend are
+    // always evaluated, `w * NaN` is still NaN (not 0) and poisons the result
+    // even though w == 0 there.
+    const Scalar safe_x = CondExpLt(x2, Scalar(se3_detail::EPS), Scalar(1.0), x);
+    const Scalar full = sin(safe_x) / safe_x;
     const Scalar w = x2 / (x2 + se3_detail::EPS);
 
     return (1.0 - w) * taylor + w * full;
 }
 
+// Recovers axis * angle from R when theta is near pi, where sin(theta) ~ 0
+// makes `vee` (and thus the generic/taylor branches below) collapse to ~0
+// and lose the axis direction entirely. Uses the identity
+// R_ii = cos(theta) + (1 - cos(theta)) n_i^2 and, for i != j,
+// R_ij + R_ji = 2 (1 - cos(theta)) n_i n_j, both of which are well-conditioned
+// near theta = pi (unlike the vee-based extraction).
+template <typename Matrix, typename Scalar>
+inline auto so3_log_pi_axis(const Matrix &R, Scalar cos_theta, Scalar theta) -> Matrix
+{
+    const Scalar one_minus_c = Scalar(1.0) - cos_theta;
+    const Scalar safe_one_minus_c = CondExpLt(one_minus_c, Scalar(se3_detail::EPS), Scalar(1.0), one_minus_c);
+
+    Scalar n2_0 = (R(0, 0) - cos_theta) / safe_one_minus_c;
+    Scalar n2_1 = (R(1, 1) - cos_theta) / safe_one_minus_c;
+    Scalar n2_2 = (R(2, 2) - cos_theta) / safe_one_minus_c;
+    // Clamp tiny negative numerical noise.
+    n2_0 = CondExpLt(n2_0, Scalar(0.0), Scalar(0.0), n2_0);
+    n2_1 = CondExpLt(n2_1, Scalar(0.0), Scalar(0.0), n2_1);
+    n2_2 = CondExpLt(n2_2, Scalar(0.0), Scalar(0.0), n2_2);
+
+    // Pick the largest-magnitude axis component as pivot so the divisions
+    // below never see a near-zero denominator.
+    const Scalar pivot_is_0 = CondExpGe(n2_0, n2_1, CondExpGe(n2_0, n2_2, Scalar(1.0), Scalar(0.0)), Scalar(0.0));
+    const Scalar pivot_is_1 = CondExpGe(n2_1, n2_0, CondExpGe(n2_1, n2_2, Scalar(1.0), Scalar(0.0)), Scalar(0.0));
+    const Scalar pivot_is_2 = Scalar(1.0) - pivot_is_0 - pivot_is_1;
+
+    const Scalar n2_pivot = pivot_is_0 * n2_0 + pivot_is_1 * n2_1 + pivot_is_2 * n2_2;
+    const Scalar n_pivot = sqrt(n2_pivot);
+    const Scalar safe_n_pivot = CondExpLt(n_pivot, Scalar(se3_detail::EPS), Scalar(1.0), n_pivot);
+
+    const Scalar sym_01 = (R(0, 1) + R(1, 0)) / (Scalar(2.0) * safe_one_minus_c);
+    const Scalar sym_02 = (R(0, 2) + R(2, 0)) / (Scalar(2.0) * safe_one_minus_c);
+    const Scalar sym_12 = (R(1, 2) + R(2, 1)) / (Scalar(2.0) * safe_one_minus_c);
+
+    const Scalar n_0 = pivot_is_0 * sqrt(n2_0)
+                      + pivot_is_1 * (sym_01 / safe_n_pivot)
+                      + pivot_is_2 * (sym_02 / safe_n_pivot);
+    const Scalar n_1 = pivot_is_1 * sqrt(n2_1)
+                      + pivot_is_0 * (sym_01 / safe_n_pivot)
+                      + pivot_is_2 * (sym_12 / safe_n_pivot);
+    const Scalar n_2 = pivot_is_2 * sqrt(n2_2)
+                      + pivot_is_0 * (sym_02 / safe_n_pivot)
+                      + pivot_is_1 * (sym_12 / safe_n_pivot);
+
+    Matrix pi_axis = Matrix::Zero(3, 1);
+    pi_axis(0, 0) = theta * n_0;
+    pi_axis(1, 0) = theta * n_1;
+    pi_axis(2, 0) = theta * n_2;
+    return pi_axis;
+}
+
 template <typename Matrix, typename Scalar>
 inline auto so3_log_smooth(const Matrix &R) -> Matrix
 {
-    const Scalar cos_theta = (R.trace() - 1) / 2;
-    const Scalar sin_theta2 = 1.0 - cos_theta * cos_theta;
-    const Scalar w = sin_theta2 / (sin_theta2 + se3_detail::EPS);
+    // Clamp for acos domain safety (trace can drift slightly outside [-1, 1]
+    // due to floating point).
+    const Scalar cos_theta_raw = (R.trace() - 1) / 2;
+    const Scalar cos_theta = CondExpGt(cos_theta_raw, Scalar(1.0), Scalar(1.0),
+        CondExpLt(cos_theta_raw, Scalar(-1.0), Scalar(-1.0), cos_theta_raw));
+    const Scalar theta = acos(cos_theta);
 
     Matrix vee = Matrix::Zero(3, 1);
     vee(0, 0) = R(2, 1) - R(1, 2);
     vee(1, 0) = R(0, 2) - R(2, 0);
     vee(2, 0) = R(1, 0) - R(0, 1);
 
-    const Scalar theta = acos(cos_theta);
-
+    // Near theta == 0: log(R) ~ 0.5 * vee.
     const auto taylor = 0.5 * vee;
 
-    // factor = theta / (2 sin(theta))
+    // Generic branch: factor = theta / (2 sin(theta)). sinc_smooth is itself
+    // NaN-safe at theta == 0, so this never produces a literal 0/0.
     const Scalar factor = 0.5 / (sinc_smooth(theta) + se3_detail::EPS);
-    const auto full = vee * factor;
+    const auto generic = vee * factor;
 
-    return (1.0 - w) * taylor + w * full;
+    // Near theta == pi: vee collapses to ~0 and loses the axis direction, so
+    // recover axis * angle from the symmetric part of R instead.
+    const auto pi_axis = so3_log_pi_axis<Matrix, Scalar>(R, cos_theta, theta);
+
+    // Two independent singularities live at opposite ends of cos_theta, so
+    // blend each in with its own weight rather than reusing a single
+    // "near singular" indicator for both (that was the source of the theta ==
+    // pi bug: it picked the theta == 0 fallback, which is wrong at pi).
+    const Scalar d0 = 1.0 - cos_theta;    // -> 0 only as theta -> 0
+    const Scalar d_pi = 1.0 + cos_theta;  // -> 0 only as theta -> pi
+    const Scalar w0 = se3_detail::EPS / (d0 + se3_detail::EPS);
+    const Scalar w_pi = se3_detail::EPS / (d_pi + se3_detail::EPS);
+    const Scalar w_generic = 1.0 - w0 - w_pi;
+
+    return w0 * taylor + w_pi * pi_axis + w_generic * generic;
 }
 
 auto trace_map_to_se3(

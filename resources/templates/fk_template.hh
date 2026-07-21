@@ -353,21 +353,20 @@ struct {{name}}
     template <std::size_t rake>
     static inline auto check_if_ik_valid_block(
         const vamp::collision::Environment<FloatVector<rake>> &environment,
-        const ConfigurationBlock<rake> &pose) noexcept -> bool
+        const ConfigurationBlock<rake> &x) noexcept -> bool
     {
         std::array<FloatVector<rake, 1>, {{check_ik_valid_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{check_ik_valid_code_output}}> y;
-        const auto &x = pose;
 
         {{check_ik_valid_code}}
 
-        for (auto i = n_ee_local_spheres; i-- > 0;)
+        {% for r in range(n_end_effector_local_spheres) %}
+        {% set i = n_end_effector_local_spheres - 1 - r %}
+        if (sphere_environment_in_collision(environment, y[{{i}} * 4 + 0], y[{{i}} * 4 + 1], y[{{i}} * 4 + 2], y[{{i}} * 4 + 3]))
         {
-            if (sphere_environment_in_collision(environment, y[i * 4 + 0], y[i * 4 + 1], y[i * 4 + 2], y[i * 4 + 3]))
-            {
-                return false;
-            }
+            return false;
         }
+        {% endfor %}
 
         return true;
     }
