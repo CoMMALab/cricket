@@ -1,6 +1,7 @@
 {
     "name": "UR10e",
     "urdf": "ur10e/ur_10e_spherized.urdf",
+    "srdf": "ur10e/ur10e.srdf",
     "end_effector": "robotiq_85_base_link",
     "resolution": 32,
     "template": "templates/fk_template.hh",
