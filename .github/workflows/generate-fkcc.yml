@@ -1,0 +1,62 @@
+name: Generate FKCC Code
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up build environment
+        uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-file: environment.yaml
+          cache-environment: true
+          cache-downloads: true
+
+      - name: Cache CPM packages
+        uses: actions/cache@v4
+        with:
+          path: .cpm-cache
+          key: cpm-cache-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'CppADCodeGen.patch') }}
+
+      - name: Build fkcc_gen
+        shell: micromamba-shell {0}
+        run: |
+          cmake -GNinja -Bbuild -DCRICKET_BUILD_JIT=OFF .
+          cmake --build build
+
+      - name: Generate FK/CC code for each robot
+        shell: micromamba-shell {0}
+        run: |
+          set -euo pipefail
+          mkdir -p generated/cpp generated/rust
+          for cfg in resources/*.json; do
+            lang=$(jq -r '.language // "c++"' "$cfg")
+            out=$(jq -r '.output' "$cfg")
+            if [ "$lang" = "rust" ]; then
+              dest="generated/rust/$out"
+            else
+              dest="generated/cpp/$out"
+            fi
+            echo "Generating $dest from $cfg"
+            ./build/fkcc_gen "$cfg" -t "$dest"
+          done
+
+      - name: Upload C++ FKCC artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fkcc-cpp
+          path: generated/cpp/*.hh
+
+      - name: Upload Rust FKCC artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fkcc-rust
+          path: generated/rust/*.rs
