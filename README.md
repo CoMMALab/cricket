@@ -177,6 +177,10 @@ In addition to the specified input fields from the configuration file, the scrip
 - `end_effector_index`: frame index of end-effector.
 - `min_radius`: minimum sphere radius on robot.
 - `max_radius`: maximum sphere radius on robot.
+- `min_radius_mobile`: minimum sphere radius among mobile (non-fixed) spheres, i.e. spheres whose kinematic chain includes at least one moving joint.
+- `max_radius_mobile`: maximum sphere radius among mobile (non-fixed) spheres.
+- `min_bounding_radius_mobile`: minimum radius among the per-link bounding spheres (used in the collision-checking hierarchy) belonging to mobile (non-fixed) links.
+- `max_bounding_radius_mobile`: maximum radius among the per-link bounding spheres belonging to mobile (non-fixed) links.
 - `joint_names`: name of joint corresponding to each DoF.
 - `link_names`: name of frame corresponding to index.
 - `per_link_spheres`: for each frame, the indices of the spheres associated with that frame.

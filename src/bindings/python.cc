@@ -51,6 +51,12 @@ NB_MODULE(_core_ext, m)
         .def_prop_ro("n_spheres", [](cricket::RobotInfo &r) { return r.spheres.size(); })
         .def_prop_ro("min_radius", [](cricket::RobotInfo &r) { return r.min_radius; })
         .def_prop_ro("max_radius", [](cricket::RobotInfo &r) { return r.max_radius; })
+        .def_prop_ro("min_radius_mobile", [](cricket::RobotInfo &r) { return r.min_radius_mobile; })
+        .def_prop_ro("max_radius_mobile", [](cricket::RobotInfo &r) { return r.max_radius_mobile; })
+        .def_prop_ro(
+            "min_bounding_radius_mobile", [](cricket::RobotInfo &r) { return r.min_bounding_radius_mobile; })
+        .def_prop_ro(
+            "max_bounding_radius_mobile", [](cricket::RobotInfo &r) { return r.max_bounding_radius_mobile; })
         .def_prop_ro("end_effector_name", [](cricket::RobotInfo &r) { return r.end_effector_name; })
         .def(
             "json",

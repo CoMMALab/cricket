@@ -219,6 +219,10 @@ namespace cricket
         json["end_effector_index"] = end_effector_index;
         json["min_radius"] = min_radius;
         json["max_radius"] = max_radius;
+        json["min_radius_mobile"] = min_radius_mobile;
+        json["max_radius_mobile"] = max_radius_mobile;
+        json["min_bounding_radius_mobile"] = min_bounding_radius_mobile;
+        json["max_bounding_radius_mobile"] = max_bounding_radius_mobile;
         json["joint_names"] = dof_to_joint_names();
         json["allowed_link_pairs"] = allowed_link_pairs;
         json["per_link_spheres"] = per_link_spheres;
@@ -316,6 +320,14 @@ namespace cricket
 
                 min_radius = std::min(min_radius, info.radius);
                 max_radius = std::max(max_radius, info.radius);
+
+                // Joint index 0 is always "universe": spheres whose kinematic chain has no
+                // moving joint above it are rigidly fixed to the world and thus immobile.
+                if (info.parent_joint != 0)
+                {
+                    min_radius_mobile = std::min(min_radius_mobile, info.radius);
+                    max_radius_mobile = std::max(max_radius_mobile, info.radius);
+                }
             }
             else
             {
@@ -357,6 +369,12 @@ namespace cricket
                 bounding_sphere_index.emplace_back(bs);
                 links_with_geometry.emplace_back(i);
                 bs++;
+
+                if (info.parent_joint != 0)
+                {
+                    min_bounding_radius_mobile = std::min(min_bounding_radius_mobile, info.radius);
+                    max_bounding_radius_mobile = std::max(max_bounding_radius_mobile, info.radius);
+                }
             }
             else
             {
