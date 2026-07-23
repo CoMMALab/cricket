@@ -16,6 +16,10 @@ struct {{name}}
     static constexpr std::size_t n_spheres = {{n_spheres}};
     static constexpr float min_radius = {{min_radius}};
     static constexpr float max_radius = {{max_radius}};
+    static constexpr float min_radius_mobile = {{min_radius_mobile}};
+    static constexpr float max_radius_mobile = {{max_radius_mobile}};
+    static constexpr float min_bounding_radius_mobile = {{min_bounding_radius_mobile}};
+    static constexpr float max_bounding_radius_mobile = {{max_bounding_radius_mobile}};
     static constexpr std::size_t resolution = {{resolution}};
     static constexpr bool euclidean = {{euclidean}};
 

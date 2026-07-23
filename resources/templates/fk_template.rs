@@ -39,6 +39,10 @@ impl {{name}} {
 
     pub const MIN_RADIUS: f32 = {{min_radius}};
     pub const MAX_RADIUS: f32 = {{max_radius}};
+    pub const MIN_RADIUS_MOBILE: f32 = {{min_radius_mobile}};
+    pub const MAX_RADIUS_MOBILE: f32 = {{max_radius_mobile}};
+    pub const MIN_BOUNDING_RADIUS_MOBILE: f32 = {{min_bounding_radius_mobile}};
+    pub const MAX_BOUNDING_RADIUS_MOBILE: f32 = {{max_bounding_radius_mobile}};
 }
 
 const fn make_upper(lower: [f32; DIM], scale: [f32; DIM]) -> [f32; DIM] {
