@@ -74,14 +74,6 @@
     </plugin>
   </gazebo>
   <!-- Now we can start using the macros included above to define the actual PR2 -->
-  <!-- World link for planar base joint -->
-  <link name="world"/>
-  <joint name="world_joint" type="planar">
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <parent link="world"/>
-    <child link="base_footprint"/>
-    <axis xyz="0 0 1"/>
-  </joint>
   <link name="base_link">
     <inertial>
       <mass value="116.0" />
