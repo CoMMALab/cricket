@@ -156,6 +156,9 @@ target_include_directories(cricket_inja INTERFACE
     $<INSTALL_INTERFACE:${_cricket_install_include_iface}>
 )
 
+add_executable(dump_srdf src/dump_srdf.cc)
+target_link_libraries(dump_srdf PRIVATE cricket::cricket fmt::fmt)
+
 add_executable(fkcc_gen src/fkcc_gen.cc)
 
 target_link_libraries(fkcc_gen
