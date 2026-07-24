@@ -181,6 +181,7 @@ In addition to the specified input fields from the configuration file, the scrip
 - `max_radius_mobile`: maximum sphere radius among mobile (non-fixed) spheres.
 - `min_bounding_radius_mobile`: minimum radius among the per-link bounding spheres (used in the collision-checking hierarchy) belonging to mobile (non-fixed) links.
 - `max_bounding_radius_mobile`: maximum radius among the per-link bounding spheres belonging to mobile (non-fixed) links.
+- `base_position`: position of the robot's base joint (average position, in the URDF's forward-kinematics frame, of the joint(s) whose parent is directly "universe", i.e. where the fixed mounting chain hands off to the first moving degree of freedom). Not necessarily the origin.
 - `joint_names`: name of joint corresponding to each DoF.
 - `link_names`: name of frame corresponding to index.
 - `per_link_spheres`: for each frame, the indices of the spheres associated with that frame.

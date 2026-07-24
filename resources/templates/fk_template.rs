@@ -43,6 +43,11 @@ impl {{name}} {
     pub const MAX_RADIUS_MOBILE: f32 = {{max_radius_mobile}};
     pub const MIN_BOUNDING_RADIUS_MOBILE: f32 = {{min_bounding_radius_mobile}};
     pub const MAX_BOUNDING_RADIUS_MOBILE: f32 = {{max_bounding_radius_mobile}};
+
+    /// Position of the robot's base joint (where its fixed mounting chain hands off to its
+    /// first moving degree of freedom), in the frame the URDF's forward kinematics is computed
+    /// in. Not necessarily the origin.
+    pub const BASE_POSITION: [f32; 3] = [{{join(base_position, ", ")}}];
 }
 
 const fn make_upper(lower: [f32; DIM], scale: [f32; DIM]) -> [f32; DIM] {

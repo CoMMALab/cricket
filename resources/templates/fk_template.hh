@@ -20,6 +20,7 @@ struct {{name}}
     static constexpr float max_radius_mobile = {{max_radius_mobile}};
     static constexpr float min_bounding_radius_mobile = {{min_bounding_radius_mobile}};
     static constexpr float max_bounding_radius_mobile = {{max_bounding_radius_mobile}};
+    static constexpr std::array<float, 3> base_position = {{{join(base_position, ", ")}}};
     static constexpr std::size_t resolution = {{resolution}};
     static constexpr bool euclidean = {{euclidean}};
 

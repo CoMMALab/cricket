@@ -57,6 +57,7 @@ NB_MODULE(_core_ext, m)
             "min_bounding_radius_mobile", [](cricket::RobotInfo &r) { return r.min_bounding_radius_mobile; })
         .def_prop_ro(
             "max_bounding_radius_mobile", [](cricket::RobotInfo &r) { return r.max_bounding_radius_mobile; })
+        .def_prop_ro("base_position", [](cricket::RobotInfo &r) { return r.base_position; })
         .def_prop_ro("end_effector_name", [](cricket::RobotInfo &r) { return r.end_effector_name; })
         .def(
             "json",

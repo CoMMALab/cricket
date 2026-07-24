@@ -87,6 +87,7 @@ namespace cricket
         float max_radius_mobile{std::numeric_limits<float>::min()};
         float min_bounding_radius_mobile{std::numeric_limits<float>::max()};
         float max_bounding_radius_mobile{std::numeric_limits<float>::min()};
+        std::array<float, 3> base_position{0.0F, 0.0F, 0.0F};
         std::vector<SphereInfo> spheres;
         std::map<std::size_t, SphereInfo> bounding_spheres;
         std::vector<std::size_t> links_with_geometry;

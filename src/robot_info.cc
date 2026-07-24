@@ -50,6 +50,41 @@ namespace cricket
         return sphere;
     }
 
+    namespace
+    {
+        // The robot's base joint(s): the joint(s) whose kinematic parent is "universe" (joint
+        // index 0), i.e. the point(s) where the robot's fixed-joint mounting chain hands off to
+        // its first actual (moving) degree of freedom. This is a static offset (it does not
+        // depend on configuration), unlike the pose of that joint after motion. Branching robots
+        // (e.g. dual-arm) may have more than one such joint; we average them to get a single
+        // representative base position.
+        auto compute_base_position(const pinocchio::Model &model) -> std::array<float, 3>
+        {
+            Eigen::Vector3d position = Eigen::Vector3d::Zero();
+            std::size_t n_root_joints = 0;
+
+            for (auto joint_id = 1U; joint_id < model.joints.size(); ++joint_id)
+            {
+                if (model.parents[joint_id] == 0)
+                {
+                    position += model.jointPlacements[joint_id].translation();
+                    ++n_root_joints;
+                }
+            }
+
+            if (n_root_joints > 0)
+            {
+                position /= static_cast<double>(n_root_joints);
+            }
+
+            return {
+                static_cast<float>(position[0]),
+                static_cast<float>(position[1]),
+                static_cast<float>(position[2]),
+            };
+        }
+    }  // namespace
+
     RobotInfo::RobotInfo(
         const std::filesystem::path &urdf_file,
         const std::optional<std::filesystem::path> &srdf_file,
@@ -62,6 +97,8 @@ namespace cricket
 
         pinocchio::urdf::buildModel(urdf_file, model, false, true);
         pinocchio::urdf::buildGeom(model, urdf_file, COLLISION, collision_model);
+
+        base_position = compute_base_position(model);
 
         if (srdf_file and not std::filesystem::exists(*srdf_file))
         {
@@ -223,6 +260,7 @@ namespace cricket
         json["max_radius_mobile"] = max_radius_mobile;
         json["min_bounding_radius_mobile"] = min_bounding_radius_mobile;
         json["max_bounding_radius_mobile"] = max_bounding_radius_mobile;
+        json["base_position"] = base_position;
         json["joint_names"] = dof_to_joint_names();
         json["allowed_link_pairs"] = allowed_link_pairs;
         json["per_link_spheres"] = per_link_spheres;
