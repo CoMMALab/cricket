@@ -31,6 +31,9 @@ struct {{name}}
     using ConfigurationArray = std::array<FloatT, dimension>;
     using Sample = FloatVector<sample_dimension>;
 
+    // Quaternion-block offsets for the KDTree's chordal SO(3) nearest-neighbor metric.
+    static constexpr std::array<std::size_t, {{length(so3_offsets)}}> so3_offsets = { {{join(so3_offsets, ", ")}} };
+
     struct alignas(FloatVectorAlignment) ConfigurationBuffer
         : std::array<float, Configuration::num_scalars_rounded>
     {

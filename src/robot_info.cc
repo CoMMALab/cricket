@@ -225,6 +225,27 @@ namespace cricket
             }
             return topology;
         }
+
+        // Quaternion-block offsets (idx_q) for the KDTree's chordal SO(3) metric: SO3 joints
+        // contribute their block directly; SE3 (floating base) contributes the rotation block
+        // after its 3 translation components. Euclidean joints contribute nothing.
+        auto generate_so3_offsets(const pinocchio::Model &model) -> nlohmann::json
+        {
+            auto [_, joint_mappings] = classify_joints(model);
+            nlohmann::json offsets = nlohmann::json::array();
+            for (const auto &jm : joint_mappings)
+            {
+                if (jm.type == JointType::SO3)
+                {
+                    offsets.push_back(jm.idx_q);
+                }
+                else if (jm.type == JointType::SE3)
+                {
+                    offsets.push_back(jm.idx_q + 3);
+                }
+            }
+            return offsets;
+        }
     }  // namespace
 
     auto RobotInfo::json(const std::optional<Bounds> &bounds) -> nlohmann::json
@@ -269,6 +290,7 @@ namespace cricket
         json["end_effector_collisions"] = get_frames_colliding_end_effector();
         json["euclidean"] = is_euclidean(model);
         json["joint_topology"] = generate_joint_topology(model);
+        json["so3_offsets"] = generate_so3_offsets(model);
 
         std::vector<std::string> link_names;
         for (auto i = 0U; i < model.frames.size(); ++i)
