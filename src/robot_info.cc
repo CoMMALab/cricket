@@ -226,9 +226,7 @@ namespace cricket
             return topology;
         }
 
-        // Quaternion-block offsets (idx_q) for the KDTree's chordal SO(3) metric: SO3 joints
-        // contribute their block directly; SE3 (floating base) contributes the rotation block
-        // after its 3 translation components. Euclidean joints contribute nothing.
+        // Quaternion-block offsets for the SO(3) metric
         auto generate_so3_offsets(const pinocchio::Model &model) -> nlohmann::json
         {
             auto [_, joint_mappings] = classify_joints(model);
