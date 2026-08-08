@@ -111,6 +111,7 @@ add_library(cricket SHARED
     src/tracing/distance.cc
     src/tracing/flask.cc
     src/tracing/constraints.cc
+    src/parameterization/rby1_constrained.cc
 )
 add_library(cricket::cricket ALIAS cricket)
 set_target_properties(cricket PROPERTIES POSITION_INDEPENDENT_CODE ON)

@@ -163,6 +163,29 @@ namespace cricket
         const std::string &language,
         std::string_view flask_template = {}) -> void;
 
+    // RBY1 constrained-bimanual parameterized IK (see src/parameterization/rainbow_ik_cg.hh
+    // for the actual math): whole-body-relative analytic IK for both arms from a single
+    // mid-pose parameterization, plus the sample/distance/interpolate kernels for planning
+    // directly over that parameterized space instead of joint configuration.
+    auto trace_rby1_constrained_ik(const RobotInfo &info, const std::string &language) -> Traced;
+    auto trace_rby1_constrained_sample(
+        const pinocchio::Model &model,
+        const std::string &language,
+        const std::optional<Bounds> &bounds) -> Traced;
+    auto trace_rby1_constrained_distance(const std::string &language) -> Traced;
+    auto trace_rby1_constrained_interpolate(const std::string &language) -> Traced;
+    auto trace_rby1_constrained_interpolate_block(const std::string &language) -> Traced;
+
+    // Derives the RBY1 constrained-bimanual parameterized-IK kernels when the recipe has
+    // "use_parameterized": true, setting the has_parameterized_space template gate either
+    // way. Shared by the offline generator (fkcc_gen) and the JIT path
+    // (generate_robot_source) so both accept the same key.
+    auto derive_parameterized_traces(
+        const RobotInfo &robot,
+        nlohmann::json &data,
+        const std::string &language,
+        const std::optional<Bounds> &bounds) -> void;
+
     // Strict recipe validation: throws if `data` contains keys cricket does not read
     // (typos otherwise fail silently, e.g. a misspelled flag defaulting to false), with a
     // nearest-match suggestion. Keys starting with '_' are ignored as comments. Checks

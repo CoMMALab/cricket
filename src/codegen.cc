@@ -461,6 +461,48 @@ namespace cricket
         data["flask_struct"] = env.render(flask_temp, data);
     }
 
+    // RBY1 constrained-bimanual parameterized IK: "use_parameterized": true traces the
+    // whole-body-relative IK plus the sample/distance/interpolate kernels over that
+    // parameterized space (see rainbow_ik_cg.hh). Not yet consumed by fk_template.hh.
+    auto derive_parameterized_traces(
+        const RobotInfo &robot,
+        nlohmann::json &data,
+        const std::string &language,
+        const std::optional<Bounds> &bounds) -> void
+    {
+        const bool use_parameterized = data.value("use_parameterized", false);
+        data["has_parameterized_space"] = use_parameterized;
+        if (not use_parameterized)
+        {
+            return;
+        }
+
+        auto param_ik = trace_rby1_constrained_ik(robot, language);
+        data["param_ik_code"] = param_ik.code;
+        data["param_ik_code_vars"] = param_ik.temp_variables;
+        data["param_ik_code_output"] = param_ik.outputs;
+
+        auto param_sample = trace_rby1_constrained_sample(robot.model, language, bounds);
+        data["param_sample_code"] = param_sample.code;
+        data["param_sample_code_vars"] = param_sample.temp_variables;
+        data["param_sample_code_output"] = param_sample.outputs;
+
+        auto param_distance = trace_rby1_constrained_distance(language);
+        data["param_distance_code"] = param_distance.code;
+        data["param_distance_code_vars"] = param_distance.temp_variables;
+
+        auto param_interpolate = trace_rby1_constrained_interpolate(language);
+        data["param_interpolate_code"] = param_interpolate.code;
+        data["param_interpolate_code_vars"] = param_interpolate.temp_variables;
+
+        auto param_interpolate_block = trace_rby1_constrained_interpolate_block(language);
+        data["param_interpolate_block_code"] = param_interpolate_block.code;
+        data["param_interpolate_block_code_vars"] = param_interpolate_block.temp_variables;
+
+        data["param_dimension"] = 19;
+        data["param_sample_dimension"] = 17;
+    }
+
     namespace
     {
         auto edit_distance(std::string_view a, std::string_view b) -> std::size_t
@@ -546,6 +588,7 @@ namespace cricket
             "closed_loops",
             "lead_screw",
             "twist",
+            "use_parameterized",
         };
         static const std::vector<std::string_view> bounds_keys = {"lower", "upper"};
         static const std::vector<std::string_view> flask_keys = {
@@ -637,6 +680,7 @@ namespace cricket
 
         derive_constraint_traces(robot, data, opts.language);
         derive_flask_traces(robot, data, opts.language);
+        derive_parameterized_traces(robot, data, opts.language, opts.bounds);
 
         auto eefk = trace_sphere_cc_fk(robot, opts.language, false, false, true);
         data["eefk_code"] = eefk.code;

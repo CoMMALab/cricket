@@ -205,6 +205,8 @@ int main(int argc, char **argv)
     }
     cricket::derive_flask_traces(robot, data, language, flask_template);
 
+    cricket::derive_parameterized_traces(robot, data, language, bounds);
+
     inja::Environment env;
 
     for (const auto &subt : data["subtemplates"])
