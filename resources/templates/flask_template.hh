@@ -50,6 +50,12 @@
         template <std::size_t rake>
         using ConfigurationBlock = FloatVector<rake, {{n_x}}>;
 
+        using State = Configuration;
+        using StateArray = ConfigurationArray;
+        using StateBuffer = ConfigurationBuffer;
+        template <std::size_t rake>
+        using StateBlock = ConfigurationBlock<rake>;
+
         template <std::size_t rake>
         using Spheres = Ambient::Spheres<rake>;
 

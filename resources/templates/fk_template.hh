@@ -47,6 +47,12 @@ struct {{name}}
     template <std::size_t rake>
     using ConfigurationBlock = FloatVector<rake, dimension>;
 
+    using State = Configuration;
+    using StateArray = ConfigurationArray;
+    using StateBuffer = ConfigurationBuffer;
+    template <std::size_t rake>
+    using StateBlock = ConfigurationBlock<rake>;
+
     template <std::size_t rake>
     struct Spheres
     {
