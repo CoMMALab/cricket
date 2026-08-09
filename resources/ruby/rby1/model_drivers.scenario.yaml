@@ -1,0 +1,38 @@
+model_drivers:
+    base+torso+left_arm+right_arm: !InverseDynamicsDriver
+      gains:
+        base_base_x_motor: {kp: 1000, ki: 1, kd: 50}
+        base_base_y_motor: {kp: 1000, ki: 1, kd: 50}
+        base_base_rz_motor: {kp: 1000, ki: 1, kd: 50}
+        torso_torso_0_motor: {kp: 1000, ki: 1, kd: 50}
+        torso_torso_1_motor: {kp: 1000, ki: 1, kd: 50}
+        torso_torso_2_motor: {kp: 1000, ki: 1, kd: 50}
+        torso_torso_3_motor: {kp: 1000, ki: 1, kd: 50}
+        torso_torso_4_motor: {kp: 1000, ki: 1, kd: 50}
+        torso_torso_5_motor: {kp: 1000, ki: 1, kd: 50}
+        right_arm_right_arm_0_motor: {kp: 1000, ki: 1, kd: 50}
+        right_arm_right_arm_1_motor: {kp: 1000, ki: 1, kd: 50}
+        right_arm_right_arm_2_motor: {kp: 1000, ki: 1, kd: 50}
+        right_arm_right_arm_3_motor: {kp: 1000, ki: 1, kd: 50}
+        right_arm_right_arm_4_motor: {kp: 1000, ki: 1, kd: 50}
+        right_arm_right_arm_5_motor: {kp: 1000, ki: 1, kd: 50}
+        right_arm_right_arm_6_motor: {kp: 1000, ki: 1, kd: 50}
+        left_arm_left_arm_0_motor: {kp: 1000, ki: 1, kd: 50}
+        left_arm_left_arm_1_motor: {kp: 1000, ki: 1, kd: 50}
+        left_arm_left_arm_2_motor: {kp: 1000, ki: 1, kd: 50}
+        left_arm_left_arm_3_motor: {kp: 1000, ki: 1, kd: 50}
+        left_arm_left_arm_4_motor: {kp: 1000, ki: 1, kd: 50}
+        left_arm_left_arm_5_motor: {kp: 1000, ki: 1, kd: 50}
+        left_arm_left_arm_6_motor: {kp: 1000, ki: 1, kd: 50}
+    head: !JointStiffnessDriver
+      gains:
+        head_0_motor: {kp: 250, kd: 50}
+        head_1_motor: {kp: 250, kd: 50}
+    left_gripper: !JointStiffnessDriver
+      gains:
+        gripper_finger_1_motor: {kp: 100, kd: 10}
+        gripper_finger_2_motor: {kp: 100, kd: 10}
+    right_gripper: !JointStiffnessDriver
+      gains:
+        gripper_finger_1_motor: {kp: 100, kd: 10}
+        gripper_finger_2_motor: {kp: 100, kd: 10}

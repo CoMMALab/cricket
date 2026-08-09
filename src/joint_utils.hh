@@ -28,7 +28,9 @@ namespace cricket
         {
             return JointType::SO3;
         }
-        if (shortname.find("Unbounded") != std::string::npos and nq == 2)
+        if ((shortname.find("Unbounded") != std::string::npos or
+             shortname.find("RUB") != std::string::npos) and
+            nq == 2)
         {
             return JointType::UnboundedRevolute;
         }

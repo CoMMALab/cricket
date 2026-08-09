@@ -1,0 +1,528 @@
+<?xml version="1.0"?>
+<robot name="rb_y1_left_arm">
+
+  <!-- Links -->
+
+  <link name="link_left_arm_base" />
+
+  <link name="link_left_arm_0">
+    <inertial>
+      <mass value="1.26164242" />
+      <origin rpy="0 0 0" xyz="-0.00316662 -0.03437151 0.00000242" />
+      <inertia ixx="0.00230624" ixy="-0.00039022" ixz="0.00000269" iyy="0.00426418" iyz="0.00000108"
+        izz="0.00432159" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/LINK_14.obj" />
+      </geometry>
+    </visual>
+
+    <collision>
+        <origin xyz="0.025 -0.018 -0.005" rpy="0 0 0" />
+        <geometry>
+            <sphere radius="0.075" />
+        </geometry>
+    </collision>
+    <collision>
+        <origin xyz="-0.015 -0.018 -0.005" rpy="0 0 0" />
+        <geometry>
+            <sphere radius="0.075" />
+        </geometry>
+    </collision>
+    <collision>
+        <origin xyz="-0.05 -0.018 -0.005" rpy="0 0 0" />
+        <geometry>
+            <sphere radius="0.075" />
+        </geometry>
+    </collision>
+  </link>
+
+  <link name="link_left_arm_1">
+    <inertial>
+      <mass value="1.88138658" />
+      <origin rpy="0 0 0" xyz="-0.00183470 0.00040596 -0.01008733" />
+      <inertia ixx="0.00295838" ixy="-0.00001176" ixz="0.00006949" iyy="0.00355208" iyz="0.00004467"
+        izz="0.00230558" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/LINK_15.obj" />
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 -0.07" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="link_left_arm_2">
+    <inertial>
+      <mass value="2.35634437" />
+      <origin rpy="0 0 0" xyz="0.00066086 -0.00038583 -0.15742972" />
+      <inertia ixx="0.00842712" ixy="0.00000247" ixz="0.00036948" iyy="0.00802311" iyz="-0.00006550"
+        izz="0.00295678" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/LINK_16.obj" />
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 -0.11" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0 0 -0.15" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0 0 -0.19" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0 0 -0.23" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05" />
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0 0.02 -0.24" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0 -0.022 -0.24" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05" />
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0.031 0.04 -0.275" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.045" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.031 -0.042 -0.275" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.045" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="link_left_arm_3">
+    <inertial>
+      <mass value="2.00905891" />
+      <origin rpy="0 0 0" xyz="-0.01565298 0.00793126 -0.04997943" />
+      <inertia ixx="0.00756474" ixy="-0.00026771" ixz="-0.00155419" iyy="0.00772758"
+        iyz="-0.00084364" izz="0.00199754" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/LINK_17.obj" />
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="-0.015 0 0" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.06" />
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="-0.031 0 -0.06" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.031 0 -0.09" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.031 0 -0.132" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="link_left_arm_4">
+    <inertial>
+      <mass value="0.42508710" />
+      <origin rpy="0 0 0" xyz="0.00000011 0.02696036 0.06182110" />
+      <inertia ixx="0.00082466" ixy="0.0" ixz="0.0" iyy="0.00075398" iyz="0.00025338"
+        izz="0.00039794" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/LINK_18.obj" />
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0.08" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0 0.027 0.07" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0 0.032 0.05" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0 0.032 0.025" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0 0.032 0" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="link_left_arm_5">
+    <inertial>
+      <mass value="1.44264795" />
+      <origin rpy="0 0 0" xyz="0.00340082 0.00576824 -0.02507309" />
+      <inertia ixx="0.00233577" ixy="0.00003048" ixz="-0.00001191" iyy="0.00232580"
+        iyz="-0.00019491" izz="0.00138375" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/LINK_19.obj" />
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0.02 0 -0.021" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.065" />
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0 -0.04 0" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0 0 -0.057" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="link_left_arm_6">
+    <inertial>
+      <mass value="0.21137279" />
+      <origin rpy="0 0 0" xyz="-0.00066810 0.00031708 -0.09636043" />
+      <inertia ixx="0.00013511" ixy="-0.00000242" ixz="0.00000102" iyy="0.00014453"
+        iyz="-0.00000094" izz="0.00025431" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/LINK_20.obj" />
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 -0.1" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="FT_sensor_L">
+    <inertial>
+      <mass value="0.49078507" />
+      <origin rpy="0 0 0" xyz="-0.00010423 -0.00108019 -0.01880676" />
+      <inertia ixx="0.00028587" ixy="-0.00000146" ixz="0.00000026" iyy="0.00030459" iyz="0.00000772"
+        izz="0.00036377" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/FT_SENSOR_L.obj" />
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 -0.0275" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="ee_left" />
+
+  <!-- BEGIN: Wrist camera (RealSense), mounted on the FT sensor -->
+  <link name="link_left_arm_camera">
+    <visual>
+      <origin xyz="0 .062 -0.038" rpy="0 0 3.14159" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/rby1_wrist_camera.obj" />
+      </geometry>
+    </visual>
+    <!-- Simple primitive for collision, matching the rest of the arm. Tune size/origin to the camera envelope. -->
+    <collision>
+      <!-- <origin xyz="0 0 0" rpy="0 0 0" /> -->
+      <origin xyz="0 .062 -0.038" rpy="0 0 3.14159" />
+      <geometry>
+        <box size="0.040 0.056 0.082" />
+      </geometry>
+    </collision>
+  </link>
+  <!-- END: Wrist camera -->
+
+  <!-- Joints -->
+
+  <joint name="left_arm_0" type="revolute">
+    <parent link="link_left_arm_base" />
+    <child link="link_left_arm_0" />
+    <origin rpy="0.349065850  0.0 0.0" xyz="0.0 0.220 0.080073452 " />
+    <axis xyz="0 1 0" />
+    <limit effort="1000.0" lower="-2.35619449" upper="2.35619449" velocity="3.14159265"
+      drake:acceleration="3.141592" />
+  </joint>
+
+  <joint name="left_arm_1" type="revolute">
+    <parent link="link_left_arm_0" />
+    <child link="link_left_arm_1" />
+    <origin rpy="-0.349065850 0.0 0.0" xyz="0.0 0.0 0.0" />
+    <axis xyz="1 0 0" />
+    <limit effort="1000.0" lower="-0.05" upper="3.14159265" velocity="3.14159265"
+      drake:acceleration="3.141592" />
+  </joint>
+
+  <joint name="left_arm_2" type="revolute">
+    <parent link="link_left_arm_1" />
+    <child link="link_left_arm_2" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
+    <axis xyz="0 0 1" />
+    <limit effort="1000.0" lower="-2.09439510" upper="2.09439510" velocity="3.14159265"
+      drake:acceleration="3.141592" />
+  </joint>
+
+  <joint name="left_arm_3" type="revolute">
+    <parent link="link_left_arm_2" />
+    <child link="link_left_arm_3" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.031 0.0 -0.276" />
+    <axis xyz="0 1 0" />
+    <limit effort="1000.0" lower="-2.61799388" upper="0.01" velocity="3.14159265"
+      drake:acceleration="3.141592" />
+  </joint>
+
+  <joint name="left_arm_4" type="revolute">
+    <parent link="link_left_arm_3" />
+    <child link="link_left_arm_4" />
+    <origin rpy="0.0 0.0 0.0" xyz="-0.031 0.0 -0.256" />
+    <axis xyz="0 0 1" />
+    <!-- Modified for camera wires <limit effort="1001.0" lower="-6.28318531" upper="6.28318531" velocity="3.14159265" drake:acceleration="3.141592" /> -->
+    <limit effort="1000.0" lower="-3.0" upper="3.0" velocity="3.14159265"
+      drake:acceleration="3.141592" />
+  </joint>
+
+  <joint name="left_arm_5" type="revolute">
+    <parent link="link_left_arm_4" />
+    <child link="link_left_arm_5" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
+    <axis xyz="0 1 0" />
+    <limit effort="1000.0" lower="-1.74532925" upper="2.00712864" velocity="30.14159265"
+      drake:acceleration="3.141592" />
+  </joint>
+
+  <joint name="left_arm_6" type="revolute">
+    <parent link="link_left_arm_5" />
+    <child link="link_left_arm_6" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
+    <axis xyz="0 0 1" />
+    <limit effort="1000.0" lower="-2.75" upper="2.75" velocity="3.14159265"
+      drake:acceleration="3.141592" />
+  </joint>
+
+  <joint name="tool_left" type="fixed">
+    <parent link="link_left_arm_6" />
+    <child link="FT_sensor_L" />
+    <origin rpy="0.0 0.0 0" xyz="0.0 0.0 -0.1087" />
+    <axis xyz="0 0 1" />
+  </joint>
+
+  <joint name="FT_Sensor_END_left" type="fixed">
+    <parent link="FT_sensor_L" />
+    <child link="ee_left" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.0461" />
+    <axis xyz="0 0 1" />
+  </joint>
+
+  <!-- BEGIN: Wrist camera mount. Tune origin to seat the camera on the FT sensor. -->
+  <joint name="left_arm_camera_mount" type="fixed">
+    <parent link="FT_sensor_L" />
+    <child link="link_left_arm_camera" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
+    <axis xyz="0 0 1" />
+  </joint>
+  <!-- END: Wrist camera mount -->
+
+  <!-- Transmissions -->
+
+  <transmission name="left_arm_0_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="left_arm_0">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="left_arm_0_motor">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="left_arm_1_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="left_arm_1">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="left_arm_1_motor">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="left_arm_2_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="left_arm_2">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="left_arm_2_motor">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="left_arm_3_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="left_arm_3">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="left_arm_3_motor">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="left_arm_4_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="left_arm_4">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="left_arm_4_motor">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="left_arm_5_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="left_arm_5">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="left_arm_5_motor">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="left_arm_6_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="left_arm_6">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="left_arm_6_motor">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <!-- Collision filters -->
+
+  <!-- Upper arm/shoulder links that can't collide with the torso. -->
+  <drake:collision_filter_group name="upper_arm">
+    <drake:member link="link_left_arm_0"/>
+    <drake:member link="link_left_arm_1"/>
+    <drake:member link="link_left_arm_2"/>
+  </drake:collision_filter_group>
+
+  <!-- Main arm links that can't collide. -->
+  <drake:collision_filter_group name="main_arm">
+    <drake:member link="link_left_arm_0"/>
+    <drake:member link="link_left_arm_1"/>
+    <drake:member link="link_left_arm_2"/>
+    <drake:member link="link_left_arm_3"/>
+    <drake:member link="link_left_arm_4"/>
+    <drake:member link="link_left_arm_5"/>
+    <drake:ignored_collision_filter_group name="main_arm"/>
+  </drake:collision_filter_group>
+
+  <!-- Lower arm/wrist links that can't collide. -->
+  <drake:collision_filter_group name="lower_arm">
+    <drake:member link="link_left_arm_3"/>
+    <drake:member link="link_left_arm_4"/>
+    <drake:member link="link_left_arm_5"/>
+    <drake:member link="link_left_arm_6"/>
+    <drake:member link="FT_sensor_L"/>
+    <drake:member link="ee_left"/>
+    <drake:member link="link_left_arm_camera"/>
+    <drake:ignored_collision_filter_group name="lower_arm"/>
+  </drake:collision_filter_group>
+
+</robot>

@@ -1,0 +1,92 @@
+<?xml version="1.0"?>
+<!--
+  Top-level xacro for the RBY1 (Ruby) sim model with a holonomic (planar,
+  actuated) base, a direct translation of the Drake model-directives file
+  add_rby1_sim_with_holonomic_base_actuators.dmd.yaml and everything it
+  pulls in (add_rby1_torso_arms_head.dmd.yaml, add_rby1_grippers_sim.dmd.yaml).
+
+  Each `add_model` in the dmd.yaml became a xacro:include of that
+  component's own xacro file (base, torso, left/right arm, head), or a
+  xacro:macro instantiation for components used more than once (the
+  gripper, added once per arm). Each `add_weld` became a zero-offset fixed
+  joint between the same two frames, since none of the welds in the source
+  file specified a non-identity X_PC transform.
+
+  Build a URDF with (run from this xacro/ directory, or pass the full path
+  to this file: xacro:include below is resolved relative to this file's
+  own location, so no ROS package lookup is needed to run this command):
+    xacro rby1_sim_with_holonomic_base_actuators.urdf.xacro > rby1_sim.urdf
+
+  Note: the mesh <geometry> tags inside the included component files use a
+  plain relative path, rooted at models/ (e.g.
+  "ruby/rby1_description_drake/meshes/BASE.obj"), controlled by each
+  component file's `mesh_root` xacro:arg. xacro copies that string into the
+  output verbatim without resolving it, so `xacro` itself always succeeds
+  regardless of the current working directory. What happens *after* that
+  depends on whoever loads the resulting URDF next: Drake resolves relative
+  mesh paths relative to the URDF file itself (robust to CWD); ROS tools
+  built on resource_retriever (RViz, Gazebo classic via gazebo_ros) require
+  a URI scheme and generally won't resolve a bare relative path at all, so
+  for those you'd either launch from a directory where
+  "ruby/rby1_description_drake/meshes" is reachable (e.g. models/), or
+  override with an absolute file:// URI, e.g.:
+    xacro rby1_sim_with_holonomic_base_actuators.urdf.xacro \
+      mesh_root:=file:///abs/path/to/rby1_description_drake/meshes \
+      > rby1_sim.urdf
+  Note this override must be passed once per component file if invoked
+  standalone, but since this top-level file expands them all in one xacro
+  run, a single mesh_root:=... argument here applies to every include.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="rby1">
+
+  <!-- Add base (floating, actuated wheels). -->
+  <xacro:include filename="rby1_base_holonomic.xacro"/>
+
+  <!-- Add torso and up. -->
+  <xacro:include filename="rby1_torso.xacro"/>
+  <joint name="base_torso_weld" type="fixed">
+    <parent link="torso_mount"/>
+    <child link="link_torso_base"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:include filename="rby1_left_arm.xacro"/>
+  <joint name="torso_left_arm_weld" type="fixed">
+    <parent link="link_torso_5"/>
+    <child link="link_left_arm_base"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:include filename="rby1_right_arm.xacro"/>
+  <joint name="torso_right_arm_weld" type="fixed">
+    <parent link="link_torso_5"/>
+    <child link="link_right_arm_base"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:include filename="rby1_head.xacro"/>
+  <joint name="torso_head_weld" type="fixed">
+    <parent link="link_torso_5"/>
+    <child link="link_head_base"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Add grippers. -->
+  <xacro:include filename="rby1_gripper.xacro"/>
+
+  <!-- left_gripper welded to left_arm::ee_left -->
+  <xacro:rby1_gripper prefix="left_" parent_link="ee_left"/>
+
+  <!-- right_gripper welded to right_arm::ee_right -->
+  <xacro:rby1_gripper prefix="right_" parent_link="ee_right"/>
+
+  <!--
+    Add filter for base, lower torso, and head (informational only, no URDF
+    equivalent, see the per-component xacro files for each group's
+    membership, and port to a MoveIt SRDF's <disable_collisions> if you need
+    the same behavior under ROS/MoveIt):
+      base_lower_torso_head_filer:
+        base::base ∪ torso::lower_torso ∪ head::head, all-pairs ignored.
+  -->
+
+</robot>

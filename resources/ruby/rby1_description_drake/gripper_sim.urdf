@@ -1,0 +1,207 @@
+<?xml version="1.0"?>
+<robot name="rb_y1_gripper">
+
+  <!-- Links -->
+
+  <link name="ee_body">
+    <inertial>
+      <mass value="0.46704998" />
+      <origin rpy="0 0 0" xyz="0.00212703 0.00000615 -0.04287176" />
+      <inertia ixx="0.00032067" ixy="0.00002383" ixz="-0.00000785" iyy="0.00059559"
+        iyz="-0.00000007" izz="0.00052732" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/EE_BODY.obj" />
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0.025 0 -0.04" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0 0 -0.04" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.025 0 -0.04" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.04" />
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0.05 -0.003 -0.06" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.02" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.05 0.003 -0.06" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.02" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="ee_finger_1">
+    <inertial>
+      <mass value="0.03030138" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.00000985" ixy="0.0" ixz="-0.00000022" iyy="0.00000845" iyz="0.0"
+        izz="0.00000201" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/EE_FINGER.obj" />
+      </geometry>
+    </visual>
+
+    <!-- These should use compliant hydroelastic. -->
+    <!-- Compliant hydroelastic added by Sid -->
+    <collision>
+      <origin xyz="0.002 -0.004 -0.026" rpy="0.12 0 0" />
+      <geometry>
+        <box size="0.01 0.02 0.065" />
+      </geometry>
+      <drake:proximity_properties>
+        <drake:compliant_hydroelastic/>
+        <drake:hydroelastic_modulus value="1e6"/>
+      </drake:proximity_properties>
+    </collision>
+    <collision>
+      <origin xyz="0.002 0.004 -0.026" rpy="-0.12 0 0" />
+      <geometry>
+        <box size="0.01 0.02 0.065" />
+      </geometry>
+      <drake:proximity_properties>
+        <drake:compliant_hydroelastic/>
+        <drake:hydroelastic_modulus value="1e6"/>
+      </drake:proximity_properties>
+    </collision>
+
+    <collision>
+      <origin xyz="0.002 0 -0.058" rpy="0 0 0" />
+      <geometry>
+        <box size="0.01 0.02 0.005" />
+      </geometry>
+      <drake:proximity_properties>
+        <drake:compliant_hydroelastic/>
+        <drake:hydroelastic_modulus value="1e6"/>
+      </drake:proximity_properties>
+    </collision>
+  </link>
+
+  <link name="ee_finger_2">
+    <inertial>
+      <mass value="0.03030138" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0" />
+      <inertia ixx="0.00000985" ixy="0.0" ixz="-0.00000022" iyy="0.00000845" iyz="0.0"
+        izz="0.00000201" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/EE_FINGER.obj" />
+      </geometry>
+    </visual>
+
+    <!-- These should use compliant hydroelastic. -->
+    <!-- Compliant hydroelastic added by Sid -->
+    <collision>
+      <origin xyz="0.002 -0.004 -0.026" rpy="0.12 0 0" />
+      <geometry>
+        <box size="0.01 0.02 0.065" />
+      </geometry>
+      <drake:proximity_properties>
+        <drake:compliant_hydroelastic/>
+        <drake:hydroelastic_modulus value="1e6"/>
+      </drake:proximity_properties>
+    </collision>
+    <collision>
+      <origin xyz="0.002 0.004 -0.026" rpy="-0.12 0 0" />
+      <geometry>
+        <box size="0.01 0.02 0.065" />
+      </geometry>
+      <drake:proximity_properties>
+        <drake:compliant_hydroelastic/>
+        <drake:hydroelastic_modulus value="1e6"/>
+      </drake:proximity_properties>
+    </collision>
+
+    <collision>
+      <origin xyz="0.002 0 -0.058" rpy="0 0 0" />
+      <geometry>
+        <box size="0.01 0.02 0.005" />
+      </geometry>
+      <drake:proximity_properties>
+        <drake:compliant_hydroelastic/>
+        <drake:hydroelastic_modulus value="1e6"/>
+      </drake:proximity_properties>
+    </collision>
+  </link>
+
+  <!-- Joints -->
+  <!-- These should use implicit PD and mimic constraints. -->
+
+  <joint name="gripper_finger_1" type="prismatic">
+    <parent link="ee_body" />
+    <child link="ee_finger_1" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.005 0.0 -0.073" />
+    <axis xyz="-1 0 0" />
+    <limit effort="1000" velocity="0.05" lower="-0.05" upper="0" drake:acceleration="1.0" />
+  </joint>
+
+  <joint name="gripper_finger_2" type="prismatic">
+    <parent link="ee_body" />
+    <child link="ee_finger_2" />
+    <origin rpy="0.0 0.0 3.1415926535" xyz="-0.005 0.0 -0.073" />
+    <axis xyz="1 0 0" />
+    <limit effort="1000" velocity="0.05" lower="0" upper="0.05" drake:acceleration="1.0" />
+  </joint>
+
+  <!-- Transmissions -->
+
+  <transmission name="gripper_finger_1_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="gripper_finger_1">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="gripper_finger_1_motor">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="gripper_finger_2_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="gripper_finger_2">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="gripper_finger_2_motor">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <!-- Collision filters -->
+
+  <!-- Gripper can't collide with itself. -->
+  <drake:collision_filter_group name="gripper">
+    <drake:member link="ee_body"/>
+    <drake:member link="ee_finger_1"/>
+    <drake:member link="ee_finger_2"/>
+    <drake:ignored_collision_filter_group name="gripper"/>
+  </drake:collision_filter_group>
+
+</robot>

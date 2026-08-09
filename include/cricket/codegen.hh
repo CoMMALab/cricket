@@ -176,6 +176,11 @@ namespace cricket
     auto trace_rby1_constrained_interpolate(const std::string &language) -> Traced;
     auto trace_rby1_constrained_interpolate_block(const std::string &language) -> Traced;
 
+    // Dual-hand FK (ee_left, ee_right world poses, 12 floats each) used to derive
+    // t_mid_left/t_mid_right (see RainbowMidPoseFkCG in rainbow_ik_cg.hh and
+    // ParameterizedSpace::compute_mid_pose in fk_template.hh).
+    auto trace_rby1_mid_pose_fk(const RobotInfo &info, const std::string &language) -> Traced;
+
     // Derives the RBY1 constrained-bimanual parameterized-IK kernels when the recipe has
     // "use_parameterized": true, setting the has_parameterized_space template gate either
     // way. Shared by the offline generator (fkcc_gen) and the JIT path

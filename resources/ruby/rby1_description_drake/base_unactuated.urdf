@@ -1,0 +1,249 @@
+<?xml version="1.0"?>
+<robot name="rb_y1_base">
+
+  <!-- Links -->
+
+  <link name="base">
+    <inertial>
+      <mass value="60.08042639" />
+      <origin rpy="0 0 0" xyz="-0.06157942 -0.00142271 0.13513861" />
+      <inertia ixx="1.37742174" ixy="0.02521789" ixz="0.18565467" iyy="2.99386515" iyz="-0.00641869"
+        izz="3.76085052" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/BASE.obj" />
+      </geometry>
+    </visual>
+
+    <!-- Front axle area -->
+    <collision>
+      <origin xyz="0.23 0.175 0.13" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.1" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.23 0.075 0.125" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.1" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.23 0 0.125" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.1" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.23 -0.075 0.125" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.1" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.23 -0.175 0.13" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.1" />
+      </geometry>
+    </collision>
+
+    <!-- Lidars -->
+    <collision>
+      <origin xyz="0.225 0.1725 0.24" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.03" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.225 -0.1725 0.24" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.03" />
+      </geometry>
+    </collision>
+
+    <!-- Mid/rear body -->
+    <collision>
+      <origin xyz="0.12 0.175 0.11" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.12 -0.175 0.11" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08" />
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="0.01 0.175 0.11" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.01 -0.175 0.11" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08" />
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="-0.1 0.175 0.11" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.1 -0.175 0.11" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08" />
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="-0.2 0.15 0.11" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.2 -0.15 0.11" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08" />
+      </geometry>
+    </collision>
+
+    <collision>
+      <origin xyz="-0.28 0.12 0.11" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.28 0.04 0.11" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.28 -0.04 0.11" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.28 -0.12 0.11" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="wheel_r">
+    <inertial>
+      <mass value="1.37783736" />
+      <origin rpy="0 0 0" xyz="0.0 -0.00073938 0.0" />
+      <inertia ixx="0.00426657" ixy="0.0" ixz="0.0" iyy="0.00811815" iyz="0.0" izz="0.00426657" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/WHEEL.obj" />
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.1" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="wheel_l">
+    <inertial>
+      <mass value="1.37783736" />
+      <origin rpy="0 0 0" xyz="0.0 0.00073938 0.0" />
+      <inertia ixx="0.00426657" ixy="0.0" ixz="0.0" iyy="0.00811815" iyz="0.0" izz="0.00426657" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/WHEEL.obj" />
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.1" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="torso_mount"/>
+
+  <!-- BEGIN: Mid-360 lidar near the front of the base -->
+  <link name="lidar_mid360">
+    <visual>
+      <origin xyz="-0.018 0 0.015" rpy="1.5708 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/mid-360.obj" />
+      </geometry>
+    </visual>
+    <!-- Box bounding the lidar; tune size/origin to its envelope. -->
+    <collision>
+      <origin xyz="-0.018 0 0.015" rpy="0 0 0" />
+      <geometry>
+        <box size="0.073 0.060 0.065" />
+      </geometry>
+    </collision>
+  </link>
+  <!-- END: Mid-360 lidar -->
+
+  <!-- Joints -->
+
+  <joint name="right_wheel" type="fixed">
+    <parent link="base" />
+    <child link="wheel_r" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.228 -0.265 0.1" />
+    <axis xyz="0 1 0" />
+  </joint>
+
+  <joint name="left_wheel" type="fixed">
+    <parent link="base" />
+    <child link="wheel_l" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.228 0.265 0.1" />
+    <axis xyz="0 1 0" />
+  </joint>
+
+  <joint name="torso_mount" type="fixed">
+    <parent link="base" />
+    <child link="torso_mount" />
+    <origin rpy="0.0 0.0 0.0" xyz="-0.247 0.0 0.168" />
+  </joint>
+
+  <!-- Mid-360 lidar mount. TUNE origin to seat it at the front of the base. -->
+  <joint name="lidar_mid360_mount" type="fixed">
+    <parent link="base" />
+    <child link="lidar_mid360" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.25 0.0 0.2" />
+  </joint>
+
+  <!-- Collision filters -->
+
+  <!-- Lower torso for filtering with base. -->
+  <drake:collision_filter_group name="base">
+    <drake:member link="base"/>
+    <drake:member link="wheel_l"/>
+    <drake:member link="wheel_r"/>
+    <drake:member link="lidar_mid360"/>
+  </drake:collision_filter_group>
+
+</robot>

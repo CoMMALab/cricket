@@ -1,0 +1,217 @@
+<?xml version="1.0"?>
+<!--
+  Xacro translation of gripper_sim.urdf, wrapped as a macro because the
+  parent dmd.yaml (add_rby1_grippers_sim.dmd.yaml) instantiates this model
+  twice, once per arm. `prefix` keeps the two instances' link/joint names
+  unique; `parent_link` is the arm end-effector frame the gripper is welded
+  to (ee_left / ee_right), reproducing the corresponding add_weld directive
+  as a zero-offset fixed joint.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="rby1_gripper">
+
+  <!--
+    No ROS package available, so meshes are given as a plain relative path,
+    rooted at models/, instead of package://. This string is copied
+    verbatim into the mesh tags below (xacro does not resolve it), so
+    whether it loads correctly depends on whatever consumes the generated
+    URDF next:
+      - Drake resolves relative mesh paths relative to the URDF file
+        itself, so this works regardless of current working directory.
+      - ROS tools built on resource_retriever (RViz, Gazebo classic via
+        gazebo_ros) generally require a URI scheme (package://, file://,
+        http(s)://) and will NOT resolve a bare relative path; you would
+        need to run them from a directory where "ruby/rby1_description_drake/meshes"
+        is reachable (e.g. launch from models/), or switch mesh_root to an
+        absolute file:// URI at that point.
+    Override at the xacro command line if this file moves relative to
+    models/, e.g.: xacro ... mesh_root:=../../different/meshes
+  -->
+  <xacro:arg name="mesh_root" default="ruby/rby1_description_drake/meshes"/>
+  <xacro:property name="mesh_dir" value="$(arg mesh_root)"/>
+
+  <xacro:macro name="rby1_gripper" params="prefix parent_link">
+
+    <!-- Links -->
+
+    <link name="${prefix}ee_body">
+      <inertial>
+        <mass value="0.46704998"/>
+        <origin rpy="0 0 0" xyz="0.00212703 0.00000615 -0.04287176"/>
+        <inertia ixx="0.00032067" ixy="0.00002383" ixz="-0.00000785" iyy="0.00059559"
+          iyz="-0.00000007" izz="0.00052732"/>
+      </inertial>
+
+      <visual>
+        <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_dir}/EE_BODY.obj"/>
+        </geometry>
+      </visual>
+
+      <collision>
+        <origin xyz="0.025 0 -0.04" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="0.04"/>
+        </geometry>
+      </collision>
+      <collision>
+        <origin xyz="0 0 -0.04" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="0.04"/>
+        </geometry>
+      </collision>
+      <collision>
+        <origin xyz="-0.025 0 -0.04" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="0.04"/>
+        </geometry>
+      </collision>
+
+      <collision>
+        <origin xyz="0.05 -0.003 -0.06" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="0.02"/>
+        </geometry>
+      </collision>
+      <collision>
+        <origin xyz="-0.05 0.003 -0.06" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="0.02"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <link name="${prefix}ee_finger_1">
+      <inertial>
+        <mass value="0.03030138"/>
+        <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+        <inertia ixx="0.00000985" ixy="0.0" ixz="-0.00000022" iyy="0.00000845" iyz="0.0"
+          izz="0.00000201"/>
+      </inertial>
+
+      <visual>
+        <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_dir}/EE_FINGER.obj"/>
+        </geometry>
+      </visual>
+
+      <!-- Note: the source URDF marks these as Drake compliant-hydroelastic
+           contact surfaces; that concept has no URDF/ROS equivalent, so
+           they're translated here as plain box collisions. -->
+      <collision>
+        <origin xyz="0.002 -0.004 -0.026" rpy="0.12 0 0"/>
+        <geometry>
+          <box size="0.01 0.02 0.065"/>
+        </geometry>
+      </collision>
+      <collision>
+        <origin xyz="0.002 0.004 -0.026" rpy="-0.12 0 0"/>
+        <geometry>
+          <box size="0.01 0.02 0.065"/>
+        </geometry>
+      </collision>
+      <collision>
+        <origin xyz="0.002 0 -0.058" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.01 0.02 0.005"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <link name="${prefix}ee_finger_2">
+      <inertial>
+        <mass value="0.03030138"/>
+        <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+        <inertia ixx="0.00000985" ixy="0.0" ixz="-0.00000022" iyy="0.00000845" iyz="0.0"
+          izz="0.00000201"/>
+      </inertial>
+
+      <visual>
+        <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_dir}/EE_FINGER.obj"/>
+        </geometry>
+      </visual>
+
+      <collision>
+        <origin xyz="0.002 -0.004 -0.026" rpy="0.12 0 0"/>
+        <geometry>
+          <box size="0.01 0.02 0.065"/>
+        </geometry>
+      </collision>
+      <collision>
+        <origin xyz="0.002 0.004 -0.026" rpy="-0.12 0 0"/>
+        <geometry>
+          <box size="0.01 0.02 0.065"/>
+        </geometry>
+      </collision>
+      <collision>
+        <origin xyz="0.002 0 -0.058" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.01 0.02 0.005"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- Joints -->
+
+    <!-- Weld to the arm's end-effector frame (add_weld in the dmd.yaml, identity transform). -->
+    <joint name="${prefix}gripper_mount" type="fixed">
+      <parent link="${parent_link}"/>
+      <child link="${prefix}ee_body"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+    </joint>
+
+    <!-- These should ideally use mimic constraints; kept as two independent
+         prismatic joints to match the source URDF, which does not define one. -->
+    <joint name="${prefix}gripper_finger_1" type="prismatic">
+      <parent link="${prefix}ee_body"/>
+      <child link="${prefix}ee_finger_1"/>
+      <origin rpy="0.0 0.0 0.0" xyz="0.005 0.0 -0.073"/>
+      <axis xyz="-1 0 0"/>
+      <limit effort="1000" velocity="0.05" lower="-0.05" upper="0"/>
+    </joint>
+
+    <joint name="${prefix}gripper_finger_2" type="prismatic">
+      <parent link="${prefix}ee_body"/>
+      <child link="${prefix}ee_finger_2"/>
+      <origin rpy="0.0 0.0 3.1415926535" xyz="-0.005 0.0 -0.073"/>
+      <axis xyz="1 0 0"/>
+      <limit effort="1000" velocity="0.05" lower="0" upper="0.05"/>
+    </joint>
+
+    <!-- Transmissions -->
+
+    <transmission name="${prefix}gripper_finger_1_transmission">
+      <type>transmission_interface/SimpleTransmission</type>
+      <joint name="${prefix}gripper_finger_1">
+        <hardwareInterface>PositionJointInterface</hardwareInterface>
+      </joint>
+      <actuator name="${prefix}gripper_finger_1_motor">
+        <hardwareInterface>PositionJointInterface</hardwareInterface>
+        <mechanicalReduction>1</mechanicalReduction>
+      </actuator>
+    </transmission>
+
+    <transmission name="${prefix}gripper_finger_2_transmission">
+      <type>transmission_interface/SimpleTransmission</type>
+      <joint name="${prefix}gripper_finger_2">
+        <hardwareInterface>PositionJointInterface</hardwareInterface>
+      </joint>
+      <actuator name="${prefix}gripper_finger_2_motor">
+        <hardwareInterface>PositionJointInterface</hardwareInterface>
+        <mechanicalReduction>1</mechanicalReduction>
+      </actuator>
+    </transmission>
+
+    <!--
+      Collision filter (informational only, no URDF equivalent):
+      - "gripper": {ee_body, ee_finger_1, ee_finger_2} all-pairs ignored
+        (also used by the top-level assembly to filter against the arm's
+        lower_arm group).
+    -->
+
+  </xacro:macro>
+
+</robot>

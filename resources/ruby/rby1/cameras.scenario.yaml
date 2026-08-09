@@ -1,0 +1,41 @@
+# Provided by Seiji Shaw:
+
+# extrinsics = np.array([
+#    [0.,   0.,  1.,  0.043],
+#    [-1.,  0.,  0.,  0.049],
+#    [0.,  -1.,  0.,  0.047],
+#    [0.,   0.,  0.,  1.]
+#])
+
+# width = 1280
+# height = 720
+# intrinsic_matrix = np.array([
+#   [909.58258057,   0.        , 646.32043457],
+#   [  0.        , 909.35491943, 374.66378784],
+#   [  0.        ,   0.        ,   1.        ]
+# ])
+
+# Code snippet to convert extrinsics:
+# ```
+# import numpy as np
+# from pydrake.all import RollPitchYaw, RotationMatrix
+
+# R = RotationMatrix(extrinsics[:3, :3])
+# rpy = RollPitchYaw(R)  # in radians
+# print(np.degrees(rpy.vector()))
+# ```
+
+cameras:
+  head:
+    X_PB:
+      base_frame: rby1_camera_mount
+      rotation: !Rpy
+        deg: [-90,  -0, -90]
+      translation: [0.043, 0.049, 0.047]
+    center_x: 646.32043457
+    center_y: 374.66378784
+    focal: {x: 909.58258057, y: 909.35491943}
+    width: 1280
+    height: 720
+    name: head
+    depth: True

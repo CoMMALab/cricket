@@ -676,6 +676,188 @@ struct {{name}}
     {% if has_flask %}
 {{ flask_struct }}
     {% endif %}
+
+    {% if has_parameterized_space %}
+    //
+    // ParameterizedSpace: an alternative Space to plan over instead of this robot's own
+    // Configuration -- e.g. a task-space parameterization whose samples resolve_block() to
+    // an ambient Configuration for FK/collision-checking. Rendered into the parent robot
+    // struct; the parent is the ambient configuration-space robot whose FK/CC kernels
+    // resolve_block() hands off to. Exposes the same dimension/State/StateArray/StateBlock<
+    // rake>/StateBuffer family as the outer struct's own default Space (see Part 1's State =
+    // Configuration aliases above) so vamp's planners can be templated on either one.
+    //
+
+    struct ParameterizedSpace
+    {
+        static constexpr const char *name = "parameterized_space";
+        static constexpr std::size_t dimension = {{param_dimension}};
+        static constexpr std::size_t sample_dimension = {{param_sample_dimension}};
+        static constexpr bool euclidean = {{param_euclidean}};
+        static constexpr std::array<std::size_t, {{length(param_so3_offsets)}}> so3_offsets = { {{join(param_so3_offsets, ", ")}} };
+
+        // Ambient configuration-space robot that resolve_block() maps into.
+        using Ambient = {{name}};
+
+        // GCP (branch) selectors for each rainbow arm's redundant self-motion manifold:
+        // (elbow_sel, shoulder_sel, wrist_sel) -- see RainbowLeftArmParameterization /
+        // RainbowRightArmParameterization in rainbow_arm_parameterization.hh. Fixed for the
+        // whole planning problem (not part of State), so param_ik_code reads these class
+        // members directly by name (`left_gcp[i]` / `right_gcp[i]`) instead of taking them as
+        // part of resolve_block's input. Overwrite directly, e.g. from a binding as
+        // `robot.parameterized.left_gcp = [...]`.
+        inline static thread_local std::array<float, 3> left_gcp = {0.0f, 1.0f, 1.0f};
+        inline static thread_local std::array<float, 3> right_gcp = {0.0f, 1.0f, 1.0f};
+
+        // Fixed per-planning-problem SE3 offsets from the mid-frame T_mid to each hand (x, y,
+        // z, qx, qy, qz, qw): T_l = T_mid * t_mid_left, T_r = T_mid * t_mid_right. Not part of
+        // State -- param_ik_code reads these class members directly by name, same mechanism
+        // as left_gcp/right_gcp above. Default identity (both hands coincide with T_mid);
+        // overwrite directly or via compute_mid_pose() below.
+        inline static thread_local std::array<float, 7> t_mid_left = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+        inline static thread_local std::array<float, 7> t_mid_right = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+
+        using State = FloatVector<dimension>;
+        struct alignas(FloatVectorAlignment) StateArray
+            : std::array<FloatT, dimension>
+        {
+        };
+        using Sample = FloatVector<sample_dimension>;
+
+        struct alignas(FloatVectorAlignment) StateBuffer
+            : std::array<float, State::num_scalars_rounded>
+        {
+        };
+
+        template <std::size_t rake>
+        using StateBlock = FloatVector<rake, dimension>;
+
+        static inline auto sample(const Sample &x_in) -> State
+        {
+            {% if param_sample_code_vars > 0 %}std::array<float, {{param_sample_code_vars}}> v;{% endif %}
+            // Value-init: pad lanes past `dimension` must be zero, matching Configuration's
+            // own sample()/interpolate() above.
+            StateBuffer y{};
+            const auto x = x_in.to_array();
+            {{param_sample_code}}
+            return State(y.data());
+        }
+
+        static inline auto distance(const State &a_in, const State &b_in) -> float
+        {
+            {% if param_distance_code_vars > 0 %}std::array<float, {{param_distance_code_vars}}> v;{% endif %}
+            std::array<float, 1> y;
+            const auto a = a_in.to_array();
+            const auto b = b_in.to_array();
+            {{param_distance_code}}
+            return y[0];
+        }
+
+        static inline auto interpolate(const State &a_in, const State &b_in, float t) -> State
+        {
+            {% if param_interpolate_code_vars > 0 %}std::array<float, {{param_interpolate_code_vars}}> v;{% endif %}
+            StateBuffer y{};
+            const auto a = a_in.to_array();
+            const auto b = b_in.to_array();
+            {{param_interpolate_code}}
+            return State(y.data());
+        }
+
+        template <std::size_t rake>
+        static inline void interpolate_block(
+            const State &a,
+            const State &b,
+            const FloatVector<rake> &t,
+            StateBlock<rake> &out) noexcept
+        {
+            using V = FloatVector<rake, 1>;
+            {% if param_interpolate_block_code_vars > 0 %}std::array<V, {{param_interpolate_block_code_vars}}> v;{% endif %}
+            {{param_interpolate_block_code}}
+        }
+
+        // Derives t_mid_left/t_mid_right from a reference whole-body configuration `q`: FK to
+        // both hands (ee_left, ee_right), take T_w_mid as the midpoint of their translations
+        // with identity rotation, then t_mid_left/t_mid_right are each hand's pose relative to
+        // that mid-frame. Scalar (non-rake) utility, called once per planning problem, not in
+        // a hot loop. Overwrites t_mid_left/t_mid_right in place; callers that want a fixed
+        // offset can still assign over them afterwards.
+        static inline void compute_mid_pose(const Ambient::ConfigurationArray &q) noexcept
+        {
+            {% if param_mid_pose_fk_code_vars > 0 %}std::array<float, {{param_mid_pose_fk_code_vars}}> v;{% endif %}
+            std::array<float, {{param_mid_pose_fk_code_output}}> y;
+            const auto &x = q;
+
+            {{param_mid_pose_fk_code}}
+
+            Eigen::Isometry3f T_w_l0 = to_isometry(&y[0]);
+            Eigen::Isometry3f T_w_r0 = to_isometry(&y[12]);
+
+            Eigen::Isometry3f T_w_mid = Eigen::Isometry3f::Identity();
+            T_w_mid.translation() = 0.5f * (T_w_l0.translation() + T_w_r0.translation());
+
+            Eigen::Isometry3f T_w_mid_inv = T_w_mid.inverse();
+            Eigen::Isometry3f T_mid_right_iso = T_w_mid_inv * T_w_r0;
+            Eigen::Isometry3f T_mid_left_iso = T_w_mid_inv * T_w_l0;
+
+            Eigen::Quaternionf qr(T_mid_right_iso.rotation());
+            t_mid_right = {
+                T_mid_right_iso.translation().x(), T_mid_right_iso.translation().y(), T_mid_right_iso.translation().z(),
+                qr.x(), qr.y(), qr.z(), qr.w()};
+
+            Eigen::Quaternionf ql(T_mid_left_iso.rotation());
+            t_mid_left = {
+                T_mid_left_iso.translation().x(), T_mid_left_iso.translation().y(), T_mid_left_iso.translation().z(),
+                ql.x(), ql.y(), ql.z(), ql.w()};
+        }
+
+        // Batched task-space -> ambient-configuration resolve, for the FK/collision-checking
+        // boundary; the counterpart of a future ParameterizedLocalPlanner's per-lane IK solve.
+        // `x` decomposes exactly as trace_rby1_constrained_sample's State layout: base(4) +
+        // torso(6) + psi_left(1) + psi_right(1) + t_mid_pose(7). param_ik_code additionally
+        // reads left_gcp/right_gcp/t_mid_left/t_mid_right directly by name (see those members
+        // above) rather than taking them from `x`. Returns {false, _} if either arm's
+        // reach_violation is nonzero (RainbowArmParamResult: no valid IK solution on this GCP
+        // branch for the requested pose -- see rainbow_arm_parameterization.hh) or the
+        // resolved ambient configuration falls outside the robot's own joint limits.
+        template <std::size_t rake>
+        static inline auto resolve_block(const StateBlock<rake> &x) noexcept
+            -> std::pair<bool, Ambient::ConfigurationBlock<rake>>
+        {
+            using V = FloatVector<rake, 1>;
+
+            std::array<V, 4> base{x[0], x[1], x[2], x[3]};
+            std::array<V, 6> torso{x[4], x[5], x[6], x[7], x[8], x[9]};
+            const auto psi_left = x[10];
+            const auto psi_right = x[11];
+            std::array<V, 7> t_mid_pose{x[12], x[13], x[14], x[15], x[16], x[17], x[18]};
+
+            FloatVector<rake, {{param_ik_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> q;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_left;
+            FloatVector<rake, 1> reach_violation_left;
+            FloatVector<rake, 1> loss_left;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_right;
+            FloatVector<rake, 1> reach_violation_right;
+            FloatVector<rake, 1> loss_right;
+
+            {{param_ik_code}}
+
+            if ((reach_violation_left[0] > 0.0f).any() or (reach_violation_right[0] > 0.0f).any())
+            {
+                return {false, q};
+            }
+
+            {% for i in range(n_q) %}
+            if ((q[{{i}}] < V(Ambient::lower_bound[{{i}}])).any() or (q[{{i}}] > V(Ambient::upper_bound[{{i}}])).any())
+            {
+                return {false, q};
+            }
+            {% endfor %}
+
+            return {true, q};
+        }
+    };
+    {% endif %}
 };
 }
 

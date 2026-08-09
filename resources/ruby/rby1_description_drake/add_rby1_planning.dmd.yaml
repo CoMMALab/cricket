@@ -1,0 +1,24 @@
+directives:
+
+# Add base (floating, fixed wheels).
+- add_model:
+    name: base
+    file: package://bimanual/models/ruby/rby1_description_drake/base_unactuated.urdf
+
+# Add torso and up.
+- add_directives:
+    file: package://bimanual/models/ruby/rby1_description_drake/add_rby1_torso_arms_head.dmd.yaml
+
+# Add grippers.
+- add_directives:
+    file: package://bimanual/models/ruby/rby1_description_drake/add_rby1_grippers_planning.dmd.yaml
+
+# Add filter for base, lower torso, and head.
+- add_collision_filter_group:
+    name: base_lower_torso_head_filer
+    members: []
+    member_groups:
+        - base::base
+        - torso::lower_torso
+        - head::head
+    ignored_collision_filter_groups: [base_lower_torso_head_filer]

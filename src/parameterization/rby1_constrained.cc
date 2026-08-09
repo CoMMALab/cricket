@@ -15,4 +15,14 @@ namespace cricket
     {
         return RainbowConstrainedBimanualIkCG<ADCG>(info, language);
     }
+
+    // RainbowMidPoseFkCG is already non-template and already `inline`-defined in
+    // rainbow_ik_cg.hh; this thin forward keeps naming consistent with the other
+    // trace_rby1_* entry points and is what actually forces its emission in this TU (an
+    // unreferenced `inline` definition would otherwise be dropped -- see
+    // trace_rby1_constrained_sample/_distance/_interpolate/_interpolate_block above).
+    auto trace_rby1_mid_pose_fk(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        return RainbowMidPoseFkCG(info, language);
+    }
 }  // namespace cricket

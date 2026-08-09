@@ -1,0 +1,148 @@
+<?xml version="1.0"?>
+<robot name="rb_y1_head">
+
+  <!-- Links -->
+
+  <link name="link_head_base" />
+
+  <link name="link_head_0">
+    <inertial>
+      <mass value="0.07582110" />
+      <origin rpy="0 0 0" xyz="-0.00800549 0.0 -0.01100308" />
+      <inertia ixx="0.00003307" ixy="0.0" ixz="-0.00000290" iyy="0.00002209" iyz="0.0"
+        izz="0.00003796" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/PAN_TILT_1.obj" />
+      </geometry>
+    </visual>
+
+    <!-- Conservative geometry to protect sensor head. -->
+    <collision>
+      <origin xyz="0 0 0.04" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.12" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="link_head_1">
+    <inertial>
+      <mass value="0.07450580" />
+      <origin rpy="0 0 0" xyz="-0.01150679 -0.00114270 -0.00031579" />
+      <inertia ixx="0.00001850" ixy="-0.00000035" ixz="0.00000203" iyy="0.00002451"
+        iyz="-0.00000010" izz="0.00002062" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/PAN_TILT_2.obj" />
+      </geometry>
+    </visual>
+  </link>
+
+  <link name="link_head_2">
+    <inertial>
+      <mass value="0.03585374" />
+      <origin rpy="0 0 0" xyz="-0.00081966 0.00099024 0.02283704" />
+      <inertia ixx="0.00002046" ixy="0.00000001" ixz="-0.00000027" iyy="0.00001044" iyz="0.00000076"
+        izz="0.00001291" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0" />
+      <geometry>
+        <mesh filename="package://bimanual/models/ruby/rby1_description_drake/meshes/PAN_TILT_3.obj" />
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- BEGIN: Camera mount on MIT's RB-Y1 (Ruby) added by Seiji -->
+  <link name="rby1_camera_mount">
+    <!-- <inertial> -->
+    <!--   <mass value="0.0221" /> -->
+    <!--   <origin rpy="0 0 0" xyz="0.0 0.0 0.0" /> -->
+    <!-- </inertial> -->
+    <visual>
+      <geometry>
+        <mesh filename="./meshes/rby1_camera_mount_realsense.obj" />
+      </geometry>
+    </visual>
+  </link>
+  <!-- END: Camera mount on MIT's RB-Y1 (Ruby) added by Seiji -->
+
+  <!-- Joints -->
+
+  <joint name="head_base" type="fixed">
+    <parent link="link_head_base" />
+    <child link="link_head_0" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.022 0.0 0.120073451525" />
+    <axis xyz="0 0 1" />
+  </joint>
+
+  <joint name="head_0" type="revolute">
+    <parent link="link_head_0" />
+    <child link="link_head_1" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.02" />
+    <axis xyz="0 0 1" />
+    <limit effort="1000" velocity="3.14" lower="-0.523" upper="0.523"
+      drake:acceleration="3.141592" />
+  </joint>
+
+  <joint name="head_1" type="revolute">
+    <parent link="link_head_1" />
+    <child link="link_head_2" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
+    <axis xyz="0 1 0" />
+    <limit effort="1000" velocity="3.14" lower="-0.35" upper="1.57"
+      drake:acceleration="3.141592" />
+  </joint>
+
+  <!-- BEGIN: Camera mount on MIT's RB-Y1 (Ruby) added by Seiji -->
+  <joint name="head_mount" type="fixed">
+    <parent link="link_head_2" />
+    <child link="rby1_camera_mount" />
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.04" />
+    <axis xyz="0 0 1" />
+  </joint>
+  <!-- END: Camera mount on MIT's RB-Y1 (Ruby) added by Seiji -->
+
+  <!-- Transmissions -->
+
+  <transmission name="head_0_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="head_0">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="head_0_motor">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="head_1_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="head_1">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="head_1_motor">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <!-- Collision filters -->
+
+  <!-- Filter all collisions in the hed assembly. -->
+  <drake:collision_filter_group name="head">
+    <drake:member link="link_head_base"/>
+    <drake:member link="link_head_1"/>
+    <drake:member link="link_head_2"/>
+    <drake:ignored_collision_filter_group name="head"/>
+  </drake:collision_filter_group>
+
+</robot>

@@ -1,0 +1,1611 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="rby1" path="assets/ruby/rby1_description_drake/xacro/rby1_with_holonomic_base.urdf">
+	<link name="world"></link>
+	<link name="base_x"></link>
+	<link name="base_y"></link>
+	<link name="base_z"></link>
+	<link name="base">
+		<inertial>
+			<mass value="60.08042639"></mass>
+			<origin rpy="0 0 0" xyz="-0.06157942 -0.00142271 0.13513861"></origin>
+			<inertia ixx="1.37742174" ixy="0.02521789" ixz="0.18565467" iyy="2.99386515" iyz="-0.00641869" izz="3.76085052"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/BASE.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.13180257380008698"></sphere>
+			</geometry>
+			<origin xyz="-0.26136475801467896 -0.11990731954574585 0.11275303363800049" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.13456536829471588"></sphere>
+			</geometry>
+			<origin xyz="-0.07690632343292236 -0.17723774909973145 0.11324109882116318" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.2039647400379181"></sphere>
+			</geometry>
+			<origin xyz="-0.17420171201229095 0.13232195377349854 0.10301918536424637" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.1402926743030548"></sphere>
+			</geometry>
+			<origin xyz="0.12259268760681152 -0.13498134911060333 0.1243569403886795" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.14838047325611115"></sphere>
+			</geometry>
+			<origin xyz="0.23882873356342316 -0.12924019992351532 0.12698452174663544" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.14080792665481567"></sphere>
+			</geometry>
+			<origin xyz="0.12315574288368225 0.1271207481622696 0.12159169465303421" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.14869347214698792"></sphere>
+			</geometry>
+			<origin xyz="0.23593208193778992 0.1273917704820633 0.12544764578342438" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="wheel_r">
+		<inertial>
+			<mass value="1.37783736"></mass>
+			<origin rpy="0 0 0" xyz="0.0 -0.00073938 0.0"></origin>
+			<inertia ixx="0.00426657" ixy="0.0" ixz="0.0" iyy="0.00811815" iyz="0.0" izz="0.00426657"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/WHEEL.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.10782000422477722"></sphere>
+			</geometry>
+			<origin xyz="0.0023810998536646366 0.0019420018652454019 -0.006564423907548189" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="wheel_l">
+		<inertial>
+			<mass value="1.37783736"></mass>
+			<origin rpy="0 0 0" xyz="0.0 0.00073938 0.0"></origin>
+			<inertia ixx="0.00426657" ixy="0.0" ixz="0.0" iyy="0.00811815" iyz="0.0" izz="0.00426657"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/WHEEL.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.10778584331274033"></sphere>
+			</geometry>
+			<origin xyz="0.005074493587017059 0.0004602745466399938 0.005131762940436602" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="torso_mount"></link>
+	<link name="lidar_mid360">
+		<visual>
+			<origin rpy="1.5708 0 0" xyz="-0.018 0 0.015"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/mid-360.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.04595066234469414"></sphere>
+			</geometry>
+			<origin xyz="-0.035515330731868744 0.0020942813716828823 0.01246936060488224" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.03765008598566055"></sphere>
+			</geometry>
+			<origin xyz="-0.0003134637081529945 -0.0022375823464244604 -0.0006569850374944508" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.03819059208035469"></sphere>
+			</geometry>
+			<origin xyz="-0.000393348018405959 -0.0037850900553166866 0.03151394799351692" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_torso_base">
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_0.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.11653736233711243"></sphere>
+			</geometry>
+			<origin xyz="-0.02341947704553604 -0.007128647994250059 0.02426796965301037" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.11507108807563782"></sphere>
+			</geometry>
+			<origin xyz="0.042554821819067 0.007842324674129486 0.021313505247235298" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08558699488639832"></sphere>
+			</geometry>
+			<origin xyz="-0.02352922037243843 -0.04457622766494751 0.12452635169029236" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08493798971176147"></sphere>
+			</geometry>
+			<origin xyz="-0.036122359335422516 0.03665117919445038 0.12474492192268372" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09948467463254929"></sphere>
+			</geometry>
+			<origin xyz="0.04924044385552406 0.007780502550303936 0.10569476336240768" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_torso_0">
+		<inertial>
+			<mass value="2.24282123"></mass>
+			<origin rpy="0 0 0" xyz="-0.08848415 0.00021367 0.00000046"></origin>
+			<inertia ixx="0.01413496" ixy="0.00092982" ixz="-0.00000010" iyy="0.01005357" iyz="-0.00000008" izz="0.01892525"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_1.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.08421126753091812"></sphere>
+			</geometry>
+			<origin xyz="-0.10424745082855225 -0.04703731834888458 -0.023228837177157402" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06985697895288467"></sphere>
+			</geometry>
+			<origin xyz="-0.1292465180158615 -0.06199485436081886 0.030067846179008484" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.0686863511800766"></sphere>
+			</geometry>
+			<origin xyz="-0.06948886066675186 -0.05953783169388771 0.03155379742383957" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08372656255960464"></sphere>
+			</geometry>
+			<origin xyz="-0.09501426666975021 0.0461224801838398 -0.024357780814170837" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08531986176967621"></sphere>
+			</geometry>
+			<origin xyz="-0.09501978754997253 0.04369206726551056 0.023602832108736038" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_torso_1">
+		<inertial>
+			<mass value="9.72162676"></mass>
+			<origin rpy="0 0 0" xyz="0.00728955 -0.01728522 0.06911380"></origin>
+			<inertia ixx="0.14862640" ixy="-0.00142621" ixz="-0.00951385" iyy="0.13854733" iyz="-0.00975351" izz="0.02912982"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_2.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.11731794476509094"></sphere>
+			</geometry>
+			<origin xyz="-0.004983353894203901 0.0037700689863413572 0.002388844033703208" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.10131846368312836"></sphere>
+			</geometry>
+			<origin xyz="0.004482864867895842 -0.02914338931441307 0.10541292279958725" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09709998965263367"></sphere>
+			</geometry>
+			<origin xyz="0.005217773374170065 0.03284668177366257 0.11463066935539246" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08500826358795166"></sphere>
+			</geometry>
+			<origin xyz="0.02810407243669033 -0.04177319258451462 0.2326408326625824" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.0884486511349678"></sphere>
+			</geometry>
+			<origin xyz="0.013381149619817734 0.045141156762838364 0.24340161681175232" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09541068226099014"></sphere>
+			</geometry>
+			<origin xyz="0.014185149222612381 -0.04220155254006386 0.34225091338157654" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09592846781015396"></sphere>
+			</geometry>
+			<origin xyz="0.016388365998864174 0.044768061488866806 0.3418574929237366" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_torso_2">
+		<inertial>
+			<mass value="9.21691850"></mass>
+			<origin rpy="0 0 0" xyz="0.00653835 -0.01769536 0.05636582"></origin>
+			<inertia ixx="0.12162270" ixy="-0.00127910" ixz="-0.00831678" iyy="0.11589190" iyz="-0.00873271" izz="0.03094484"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_3.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.10095486789941788"></sphere>
+			</geometry>
+			<origin xyz="-0.028505839407444 0.0002885409048758447 0.01210398506373167" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09519585967063904"></sphere>
+			</geometry>
+			<origin xyz="0.03143953159451485 0.000998452422209084 0.00320241367444396" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09520123153924942"></sphere>
+			</geometry>
+			<origin xyz="0.008874010294675827 -0.027893081307411194 0.11267407983541489" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09256121516227722"></sphere>
+			</geometry>
+			<origin xyz="0.010243507102131844 0.03047432005405426 0.11198613792657852" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08171659708023071"></sphere>
+			</geometry>
+			<origin xyz="0.03203494846820831 -0.03609130159020424 0.23460224270820618" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08041346073150635"></sphere>
+			</geometry>
+			<origin xyz="0.02850201539695263 0.04410195350646973 0.2363405078649521" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08470313996076584"></sphere>
+			</geometry>
+			<origin xyz="0.025364523753523827 -0.039820022881031036 0.33256563544273376" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08364315330982208"></sphere>
+			</geometry>
+			<origin xyz="0.02485373616218567 0.04174744337797165 0.33281421661376953" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_torso_3">
+		<inertial>
+			<mass value="4.18679196"></mass>
+			<origin rpy="0 0 0" xyz="-0.00574156 -0.01725975 0.00005610"></origin>
+			<inertia ixx="0.00849870" ixy="0.00040861" ixz="-0.00000263" iyy="0.00929513" iyz="-0.00001243" izz="0.00955442"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_4.obj"></mesh>
+			</geometry>
+		</visual>
+	</link>
+	<link name="link_torso_4">
+		<inertial>
+			<mass value="4.45566276"></mass>
+			<origin rpy="0 0 0" xyz="-0.09097095 0.00005085 0.02601950"></origin>
+			<inertia ixx="0.01545991" ixy="0.00001883" ixz="-0.00780349" iyy="0.02550888" iyz="0.00000715" izz="0.01952563"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_5.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.09130633622407913"></sphere>
+			</geometry>
+			<origin xyz="-0.14525772631168365 -0.035395145416259766 -0.013386059552431107" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09043639898300171"></sphere>
+			</geometry>
+			<origin xyz="-0.1449684351682663 0.034555502235889435 -0.012893036007881165" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.1059553474187851"></sphere>
+			</geometry>
+			<origin xyz="-0.11694945394992828 0.004014561418443918 0.05526139214634895" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09318780899047852"></sphere>
+			</geometry>
+			<origin xyz="0.015386912971735 -0.04128589853644371 -0.010142717510461807" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09394414722919464"></sphere>
+			</geometry>
+			<origin xyz="0.016372807323932648 -0.04295794293284416 0.068903848528862" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.11449184268712997"></sphere>
+			</geometry>
+			<origin xyz="-0.011559934355318546 0.031968578696250916 0.025317588821053505" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_torso_5">
+		<inertial>
+			<mass value="32.0"></mass>
+			<origin rpy="0 0 0" xyz="-0.01338376 0.00025621 -0.03272487"></origin>
+			<inertia ixx="0.288" ixy="0.0" ixz="0.0" iyy="0.288" iyz="0.0" izz="0.288"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_6.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.14790445566177368"></sphere>
+			</geometry>
+			<origin xyz="-0.09337745606899261 0.01890365406870842 -0.08081043511629105" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.1599876433610916"></sphere>
+			</geometry>
+			<origin xyz="0.0031926825176924467 0.011701524257659912 -0.06852805614471436" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.12431846559047699"></sphere>
+			</geometry>
+			<origin xyz="-0.13574621081352234 -0.05626391991972923 0.06813689321279526" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.12675057351589203"></sphere>
+			</geometry>
+			<origin xyz="-0.13321727514266968 0.0587955042719841 0.06341996043920517" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.16922824084758759"></sphere>
+			</geometry>
+			<origin xyz="0.005405868403613567 0.010684171691536903 0.03332905098795891" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_left_arm_base"></link>
+	<link name="link_left_arm_0">
+		<inertial>
+			<mass value="1.26164242"></mass>
+			<origin rpy="0 0 0" xyz="-0.00316662 -0.03437151 0.00000242"></origin>
+			<inertia ixx="0.00230624" ixy="-0.00039022" ixz="0.00000269" iyy="0.00426418" iyz="0.00000108" izz="0.00432159"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_14.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.11317576467990875"></sphere>
+			</geometry>
+			<origin xyz="-0.004629852250218391 -0.017886441200971603 -0.0035843043588101864" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_left_arm_1">
+		<inertial>
+			<mass value="1.88138658"></mass>
+			<origin rpy="0 0 0" xyz="-0.00183470 0.00040596 -0.01008733"></origin>
+			<inertia ixx="0.00295838" ixy="-0.00001176" ixz="0.00006949" iyy="0.00355208" iyz="0.00004467" izz="0.00230558"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_15.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.05285244062542915"></sphere>
+			</geometry>
+			<origin xyz="0.009848392568528652 -0.006704083178192377 -0.056520212441682816" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.05285244062542915"></sphere>
+			</geometry>
+			<origin xyz="-0.0057253544218838215 0.01195024698972702 -0.08140970021486282" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_left_arm_2">
+		<inertial>
+			<mass value="2.35634437"></mass>
+			<origin rpy="0 0 0" xyz="0.00066086 -0.00038583 -0.15742972"></origin>
+			<inertia ixx="0.00842712" ixy="0.00000247" ixz="0.00036948" iyy="0.00802311" iyz="-0.00006550" izz="0.00295678"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_16.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.1277574896812439"></sphere>
+			</geometry>
+			<origin xyz="0.009406130760908127 0.0007858990575186908 -0.19100764393806458" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_left_arm_3">
+		<inertial>
+			<mass value="2.00905891"></mass>
+			<origin rpy="0 0 0" xyz="-0.01565298 0.00793126 -0.04997943"></origin>
+			<inertia ixx="0.00756474" ixy="-0.00026771" ixz="-0.00155419" iyy="0.00772758" iyz="-0.00084364" izz="0.00199754"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_17.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.06491434574127197"></sphere>
+			</geometry>
+			<origin xyz="-0.03020898811519146 0.0013013866264373064 -0.11266106367111206" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.0720745176076889"></sphere>
+			</geometry>
+			<origin xyz="-0.024336788803339005 -0.00014368472329806536 -0.009444047696888447" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_left_arm_4">
+		<inertial>
+			<mass value="0.42508710"></mass>
+			<origin rpy="0 0 0" xyz="0.00000011 0.02696036 0.06182110"></origin>
+			<inertia ixx="0.00082466" ixy="0.0" ixz="0.0" iyy="0.00075398" iyz="0.00025338" izz="0.00039794"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_18.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.0806405171751976"></sphere>
+			</geometry>
+			<origin xyz="-0.0004023065266665071 0.022319583222270012 0.03550535440444946" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_left_arm_5">
+		<inertial>
+			<mass value="1.44264795"></mass>
+			<origin rpy="0 0 0" xyz="0.00340082 0.00576824 -0.02507309"></origin>
+			<inertia ixx="0.00233577" ixy="0.00003048" ixz="-0.00001191" iyy="0.00232580" iyz="-0.00019491" izz="0.00138375"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_19.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.08089786767959595"></sphere>
+			</geometry>
+			<origin xyz="0.007618030998855829 -0.00968726072460413 -0.02982964925467968" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_left_arm_6">
+		<inertial>
+			<mass value="0.21137279"></mass>
+			<origin rpy="0 0 0" xyz="-0.00066810 0.00031708 -0.09636043"></origin>
+			<inertia ixx="0.00013511" ixy="-0.00000242" ixz="0.00000102" iyy="0.00014453" iyz="-0.00000094" izz="0.00025431"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_20.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.05285244062542915"></sphere>
+			</geometry>
+			<origin xyz="0.009848392568528652 -0.006704083178192377 -0.08652020990848541" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.05285244062542915"></sphere>
+			</geometry>
+			<origin xyz="-0.0057253544218838215 0.01195024698972702 -0.11140970140695572" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="FT_sensor_L">
+		<inertial>
+			<mass value="0.49078507"></mass>
+			<origin rpy="0 0 0" xyz="-0.00010423 -0.00108019 -0.01880676"></origin>
+			<inertia ixx="0.00028587" ixy="-0.00000146" ixz="0.00000026" iyy="0.00030459" iyz="0.00000772" izz="0.00036377"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/FT_SENSOR_L.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.043100323528051376"></sphere>
+			</geometry>
+			<origin xyz="0.0017106859013438225 -0.0013298363192006946 -0.025594206526875496" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="ee_left"></link>
+	<link name="link_left_arm_camera">
+		<visual>
+			<origin rpy="0 0 3.14159" xyz="0 .062 -0.038"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/rby1_wrist_camera.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.03778841346502304"></sphere>
+			</geometry>
+			<origin xyz="-0.001957481727004051 0.05978444963693619 -0.05834720656275749" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.03778841346502304"></sphere>
+			</geometry>
+			<origin xyz="-0.002104605548083782 0.0593467578291893 -0.01797637715935707" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_right_arm_base"></link>
+	<link name="link_right_arm_0">
+		<inertial>
+			<mass value="1.26164242"></mass>
+			<origin rpy="0 0 0" xyz="-0.00316662 0.03437181 -0.00000030"></origin>
+			<inertia ixx="0.00230621" ixy="0.00039024" ixz="-0.00000256" iyy="0.00426418" iyz="0.00000118" izz="0.00432156"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_7.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.11317576467990875"></sphere>
+			</geometry>
+			<origin xyz="-0.004629852250218391 0.01811355911195278 -0.0035843043588101864" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_right_arm_1">
+		<inertial>
+			<mass value="2.27287031"></mass>
+			<origin rpy="0 0 0" xyz="-0.00307855 -0.00124741 -0.01294324"></origin>
+			<inertia ixx="0.00388490" ixy="-0.00001477" ixz="0.00011465" iyy="0.00447034" iyz="-0.00010023" izz="0.00288341"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_8.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.05285244062542915"></sphere>
+			</geometry>
+			<origin xyz="0.009848392568528652 -0.006704083178192377 -0.056520212441682816" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.05285244062542915"></sphere>
+			</geometry>
+			<origin xyz="-0.0057253544218838215 0.01195024698972702 -0.08140970021486282" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_right_arm_2">
+		<inertial>
+			<mass value="2.46909439"></mass>
+			<origin rpy="0 0 0" xyz="0.00115434 -0.00196635 -0.16192524"></origin>
+			<inertia ixx="0.00980269" ixy="0.00005871" ixz="0.00051888" iyy="0.00924560" iyz="-0.00045932" izz="0.00329867"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_9.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.1277574896812439"></sphere>
+			</geometry>
+			<origin xyz="0.009406130760908127 -0.0007858990575186908 -0.19100764393806458" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_right_arm_3">
+		<inertial>
+			<mass value="2.26099493"></mass>
+			<origin rpy="0 0 0" xyz="-0.01603135 -0.00692891 -0.04549811"></origin>
+			<inertia ixx="0.00822606" ixy="0.00027620" ixz="-0.00156570" iyy="0.00844870" iyz="0.00076157" izz="0.00236614"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_10.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.06491434574127197"></sphere>
+			</geometry>
+			<origin xyz="-0.03020898811519146 0.0013013866264373064 -0.11266106367111206" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.0720745176076889"></sphere>
+			</geometry>
+			<origin xyz="-0.024336788803339005 -0.00014368472329806536 -0.009444047696888447" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_right_arm_4">
+		<inertial>
+			<mass value="0.42508710"></mass>
+			<origin rpy="0 0 0" xyz="-0.00000011 -0.02696036 0.06182110"></origin>
+			<inertia ixx="0.00082466" ixy="0.0" ixz="0.0" iyy="0.00075398" iyz="-0.00025338" izz="0.00039794"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_11.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.0806405171751976"></sphere>
+			</geometry>
+			<origin xyz="-0.0004023065266665071 -0.022319583222270012 0.03550535440444946" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_right_arm_5">
+		<inertial>
+			<mass value="1.59194395"></mass>
+			<origin rpy="0 0 0" xyz="0.00318034 -0.00532264 -0.02809655"></origin>
+			<inertia ixx="0.00256054" ixy="-0.00002344" ixz="-0.00001563" iyy="0.00257233" iyz="0.00021608" izz="0.00156092"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_12.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.08089786767959595"></sphere>
+			</geometry>
+			<origin xyz="0.007618030998855829 0.00968726072460413 -0.02982964925467968" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_right_arm_6">
+		<inertial>
+			<mass value="0.21137279"></mass>
+			<origin rpy="0 0 0" xyz="0.00066810 -0.00031708 -0.09636043"></origin>
+			<inertia ixx="0.00013511" ixy="-0.00000242" ixz="-0.00000102" iyy="0.00014453" iyz="0.00000094" izz="0.00025431"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/LINK_13.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.05285244062542915"></sphere>
+			</geometry>
+			<origin xyz="0.009848392568528652 -0.006704083178192377 -0.08652020990848541" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.05285244062542915"></sphere>
+			</geometry>
+			<origin xyz="-0.0057253544218838215 0.01195024698972702 -0.11140970140695572" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="FT_sensor_R">
+		<inertial>
+			<mass value="0.49078507"></mass>
+			<origin rpy="0 0 0" xyz="0.00010423 0.00108019 -0.01880676"></origin>
+			<inertia ixx="0.00028587" ixy="-0.00000146" ixz="-0.00000026" iyy="0.00030459" iyz="-0.00000772" izz="0.00036377"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/FT_SENSOR_R.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.043100323528051376"></sphere>
+			</geometry>
+			<origin xyz="0.0017106859013438225 -0.0013298363192006946 -0.025594206526875496" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="ee_right"></link>
+	<link name="link_right_arm_camera">
+		<visual>
+			<origin rpy="0 0 0" xyz="0 -0.062 -0.038"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/rby1_wrist_camera.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.03778841346502304"></sphere>
+			</geometry>
+			<origin xyz="-0.001957481727004051 -0.06421554833650589 -0.05834720656275749" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.03778841346502304"></sphere>
+			</geometry>
+			<origin xyz="-0.002104605548083782 -0.06465324014425278 -0.01797637715935707" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_head_base"></link>
+	<link name="link_head_0">
+		<inertial>
+			<mass value="0.07582110"></mass>
+			<origin rpy="0 0 0" xyz="-0.00800549 0.0 -0.01100308"></origin>
+			<inertia ixx="0.00003307" ixy="0.0" ixz="-0.00000290" iyy="0.00002209" iyz="0.0" izz="0.00003796"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/PAN_TILT_1.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.12459595501422882"></sphere>
+			</geometry>
+			<origin xyz="-0.036990273743867874 -0.036356981843709946 0.02970093861222267" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08736594021320343"></sphere>
+			</geometry>
+			<origin xyz="-0.05639028176665306 0.04862283915281296 -0.015439106151461601" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08947203308343887"></sphere>
+			</geometry>
+			<origin xyz="-0.056130554527044296 0.056798167526721954 0.08528739213943481" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.12484770268201828"></sphere>
+			</geometry>
+			<origin xyz="0.036424338817596436 -0.035064227879047394 0.03134023770689964" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.12153845280408859"></sphere>
+			</geometry>
+			<origin xyz="0.0377415232360363 0.03758934140205383 0.048456981778144836" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="link_head_1">
+		<inertial>
+			<mass value="0.07450580"></mass>
+			<origin rpy="0 0 0" xyz="-0.01150679 -0.00114270 -0.00031579"></origin>
+			<inertia ixx="0.00001850" ixy="-0.00000035" ixz="0.00000203" iyy="0.00002451" iyz="-0.00000010" izz="0.00002062"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/PAN_TILT_2.obj"></mesh>
+			</geometry>
+		</visual>
+	</link>
+	<link name="link_head_2">
+		<inertial>
+			<mass value="0.03585374"></mass>
+			<origin rpy="0 0 0" xyz="-0.00081966 0.00099024 0.02283704"></origin>
+			<inertia ixx="0.00002046" ixy="0.00000001" ixz="-0.00000027" iyy="0.00001044" iyz="0.00000076" izz="0.00001291"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/PAN_TILT_3.obj"></mesh>
+			</geometry>
+		</visual>
+	</link>
+	<link name="rby1_camera_mount">
+		<visual>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/rby1_camera_mount_realsense.obj"></mesh>
+			</geometry>
+		</visual>
+	</link>
+	<link name="left_ee_body">
+		<inertial>
+			<mass value="0.46704998"></mass>
+			<origin rpy="0 0 0" xyz="0.00212703 0.00000615 -0.04287176"></origin>
+			<inertia ixx="0.00032067" ixy="0.00002383" ixz="-0.00000785" iyy="0.00059559" iyz="-0.00000007" izz="0.00052732"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/EE_BODY.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.046789802610874176"></sphere>
+			</geometry>
+			<origin xyz="-0.02951020747423172 0.0019440099131315947 -0.03866790980100632" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.046789802610874176"></sphere>
+			</geometry>
+			<origin xyz="0.02868925780057907 0.0007435178849846125 -0.03896341472864151" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="left_ee_finger_1">
+		<inertial>
+			<mass value="0.03030138"></mass>
+			<origin rpy="0 0 0" xyz="0.0 0.0 0.0"></origin>
+			<inertia ixx="0.00000985" ixy="0.0" ixz="-0.00000022" iyy="0.00000845" iyz="0.0" izz="0.00000201"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/EE_FINGER.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.03427768871188164"></sphere>
+			</geometry>
+			<origin xyz="0.0024527516216039658 -0.0016467842506244779 -0.0250600203871727" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="left_ee_finger_2">
+		<inertial>
+			<mass value="0.03030138"></mass>
+			<origin rpy="0 0 0" xyz="0.0 0.0 0.0"></origin>
+			<inertia ixx="0.00000985" ixy="0.0" ixz="-0.00000022" iyy="0.00000845" iyz="0.0" izz="0.00000201"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/EE_FINGER.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.03427768871188164"></sphere>
+			</geometry>
+			<origin xyz="0.0024527516216039658 -0.0016467842506244779 -0.0250600203871727" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="right_ee_body">
+		<inertial>
+			<mass value="0.46704998"></mass>
+			<origin rpy="0 0 0" xyz="0.00212703 0.00000615 -0.04287176"></origin>
+			<inertia ixx="0.00032067" ixy="0.00002383" ixz="-0.00000785" iyy="0.00059559" iyz="-0.00000007" izz="0.00052732"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/EE_BODY.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.046789802610874176"></sphere>
+			</geometry>
+			<origin xyz="-0.02951020747423172 0.0019440099131315947 -0.03866790980100632" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.046789802610874176"></sphere>
+			</geometry>
+			<origin xyz="0.02868925780057907 0.0007435178849846125 -0.03896341472864151" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="right_ee_finger_1">
+		<inertial>
+			<mass value="0.03030138"></mass>
+			<origin rpy="0 0 0" xyz="0.0 0.0 0.0"></origin>
+			<inertia ixx="0.00000985" ixy="0.0" ixz="-0.00000022" iyy="0.00000845" iyz="0.0" izz="0.00000201"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/EE_FINGER.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.03427768871188164"></sphere>
+			</geometry>
+			<origin xyz="0.0024527516216039658 -0.0016467842506244779 -0.0250600203871727" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="right_ee_finger_2">
+		<inertial>
+			<mass value="0.03030138"></mass>
+			<origin rpy="0 0 0" xyz="0.0 0.0 0.0"></origin>
+			<inertia ixx="0.00000985" ixy="0.0" ixz="-0.00000022" iyy="0.00000845" iyz="0.0" izz="0.00000201"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="1.57079632679 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="ruby/rby1_description_drake/meshes/EE_FINGER.obj"></mesh>
+			</geometry>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.03427768871188164"></sphere>
+			</geometry>
+			<origin xyz="0.0024527516216039658 -0.0016467842506244779 -0.0250600203871727" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<joint name="base_x" type="prismatic">
+		<parent link="world"></parent>
+		<child link="base_x"></child>
+		<axis xyz="1 0 0"></axis>
+		<limit effort="1000" lower="-1000" upper="1000" velocity="1000.00"></limit>
+	</joint>
+	<joint name="base_y" type="prismatic">
+		<parent link="base_x"></parent>
+		<child link="base_y"></child>
+		<axis xyz="0 1 0"></axis>
+		<limit effort="1000" lower="-1000" upper="1000" velocity="1000.00"></limit>
+	</joint>
+	<joint name="base_z" type="fixed">
+		<origin rpy="0 0 0" xyz="0 0 0"></origin>
+		<parent link="base_y"></parent>
+		<child link="base_z"></child>
+		<axis xyz="0 0 1"></axis>
+	</joint>
+	<joint name="base_rz" type="continuous">
+		<parent link="base_z"></parent>
+		<child link="base"></child>
+		<axis xyz="0 0 1"></axis>
+	</joint>
+	<joint name="right_wheel" type="fixed">
+		<parent link="base"></parent>
+		<child link="wheel_r"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.228 -0.265 0.1"></origin>
+		<axis xyz="0 1 0"></axis>
+	</joint>
+	<joint name="left_wheel" type="fixed">
+		<parent link="base"></parent>
+		<child link="wheel_l"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.228 0.265 0.1"></origin>
+		<axis xyz="0 1 0"></axis>
+	</joint>
+	<joint name="torso_mount" type="fixed">
+		<parent link="base"></parent>
+		<child link="torso_mount"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="-0.247 0.0 0.168"></origin>
+	</joint>
+	<joint name="lidar_mid360_mount" type="fixed">
+		<parent link="base"></parent>
+		<child link="lidar_mid360"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.25 0.0 0.2"></origin>
+	</joint>
+	<joint name="torso_0" type="revolute">
+		<parent link="link_torso_base"></parent>
+		<child link="link_torso_0"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.247 0.0 0.1125"></origin>
+		<axis xyz="1 0 0"></axis>
+		<limit effort="1000.0" lower="-0.34906585" upper="0.34906585" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="torso_1" type="revolute">
+		<parent link="link_torso_0"></parent>
+		<child link="link_torso_1"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"></origin>
+		<axis xyz="0 1 0"></axis>
+		<limit effort="1000.0" lower="-1.04719755" upper="1.52173048" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="torso_2" type="revolute">
+		<parent link="link_torso_1"></parent>
+		<child link="link_torso_2"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.350"></origin>
+		<axis xyz="0 1 0"></axis>
+		<limit effort="1000.0" lower="-2.478367" upper="1.570796" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="torso_3" type="revolute">
+		<parent link="link_torso_2"></parent>
+		<child link="link_torso_3"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.350"></origin>
+		<axis xyz="0 1 0"></axis>
+		<limit effort="1000.0" lower="-0.78539816" upper="1.57079633" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="torso_4" type="revolute">
+		<parent link="link_torso_3"></parent>
+		<child link="link_torso_4"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"></origin>
+		<axis xyz="1 0 0"></axis>
+		<limit effort="1000.0" lower="-0.52359878" upper="0.52359878" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="torso_5" type="revolute">
+		<parent link="link_torso_4"></parent>
+		<child link="link_torso_5"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.309426548461"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit effort="1000.0" lower="-1.57079633" upper="1.57079633" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="base_torso_weld" type="fixed">
+		<parent link="torso_mount"></parent>
+		<child link="link_torso_base"></child>
+		<origin rpy="0 0 0" xyz="0 0 0"></origin>
+	</joint>
+	<joint name="left_arm_0" type="revolute">
+		<parent link="link_left_arm_base"></parent>
+		<child link="link_left_arm_0"></child>
+		<origin rpy="0.349065850  0.0 0.0" xyz="0.0 0.220 0.080073452 "></origin>
+		<axis xyz="0 1 0"></axis>
+		<limit effort="1000.0" lower="-2.35619449" upper="2.35619449" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="left_arm_1" type="revolute">
+		<parent link="link_left_arm_0"></parent>
+		<child link="link_left_arm_1"></child>
+		<origin rpy="-0.349065850 0.0 0.0" xyz="0.0 0.0 0.0"></origin>
+		<axis xyz="1 0 0"></axis>
+		<limit effort="1000.0" lower="-0.05" upper="3.14159265" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="left_arm_2" type="revolute">
+		<parent link="link_left_arm_1"></parent>
+		<child link="link_left_arm_2"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit effort="1000.0" lower="-2.09439510" upper="2.09439510" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="left_arm_3" type="revolute">
+		<parent link="link_left_arm_2"></parent>
+		<child link="link_left_arm_3"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.031 0.0 -0.276"></origin>
+		<axis xyz="0 1 0"></axis>
+		<limit effort="1000.0" lower="-2.61799388" upper="0.01" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="left_arm_4" type="revolute">
+		<parent link="link_left_arm_3"></parent>
+		<child link="link_left_arm_4"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="-0.031 0.0 -0.256"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit effort="1000.0" lower="-3.0" upper="3.0" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="left_arm_5" type="revolute">
+		<parent link="link_left_arm_4"></parent>
+		<child link="link_left_arm_5"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"></origin>
+		<axis xyz="0 1 0"></axis>
+		<limit effort="1000.0" lower="-1.74532925" upper="2.00712864" velocity="30.14159265"></limit>
+	</joint>
+	<joint name="left_arm_6" type="revolute">
+		<parent link="link_left_arm_5"></parent>
+		<child link="link_left_arm_6"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit effort="1000.0" lower="-2.75" upper="2.75" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="tool_left" type="fixed">
+		<parent link="link_left_arm_6"></parent>
+		<child link="FT_sensor_L"></child>
+		<origin rpy="0.0 0.0 0" xyz="0.0 0.0 -0.1087"></origin>
+		<axis xyz="0 0 1"></axis>
+	</joint>
+	<joint name="FT_Sensor_END_left" type="fixed">
+		<parent link="FT_sensor_L"></parent>
+		<child link="ee_left"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.0461"></origin>
+		<axis xyz="0 0 1"></axis>
+	</joint>
+	<joint name="left_arm_camera_mount" type="fixed">
+		<parent link="FT_sensor_L"></parent>
+		<child link="link_left_arm_camera"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"></origin>
+		<axis xyz="0 0 1"></axis>
+	</joint>
+	<joint name="torso_left_arm_weld" type="fixed">
+		<parent link="link_torso_5"></parent>
+		<child link="link_left_arm_base"></child>
+		<origin rpy="0 0 0" xyz="0 0 0"></origin>
+	</joint>
+	<joint name="right_arm_0" type="revolute">
+		<parent link="link_right_arm_base"></parent>
+		<child link="link_right_arm_0"></child>
+		<origin rpy="-0.349065850  0.0 0.0" xyz="0.0 -0.220 0.080073451539 "></origin>
+		<axis xyz="0 1 0"></axis>
+		<limit effort="1000.0" lower="-2.35619449" upper="2.35619449" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="right_arm_1" type="revolute">
+		<parent link="link_right_arm_0"></parent>
+		<child link="link_right_arm_1"></child>
+		<origin rpy="0.349065850 0.0 0.0" xyz="0.0 0.0 0.0"></origin>
+		<axis xyz="1 0 0"></axis>
+		<limit effort="1000.0" lower="-3.14159265" upper="0.05" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="right_arm_2" type="revolute">
+		<parent link="link_right_arm_1"></parent>
+		<child link="link_right_arm_2"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit effort="1000.0" lower="-2.09439510" upper="2.09439510" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="right_arm_3" type="revolute">
+		<parent link="link_right_arm_2"></parent>
+		<child link="link_right_arm_3"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.031 0.0 -0.276"></origin>
+		<axis xyz="0 1 0"></axis>
+		<limit effort="1000.0" lower="-2.61799388" upper="0.01" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="right_arm_4" type="revolute">
+		<parent link="link_right_arm_3"></parent>
+		<child link="link_right_arm_4"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="-0.031 0.0 -0.256"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit effort="1000.0" lower="-3.0" upper="3.0" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="right_arm_5" type="revolute">
+		<parent link="link_right_arm_4"></parent>
+		<child link="link_right_arm_5"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"></origin>
+		<axis xyz="0 1 0"></axis>
+		<limit effort="1000.0" lower="-1.74532925" upper="2.00712864" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="right_arm_6" type="revolute">
+		<parent link="link_right_arm_5"></parent>
+		<child link="link_right_arm_6"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit effort="1000.0" lower="-2.75" upper="2.75" velocity="3.14159265"></limit>
+	</joint>
+	<joint name="tool_right" type="fixed">
+		<parent link="link_right_arm_6"></parent>
+		<child link="FT_sensor_R"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.1087"></origin>
+		<axis xyz="0 0 1"></axis>
+	</joint>
+	<joint name="FT_Sensor_END_right" type="fixed">
+		<parent link="FT_sensor_R"></parent>
+		<child link="ee_right"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.0461"></origin>
+		<axis xyz="0 0 1"></axis>
+	</joint>
+	<joint name="right_arm_camera_mount" type="fixed">
+		<parent link="FT_sensor_R"></parent>
+		<child link="link_right_arm_camera"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"></origin>
+		<axis xyz="0 0 1"></axis>
+	</joint>
+	<joint name="torso_right_arm_weld" type="fixed">
+		<parent link="link_torso_5"></parent>
+		<child link="link_right_arm_base"></child>
+		<origin rpy="0 0 0" xyz="0 0 0"></origin>
+	</joint>
+	<joint name="head_base" type="fixed">
+		<parent link="link_head_base"></parent>
+		<child link="link_head_0"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.022 0.0 0.120073451525"></origin>
+		<axis xyz="0 0 1"></axis>
+	</joint>
+	<joint name="head_0" type="fixed">
+		<parent link="link_head_0"></parent>
+		<child link="link_head_1"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.02"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit effort="1000" lower="-0.523" upper="0.523" velocity="3.14"></limit>
+	</joint>
+	<joint name="head_1" type="fixed">
+		<parent link="link_head_1"></parent>
+		<child link="link_head_2"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"></origin>
+		<axis xyz="0 1 0"></axis>
+		<limit effort="1000" lower="-0.35" upper="1.57" velocity="3.14"></limit>
+	</joint>
+	<joint name="head_mount" type="fixed">
+		<parent link="link_head_2"></parent>
+		<child link="rby1_camera_mount"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.04"></origin>
+		<axis xyz="0 0 1"></axis>
+	</joint>
+	<joint name="torso_head_weld" type="fixed">
+		<parent link="link_torso_5"></parent>
+		<child link="link_head_base"></child>
+		<origin rpy="0 0 0" xyz="0 0 0"></origin>
+	</joint>
+	<joint name="left_gripper_mount" type="fixed">
+		<parent link="ee_left"></parent>
+		<child link="left_ee_body"></child>
+		<origin rpy="0 0 0" xyz="0 0 0"></origin>
+	</joint>
+	<joint name="left_gripper_finger_1" type="fixed">
+		<parent link="left_ee_body"></parent>
+		<child link="left_ee_finger_1"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.005 0.0 -0.073"></origin>
+		<axis xyz="-1 0 0"></axis>
+		<limit effort="1000" lower="-0.05" upper="0" velocity="0.05"></limit>
+	</joint>
+	<joint name="left_gripper_finger_2" type="fixed">
+		<parent link="left_ee_body"></parent>
+		<child link="left_ee_finger_2"></child>
+		<origin rpy="0.0 0.0 3.1415926535" xyz="-0.005 0.0 -0.073"></origin>
+		<axis xyz="1 0 0"></axis>
+		<limit effort="1000" lower="0" upper="0.05" velocity="0.05"></limit>
+	</joint>
+	<joint name="right_gripper_mount" type="fixed">
+		<parent link="ee_right"></parent>
+		<child link="right_ee_body"></child>
+		<origin rpy="0 0 0" xyz="0 0 0"></origin>
+	</joint>
+	<joint name="right_gripper_finger_1" type="fixed">
+		<parent link="right_ee_body"></parent>
+		<child link="right_ee_finger_1"></child>
+		<origin rpy="0.0 0.0 0.0" xyz="0.005 0.0 -0.073"></origin>
+		<axis xyz="-1 0 0"></axis>
+		<limit effort="1000" lower="-0.05" upper="0" velocity="0.05"></limit>
+	</joint>
+	<joint name="right_gripper_finger_2" type="fixed">
+		<parent link="right_ee_body"></parent>
+		<child link="right_ee_finger_2"></child>
+		<origin rpy="0.0 0.0 3.1415926535" xyz="-0.005 0.0 -0.073"></origin>
+		<axis xyz="1 0 0"></axis>
+		<limit effort="1000" lower="0" upper="0.05" velocity="0.05"></limit>
+	</joint>
+	<transmission name="base_x_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="base_x">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="base_x_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="base_y_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="base_y">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="base_y_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="base_rz_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="base_rz">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="base_rz_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="torso_0_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="torso_0">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="torso_0_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="torso_1_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="torso_1">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="torso_1_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="torso_2_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="torso_2">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="torso_2_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="torso_3_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="torso_3">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="torso_3_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="torso_4_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="torso_4">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="torso_4_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="torso_5_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="torso_5">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="torso_5_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="left_arm_0_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="left_arm_0">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="left_arm_0_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="left_arm_1_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="left_arm_1">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="left_arm_1_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="left_arm_2_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="left_arm_2">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="left_arm_2_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="left_arm_3_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="left_arm_3">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="left_arm_3_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="left_arm_4_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="left_arm_4">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="left_arm_4_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="left_arm_5_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="left_arm_5">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="left_arm_5_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="left_arm_6_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="left_arm_6">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="left_arm_6_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="right_arm_0_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="right_arm_0">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="right_arm_0_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="right_arm_1_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="right_arm_1">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="right_arm_1_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="right_arm_2_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="right_arm_2">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="right_arm_2_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="right_arm_3_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="right_arm_3">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="right_arm_3_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="right_arm_4_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="right_arm_4">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="right_arm_4_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="right_arm_5_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="right_arm_5">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="right_arm_5_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="right_arm_6_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="right_arm_6">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="right_arm_6_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="head_0_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="head_0">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="head_0_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="head_1_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="head_1">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="head_1_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="left_gripper_finger_1_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="left_gripper_finger_1">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="left_gripper_finger_1_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="left_gripper_finger_2_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="left_gripper_finger_2">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="left_gripper_finger_2_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="right_gripper_finger_1_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="right_gripper_finger_1">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="right_gripper_finger_1_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+	<transmission name="right_gripper_finger_2_transmission">
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="right_gripper_finger_2">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="right_gripper_finger_2_motor">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+		</actuator>
+	</transmission>
+</robot>

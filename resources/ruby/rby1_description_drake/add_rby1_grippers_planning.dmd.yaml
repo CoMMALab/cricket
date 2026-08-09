@@ -1,0 +1,35 @@
+directives:
+
+# Add left gripper welded to left arm.
+- add_model:
+    name: left_gripper
+    file: package://bimanual/models/ruby/rby1_description_drake/gripper_planning.urdf
+- add_weld:
+    parent: left_arm::ee_left
+    child: left_gripper::ee_body
+
+# Add filter between left lower arm/wrist and left gripper.
+- add_collision_filter_group:
+    name: left_arm_gripper_filter
+    members: []
+    member_groups:
+        - left_arm::lower_arm
+        - left_gripper::gripper
+    ignored_collision_filter_groups: [left_arm_gripper_filter]
+
+# Add right gripper welded to right arm.
+- add_model:
+    name: right_gripper
+    file: package://bimanual/models/ruby/rby1_description_drake/gripper_planning.urdf
+- add_weld:
+    parent: right_arm::ee_right
+    child: right_gripper::ee_body
+
+# Add filter between right lower arm/wrist and right gripper.
+- add_collision_filter_group:
+    name: right_arm_gripper_filter
+    members: []
+    member_groups:
+        - right_arm::lower_arm
+        - right_gripper::gripper
+    ignored_collision_filter_groups: [right_arm_gripper_filter]

@@ -462,8 +462,9 @@ namespace cricket
     }
 
     // RBY1 constrained-bimanual parameterized IK: "use_parameterized": true traces the
-    // whole-body-relative IK plus the sample/distance/interpolate kernels over that
-    // parameterized space (see rainbow_ik_cg.hh). Not yet consumed by fk_template.hh.
+    // whole-body-relative IK, the dual-hand FK used to derive t_mid_left/t_mid_right, and
+    // the sample/distance/interpolate kernels over that parameterized space -- all consumed
+    // by fk_template.hh's ParameterizedSpace struct (see rainbow_ik_cg.hh for the math).
     auto derive_parameterized_traces(
         const RobotInfo &robot,
         nlohmann::json &data,
@@ -481,6 +482,15 @@ namespace cricket
         data["param_ik_code"] = param_ik.code;
         data["param_ik_code_vars"] = param_ik.temp_variables;
         data["param_ik_code_output"] = param_ik.outputs;
+
+        // RainbowArmParamResult::unclipped is always a Vector3 -- see
+        // rainbow_arm_parameterization.hh -- fixed regardless of robot, not something to trace.
+        data["param_ik_num_unclipped"] = 3;
+
+        auto param_mid_pose_fk = trace_rby1_mid_pose_fk(robot, language);
+        data["param_mid_pose_fk_code"] = param_mid_pose_fk.code;
+        data["param_mid_pose_fk_code_vars"] = param_mid_pose_fk.temp_variables;
+        data["param_mid_pose_fk_code_output"] = param_mid_pose_fk.outputs;
 
         auto param_sample = trace_rby1_constrained_sample(robot.model, language, bounds);
         data["param_sample_code"] = param_sample.code;
@@ -501,6 +511,13 @@ namespace cricket
 
         data["param_dimension"] = 19;
         data["param_sample_dimension"] = 17;
+
+        // State layout (see trace_rby1_constrained_sample's header comment above):
+        // base(4) + torso(6) + psi_left/right(2) + t_mid pose(7, [x,y,z,qx,qy,qz,qw]) == 19.
+        // Non-Euclidean: base_rz is an SO(2) (cos, sin) pair and t_mid's orientation is a
+        // genuine SO(3) quaternion block at local offset 12 + 3 == 15.
+        data["param_euclidean"] = false;
+        data["param_so3_offsets"] = std::vector<std::size_t>{15};
     }
 
     namespace
