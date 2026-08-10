@@ -824,6 +824,65 @@ struct {{name}}
             return y;
         }
 
+        // Left/right end-effector WORLD poses derived directly from a T_mid pose (x, y, z, qx,
+        // qy, qz, qw) plus the fixed t_mid_left/t_mid_right offsets above: T_l = T_mid *
+        // t_mid_left, T_r = T_mid * t_mid_right. Pure SE3 composition -- no FK, no arm IK, same
+        // algebra as param_ik_code's mid-pose handling (see RainbowConstrainedBimanualIkCG in
+        // rainbow_ik_cg.hh) but exposed standalone for callers that only need the hands' world
+        // poses, e.g. eefs_in_collision below.
+        static inline auto eef_world_poses(const std::array<float, 7> &t_mid_pose) noexcept
+            -> std::pair<Eigen::Isometry3f, Eigen::Isometry3f>
+        {
+            auto to_iso = [](const std::array<float, 7> &p) {
+                Eigen::Isometry3f t = Eigen::Isometry3f::Identity();
+                t.translation() = Eigen::Vector3f(p[0], p[1], p[2]);
+                t.linear() = Eigen::Quaternionf(p[6], p[3], p[4], p[5]).toRotationMatrix();
+                return t;
+            };
+
+            Eigen::Isometry3f t_mid_world = to_iso(t_mid_pose);
+            Eigen::Isometry3f t_mid_left_offset = to_iso(t_mid_left);
+            Eigen::Isometry3f t_mid_right_offset = to_iso(t_mid_right);
+
+            return {t_mid_world * t_mid_left_offset, t_mid_world * t_mid_right_offset};
+        }
+
+        {% if num_end_effectors == 2 %}
+        // Fast partial collision pre-filter for a sampled parameterized State: computes the
+        // left/right hands' world poses via eef_world_poses() above (no arm IK) and checks
+        // their attachments against the environment and against each other. Does NOT check
+        // attachments against the robot's own body (torso/arms/base) -- that requires a
+        // resolved ambient `q` (see resolve_block + Ambient::fkcc_attach below), which this
+        // deliberately skips to stay IK-free. Intended to prune obviously-bad samples before
+        // paying for resolve_block(); a `false` return here is not a full validity guarantee.
+        // Assumes end effector 0 is the left hand and 1 is the right hand (this robot's
+        // configured order -- see GenOptions::end_effectors), matching t_mid_left/t_mid_right.
+        static inline auto eefs_in_collision(
+            const vamp::collision::Environment<float> &environment,
+            const State &x_in) noexcept -> bool
+        {
+            const auto x = x_in.to_array();
+            std::array<float, 7> t_mid_pose{x[12], x[13], x[14], x[15], x[16], x[17], x[18]};
+
+            auto [left_world, right_world] = eef_world_poses(t_mid_pose);
+
+            set_attachment_pose(environment, 0, left_world);
+            set_attachment_pose(environment, 1, right_world);
+
+            if (attachment_environment_collision(environment))
+            {
+                return true;
+            }
+
+            if (attachment_attachment_collision(environment))
+            {
+                return true;
+            }
+
+            return false;
+        }
+        {% endif %}
+
         // Batched task-space -> ambient-configuration resolve, for the FK/collision-checking
         // boundary; the counterpart of a future ParameterizedLocalPlanner's per-lane IK solve.
         // `x` decomposes exactly as trace_rby1_constrained_sample's State layout: base(4) +
