@@ -810,6 +810,20 @@ struct {{name}}
                 ql.x(), ql.y(), ql.z(), ql.w()};
         }
 
+        // World-frame center-of-mass position for a reference whole-body configuration `q`.
+        // Scalar (non-rake) utility, same call pattern as compute_mid_pose above; traced with
+        // compute_jac=false so no Jacobian rows are computed or emitted.
+        static inline auto compute_com(const Ambient::ConfigurationArray &q) noexcept -> std::array<float, 3>
+        {
+            {% if param_com_code_vars > 0 %}std::array<float, {{param_com_code_vars}}> v;{% endif %}
+            std::array<float, {{param_com_code_output}}> y;
+            const auto &x = q;
+
+            {{param_com_code}}
+
+            return y;
+        }
+
         // Batched task-space -> ambient-configuration resolve, for the FK/collision-checking
         // boundary; the counterpart of a future ParameterizedLocalPlanner's per-lane IK solve.
         // `x` decomposes exactly as trace_rby1_constrained_sample's State layout: base(4) +

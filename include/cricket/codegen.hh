@@ -73,16 +73,20 @@ namespace cricket
     // Input: q (nq), then per end-effector [rTe (7), wTr (7), lb (6), ub (6)] with transforms
     // as wxyz quaternion + xyz translation. Output: d(err)/dq (6 n_eef x nq, row-major), then
     // the raw error (6 n_eef); bounds are hinged at runtime, not on the tape.
-    auto trace_tsr_error(const RobotInfo &info, const std::string &language) -> Traced;
+    // If `compute_jac` is false, only the raw error is emitted (no Jacobian rows).
+    auto trace_tsr_error(const RobotInfo &info, const std::string &language, bool compute_jac = true)
+        -> Traced;
 
     // Relative-pose (bimanual) TSR error between two end-effectors.
     // Input: q (nq), then the reference relative transform lTr (7), lb (6), ub (6).
-    // Output: d(err)/dq (6 x nq, row-major), then the raw error (6).
+    // Output: d(err)/dq (6 x nq, row-major), then the raw error (6). If `compute_jac` is
+    // false, only the raw error is emitted (no Jacobian rows).
     auto trace_tsr_bimanual_error(
         const RobotInfo &info,
         const std::string &language,
         std::size_t eef1 = 0,
-        std::size_t eef2 = 1) -> Traced;
+        std::size_t eef2 = 1,
+        bool compute_jac = true) -> Traced;
 
     // Projection step from a TSR error and Jacobian; `relative` selects the 6-row bimanual
     // error instead of the 6 n_eef-row per-end-effector error.
@@ -104,11 +108,13 @@ namespace cricket
     // Center-of-mass position and Jacobian, optionally expressed relative to the mean
     // position of a set of reference (body) frames, e.g. the feet of a standing humanoid so
     // that a support polygon can be stated in the stance frame.
-    // Input: q (nq). Output: d(com)/dq (3 x nq, row-major), then com (3).
+    // Input: q (nq). Output: d(com)/dq (3 x nq, row-major), then com (3). If `compute_jac`
+    // is false, only com (3) is emitted (no Jacobian rows).
     auto trace_com_jacobian(
         const RobotInfo &info,
         const std::vector<std::string> &reference_frames,
-        const std::string &language) -> Traced;
+        const std::string &language,
+        bool compute_jac = true) -> Traced;
 
     // Loop-closure distance constraint: the distance between two (body) frames must equal a
     // fixed length, e.g. a rigid rod cut from a closed kinematic chain.
@@ -119,18 +125,22 @@ namespace cricket
         double length;
     };
 
-    // Input: q (nq). Output: d(err)/dq (n_loops x nq, row-major), then err (n_loops).
+    // Input: q (nq). Output: d(err)/dq (n_loops x nq, row-major), then err (n_loops). If
+    // `compute_jac` is false, only err (n_loops) is emitted (no Jacobian rows).
     auto trace_closed_loop_error(
         const RobotInfo &info,
         const std::vector<ClosedLoop> &loops,
-        const std::string &language) -> Traced;
+        const std::string &language,
+        bool compute_jac = true) -> Traced;
 
     // Lead-screw coupling of the first end-effector: axial advance along the reference
     // frame's z-axis locked to rotation about it. h(q) is the conserved quantity of the
     // coupling and dh/dq its Pfaffian row (the velocity form is dh/dq qdot = 0).
     // Input: q (nq), then rTe (7), wTr (7), pitch (1) with transforms as wxyz quaternion +
-    // xyz translation. Output: d(h)/dq (1 x nq, row-major), then h (1).
-    auto trace_lead_screw_error(const RobotInfo &info, const std::string &language) -> Traced;
+    // xyz translation. Output: d(h)/dq (1 x nq, row-major), then h (1). If `compute_jac`
+    // is false, only h (1) is emitted (no Jacobian row).
+    auto trace_lead_screw_error(
+        const RobotInfo &info, const std::string &language, bool compute_jac = true) -> Traced;
 
     // Twist Jacobians of the first end-effector's offset frame, for constant-coefficient
     // Pfaffian velocity constraints c_ref^T twist_ref + c_loc^T twist_loc = 0 whose rows

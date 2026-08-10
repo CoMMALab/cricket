@@ -89,9 +89,26 @@ namespace cricket
                 handler.getTemporaryVariableCount(),
                 jac_e_q.size()};
         }
+
+        // Emit code computing just [err] for an error function, skipping the Jacobian.
+        auto emit_error(ADFun<CGD> &error_func, std::size_t num_inp, const std::string &language)
+            -> Traced
+        {
+            CodeHandler<double> handler;
+            CppAD::vector<CGD> ind_vars(num_inp);
+            handler.makeVariables(ind_vars);
+
+            CppAD::vector<CGD> error_vec = error_func.Forward(0, ind_vars);
+
+            return Traced{
+                generate_code(handler, error_vec, language),
+                handler.getTemporaryVariableCount(),
+                error_vec.size()};
+        }
     }  // namespace
 
-    auto trace_tsr_error(const RobotInfo &info, const std::string &language) -> Traced
+    auto trace_tsr_error(const RobotInfo &info, const std::string &language, bool compute_jac)
+        -> Traced
     {
         const auto nq = static_cast<std::size_t>(info.model.nq);
         const auto n_eef = info.end_effector_indexes.size();
@@ -139,14 +156,16 @@ namespace cricket
         }
 
         ADFun<CGD> error_func(ad_inp, data);
-        return emit_error_and_jacobian(error_func, num_inp, nq, n_out, language);
+        return compute_jac ? emit_error_and_jacobian(error_func, num_inp, nq, n_out, language)
+                            : emit_error(error_func, num_inp, language);
     }
 
     auto trace_tsr_bimanual_error(
         const RobotInfo &info,
         const std::string &language,
         std::size_t eef1,
-        std::size_t eef2) -> Traced
+        std::size_t eef2,
+        bool compute_jac) -> Traced
     {
         const auto nq = static_cast<std::size_t>(info.model.nq);
 
@@ -189,7 +208,8 @@ namespace cricket
         ADVectorXs data = se3_displacement(errT);
 
         ADFun<CGD> error_func(ad_inp, data);
-        return emit_error_and_jacobian(error_func, num_inp, nq, task_dim, language);
+        return compute_jac ? emit_error_and_jacobian(error_func, num_inp, nq, task_dim, language)
+                            : emit_error(error_func, num_inp, language);
     }
 
     auto trace_solve_tsr(
@@ -282,7 +302,8 @@ namespace cricket
     auto trace_com_jacobian(
         const RobotInfo &info,
         const std::vector<std::string> &reference_frames,
-        const std::string &language) -> Traced
+        const std::string &language,
+        bool compute_jac) -> Traced
     {
         const auto nq = static_cast<std::size_t>(info.model.nq);
 
@@ -337,13 +358,15 @@ namespace cricket
         }
 
         ADFun<CGD> com_func(ad_inp, data);
-        return emit_error_and_jacobian(com_func, nq, nq, 3, language);
+        return compute_jac ? emit_error_and_jacobian(com_func, nq, nq, 3, language)
+                            : emit_error(com_func, nq, language);
     }
 
     auto trace_closed_loop_error(
         const RobotInfo &info,
         const std::vector<ClosedLoop> &loops,
-        const std::string &language) -> Traced
+        const std::string &language,
+        bool compute_jac) -> Traced
     {
         if (loops.empty())
         {
@@ -397,10 +420,12 @@ namespace cricket
         }
 
         ADFun<CGD> error_func(ad_inp, data);
-        return emit_error_and_jacobian(error_func, nq, nq, loops.size(), language);
+        return compute_jac ? emit_error_and_jacobian(error_func, nq, nq, loops.size(), language)
+                            : emit_error(error_func, nq, language);
     }
 
-    auto trace_lead_screw_error(const RobotInfo &info, const std::string &language) -> Traced
+    auto trace_lead_screw_error(const RobotInfo &info, const std::string &language, bool compute_jac)
+        -> Traced
     {
         const auto nq = static_cast<std::size_t>(info.model.nq);
 
@@ -446,7 +471,8 @@ namespace cricket
         data[0] = displacement[2] - advance_per_radian * displacement[5];
 
         ADFun<CGD> error_func(ad_inp, data);
-        return emit_error_and_jacobian(error_func, num_inp, nq, 1, language);
+        return compute_jac ? emit_error_and_jacobian(error_func, num_inp, nq, 1, language)
+                            : emit_error(error_func, num_inp, language);
     }
 
     auto trace_twist_jacobians(const RobotInfo &info, const std::string &language) -> Traced

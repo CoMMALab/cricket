@@ -492,6 +492,15 @@ namespace cricket
         data["param_mid_pose_fk_code_vars"] = param_mid_pose_fk.temp_variables;
         data["param_mid_pose_fk_code_output"] = param_mid_pose_fk.outputs;
 
+        // CoM position in the frame of robot base: reuses
+        // trace_com_jacobian's error computation with compute_jac=false since
+        // ParameterizedSpace::compute_com is a scalar, once-per-problem utility like
+        // compute_mid_pose, not a per-lane hot-loop constraint.
+        auto param_com = trace_com_jacobian(robot, {"base"}, language, false);
+        data["param_com_code"] = param_com.code;
+        data["param_com_code_vars"] = param_com.temp_variables;
+        data["param_com_code_output"] = param_com.outputs;
+
         auto param_sample = trace_rby1_constrained_sample(robot.model, language, bounds);
         data["param_sample_code"] = param_sample.code;
         data["param_sample_code_vars"] = param_sample.temp_variables;
