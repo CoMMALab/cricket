@@ -939,6 +939,17 @@ namespace cricket
                 }
             }
 
+            // print link name and the sphere indices for debugging
+            if (not link_info.empty())
+            {
+                fmt::print("Link {} has spheres: ", model.frames[i].name);
+                for (const auto &s : sphere_indices)
+                {
+                    fmt::print("{} ", s);
+                }
+                fmt::print("\n");
+            }
+
             per_link_spheres.emplace_back(sphere_indices);
 
             if (not link_info.empty())

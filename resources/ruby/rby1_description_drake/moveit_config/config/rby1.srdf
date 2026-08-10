@@ -24,6 +24,8 @@
     <disable_collisions link1="base" link2="lidar_mid360" reason="Adjacent"/>
     <disable_collisions link1="base" link2="link_torso_0" reason="Default"/>
     <disable_collisions link1="base" link2="link_torso_1" reason="Default"/>
+    <disable_collisions link1="base" link2="link_torso_2" reason="Default"/>
+    <disable_collisions link1="base" link2="link_torso_3" reason="Default"/>
     <disable_collisions link1="base" link2="link_torso_base" reason="Adjacent"/>
     <disable_collisions link1="base" link2="wheel_l" reason="Adjacent"/>
     <disable_collisions link1="base" link2="wheel_r" reason="Adjacent"/>
@@ -46,12 +48,19 @@
     <disable_collisions link1="left_ee_finger_2" link2="link_left_arm_6" reason="Never"/>
     <disable_collisions link1="left_ee_finger_2" link2="link_left_arm_camera" reason="Never"/>
     <disable_collisions link1="lidar_mid360" link2="link_torso_0" reason="Never"/>
+    <disable_collisions link1="lidar_mid360" link2="link_torso_1" reason="Never"/>
+    <disable_collisions link1="lidar_mid360" link2="link_torso_2" reason="Never"/>
+    <disable_collisions link1="lidar_mid360" link2="link_torso_3" reason="Never"/>
     <disable_collisions link1="lidar_mid360" link2="link_torso_4" reason="Never"/>
     <disable_collisions link1="lidar_mid360" link2="link_torso_base" reason="Never"/>
     <disable_collisions link1="lidar_mid360" link2="wheel_l" reason="Never"/>
     <disable_collisions link1="lidar_mid360" link2="wheel_r" reason="Never"/>
     <disable_collisions link1="link_head_0" link2="link_left_arm_0" reason="Default"/>
+    <disable_collisions link1="link_head_0" link2="link_left_arm_1" reason="Default"/>
+    <disable_collisions link1="link_head_0" link2="link_left_arm_2" reason="Default"/>
     <disable_collisions link1="link_head_0" link2="link_right_arm_0" reason="Default"/>
+    <disable_collisions link1="link_head_0" link2="link_right_arm_1" reason="Default"/>
+    <disable_collisions link1="link_head_0" link2="link_right_arm_2" reason="Default"/>
     <disable_collisions link1="link_head_0" link2="link_torso_0" reason="Never"/>
     <disable_collisions link1="link_head_0" link2="link_torso_1" reason="Never"/>
     <disable_collisions link1="link_head_0" link2="link_torso_2" reason="Never"/>
@@ -139,6 +148,7 @@
     <disable_collisions link1="link_torso_1" link2="wheel_l" reason="Never"/>
     <disable_collisions link1="link_torso_1" link2="wheel_r" reason="Never"/>
     <disable_collisions link1="link_torso_2" link2="link_torso_4" reason="Adjacent"/>
+    <disable_collisions link1="link_torso_2" link2="link_torso_5" reason="Adjacent"/>
     <disable_collisions link1="link_torso_2" link2="wheel_l" reason="Never"/>
     <disable_collisions link1="link_torso_2" link2="wheel_r" reason="Never"/>
     <disable_collisions link1="link_torso_4" link2="link_torso_5" reason="Adjacent"/>

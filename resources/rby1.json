@@ -2,7 +2,7 @@
     "name": "RBY1",
     "urdf": "ruby/rby1_description_drake/xacro/rby1_with_holonomic_base_spherized.urdf",
     "srdf": "ruby/rby1_description_drake/moveit_config/config/rby1.srdf",
-    "end_effector": "ee_right",
+    "end_effector": ["ee_left", "ee_right"],
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
