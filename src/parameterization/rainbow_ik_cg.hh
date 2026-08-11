@@ -783,6 +783,213 @@ inline auto RainbowMidPoseFkCG(const RobotInfo &info, const std::string &languag
     return Traced{function_code.str(), handler.getTemporaryVariableCount(), 24};
 }
 
+// Left/right end-effector WORLD poses derived from a T_mid pose plus the fixed
+// t_mid_left/t_mid_right offsets: T_l = T_mid * t_mid_left, T_r = T_mid * t_mid_right -- the
+// same composition RainbowConstrainedBimanualIkCG does internally (see that function's
+// header comment) before converting to link_torso_5-relative frame for arm IK, but broken
+// out standalone here since eefs_in_collision (fk_template.hh) only needs the hands' world
+// poses, not the arm IK that follows. Branch-free (pure SE3 composition), so -- like
+// RainbowMidPoseFkCG -- a single "c++"-generated trace is valid whether fk_template.hh
+// instantiates it scalar or rake-batched (FloatVector<rake,1>); operator overloading on that
+// type makes the generated arithmetic work unchanged either way, no "c++_block" variant
+// needed. Output is translation + rotation matrix (vamp::to_isometry's 12-float layout)
+// rather than a quaternion, both because that's what to_isometry wants and to avoid ever
+// needing to convert a rotation matrix back to a quaternion in taped code (unsafe to trace,
+// same reasoning as the header comment above RainbowConstrainedBimanualIkCG) -- this is also
+// why RainbowEefLocalSpheresFkCG below takes its per-eef pose as matrix, not quaternion: it
+// consumes this function's output directly.
+//
+// Tape input layout (21): [0:7) T_mid pose (x, y, z, qx, qy, qz, qw), [7:14) t_mid_left
+// (fixed, aliases the `t_mid_left` thread_local member -- not actually driven by a caller,
+// see RainbowConstrainedBimanualIkCG's header comment for this convention), [14:21)
+// t_mid_right (fixed, aliases `t_mid_right`).
+//
+// Output layout (24): [0:12) left hand world pose (translation xyz + rotation matrix,
+// column-major), [12:24) right hand world pose, same shape as RainbowMidPoseFkCG's output.
+inline auto RainbowEefWorldPosesFromMidCG(const std::string &language) -> Traced
+{
+    std::cout << "Generating T_mid -> hand world pose code for eefs_in_collision..." << std::endl;
+
+    const std::size_t num_inp = 7 + 7 + 7;
+    ADVectorXs ad_inp(num_inp);
+    for (auto i = 0U; i < num_inp; ++i)
+    {
+        ad_inp[i] = ADCG(0.0001);
+    }
+    Independent(ad_inp);
+
+    Eigen::Quaternion<ADCG> t_mid_quat(ad_inp[6], ad_inp[3], ad_inp[4], ad_inp[5]);
+    pinocchio::SE3Tpl<ADCG> t_mid_world(t_mid_quat, Eigen::Matrix<ADCG, 3, 1>(ad_inp[0], ad_inp[1], ad_inp[2]));
+
+    Eigen::Quaternion<ADCG> t_mid_left_quat(ad_inp[13], ad_inp[10], ad_inp[11], ad_inp[12]);
+    pinocchio::SE3Tpl<ADCG> t_mid_left_offset(
+        t_mid_left_quat, Eigen::Matrix<ADCG, 3, 1>(ad_inp[7], ad_inp[8], ad_inp[9]));
+
+    Eigen::Quaternion<ADCG> t_mid_right_quat(ad_inp[20], ad_inp[17], ad_inp[18], ad_inp[19]);
+    pinocchio::SE3Tpl<ADCG> t_mid_right_offset(
+        t_mid_right_quat, Eigen::Matrix<ADCG, 3, 1>(ad_inp[14], ad_inp[15], ad_inp[16]));
+
+    pinocchio::SE3Tpl<ADCG> left_world = t_mid_world * t_mid_left_offset;
+    pinocchio::SE3Tpl<ADCG> right_world = t_mid_world * t_mid_right_offset;
+
+    ADVectorXs data(24);
+
+    // Duplicate of RainbowMidPoseFkCG's write_frame, operating on an SE3Tpl instead of a
+    // pinocchio frame placement.
+    auto write_pose = [&](const pinocchio::SE3Tpl<ADCG> &pose, std::size_t offset) {
+        data[offset + 0] = pose.translation()[0];
+        data[offset + 1] = pose.translation()[1];
+        data[offset + 2] = pose.translation()[2];
+
+        const auto &R = pose.rotation();
+        data[offset + 3] = R(0, 0);
+        data[offset + 4] = R(1, 0);
+        data[offset + 5] = R(2, 0);
+        data[offset + 6] = R(0, 1);
+        data[offset + 7] = R(1, 1);
+        data[offset + 8] = R(2, 1);
+        data[offset + 9] = R(0, 2);
+        data[offset + 10] = R(1, 2);
+        data[offset + 11] = R(2, 2);
+    };
+
+    write_pose(left_world, 0);
+    write_pose(right_world, 12);
+
+    ADFun<CGD> eef_world_poses_func(ad_inp, data);
+
+    CodeHandler<double> handler;
+    CppAD::vector<CGD> ind_vars(num_inp);
+    handler.makeVariables(ind_vars);
+
+    CppAD::vector<CGD> result = eef_world_poses_func.Forward(0, ind_vars);
+
+    return Traced{generate_code(handler, result, language), handler.getTemporaryVariableCount(), result.size()};
+}
+
+// Per-end-effector collision spheres rigidly attached to each of
+// `info.end_effector_names` (e.g. gripper/finger geometry, as opposed to an
+// externally attached object), expressed as a function of a *candidate
+// world-frame pose for that end effector* (translation + rotation matrix,
+// vamp::to_isometry's 12-float layout) instead of the ambient joint
+// configuration -- since these spheres are rigid with their end-effector
+// frame, their world position is just `R * local + t`, with no
+// forwardKinematics needed. Pose is taken as a rotation *matrix* rather
+// than a quaternion so this consumes RainbowEefWorldPosesFromMidCG's own
+// matrix-form output directly, with no matrix->quaternion round trip
+// through taped code -- see that function's header comment for why that
+// round trip is unsafe to tape. Also branch-free, like RainbowMidPoseFkCG,
+// so the same "c++"-generated trace is valid whether fk_template.hh
+// instantiates it scalar or rake-batched (FloatVector<rake,1>): operator
+// overloading on that type makes the generated arithmetic work unchanged
+// either way. Generic over the number of end effectors (not hardcoded to
+// the bimanual ee_left/ee_right pair), so it works unchanged if a robot
+// config declares 1, 2, or more. Lets ParameterizedSpace::eefs_in_collision
+// (fk_template.hh) reject a sampled T_mid pose whose hands would already
+// be in collision, without solving arm IK for the rest of the body first.
+//
+// `local_offset` per sphere is precomputed here (double precision, not
+// taped) as `frame.placement.inverse().act(sphere.relative.translation())`
+// -- i.e. the sphere's fixed offset from the URDF sphere's own parent
+// joint (`sphere.relative`), re-expressed relative to the end effector's
+// own *frame* instead, since that's the pose eef_world_poses() hands us
+// (see fk_template.hh's ParameterizedSpace::eef_world_poses), not the
+// frame's parent joint's pose. Sphere orientation is irrelevant (spheres
+// are symmetric), so only the translation is carried through.
+//
+// Tape input layout (12 * num_end_effectors): each end effector's world
+// pose (x, y, z, then rotation matrix column-major), in
+// `info.end_effector_names` order.
+//
+// Output: each end effector's spheres (x, y, z, r) each, back to back, in
+// `info.end_effector_names` order, and within an end effector, in the
+// order they appear in `info.spheres`. `EefLocalSpheres::counts` reports
+// how many spheres landed in each end effector's slice.
+inline auto RainbowEefLocalSpheresFkCG(const RobotInfo &info, const std::string &language) -> EefLocalSpheres
+{
+    std::cout << "Generating per-end-effector local-sphere FK code for eefs_in_collision..." << std::endl;
+
+    const auto num_end_effectors = info.end_effector_indexes.size();
+
+    // Per end effector: local sphere offsets + radii relative to the end effector's own
+    // frame -- fixed, precomputed in double precision.
+    std::vector<std::vector<std::pair<Eigen::Vector3d, float>>> per_eef_spheres(num_end_effectors);
+    for (auto k = 0U; k < num_end_effectors; ++k)
+    {
+        const auto &frame = info.model.frames[info.end_effector_indexes[k]];
+
+        for (const auto &sphere : info.spheres)
+        {
+            if (sphere.parent_joint != frame.parentJoint)
+            {
+                continue;
+            }
+
+            Eigen::Vector3d local_offset = frame.placement.inverse().act(sphere.relative.translation());
+            per_eef_spheres[k].emplace_back(local_offset, sphere.radius);
+        }
+    }
+
+    ADVectorXs ad_pose(12 * num_end_effectors);
+    for (auto i = 0U; i < ad_pose.size(); ++i)
+    {
+        ad_pose[i] = ADCG(0.0);
+    }
+    Independent(ad_pose);
+
+    std::size_t total_spheres = 0;
+    for (const auto &spheres : per_eef_spheres)
+    {
+        total_spheres += spheres.size();
+    }
+    ADVectorXs data(total_spheres * 4);
+
+    std::size_t data_offset = 0;
+    for (auto k = 0U; k < num_end_effectors; ++k)
+    {
+        const auto pose_offset = 12 * k;
+        Eigen::Matrix<ADCG, 3, 1> translation{
+            ad_pose[pose_offset + 0], ad_pose[pose_offset + 1], ad_pose[pose_offset + 2]};
+
+        // Column-major, matching vamp::to_isometry / trace_frame's layout.
+        Eigen::Matrix<ADCG, 3, 3> rotation;
+        rotation.col(0) << ad_pose[pose_offset + 3], ad_pose[pose_offset + 4], ad_pose[pose_offset + 5];
+        rotation.col(1) << ad_pose[pose_offset + 6], ad_pose[pose_offset + 7], ad_pose[pose_offset + 8];
+        rotation.col(2) << ad_pose[pose_offset + 9], ad_pose[pose_offset + 10], ad_pose[pose_offset + 11];
+
+        for (const auto &[local_offset, radius] : per_eef_spheres[k])
+        {
+            Eigen::Matrix<ADCG, 3, 1> local{ADCG(local_offset[0]), ADCG(local_offset[1]), ADCG(local_offset[2])};
+            Eigen::Matrix<ADCG, 3, 1> world = rotation * local + translation;
+
+            data[data_offset + 0] = world[0];
+            data[data_offset + 1] = world[1];
+            data[data_offset + 2] = world[2];
+            data[data_offset + 3] = ADCG(radius);
+            data_offset += 4;
+        }
+    }
+
+    ADFun<CGD> eef_local_spheres_func(ad_pose, data);
+
+    CodeHandler<double> handler;
+    CppAD::vector<CGD> ind_vars(static_cast<std::size_t>(ad_pose.size()));
+    handler.makeVariables(ind_vars);
+
+    CppAD::vector<CGD> result = eef_local_spheres_func.Forward(0, ind_vars);
+
+    std::vector<std::size_t> counts;
+    counts.reserve(num_end_effectors);
+    for (const auto &spheres : per_eef_spheres)
+    {
+        counts.push_back(spheres.size());
+    }
+
+    return EefLocalSpheres{
+        Traced{generate_code(handler, result, language), handler.getTemporaryVariableCount(), result.size()},
+        counts};
+}
+
 // Whole-body-relative parameterized IK for the constrained_bimanual_ik
 // mode: the counterpart of RainbowIkCG above, except the two hands'
 // goal poses aren't tape inputs directly -- they're derived from a

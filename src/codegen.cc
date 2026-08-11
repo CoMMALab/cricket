@@ -492,6 +492,29 @@ namespace cricket
         data["param_mid_pose_fk_code_vars"] = param_mid_pose_fk.temp_variables;
         data["param_mid_pose_fk_code_output"] = param_mid_pose_fk.outputs;
 
+        // T_mid -> left/right hand WORLD poses (translation + rotation matrix), the
+        // standalone piece of RainbowConstrainedBimanualIkCG that eefs_in_collision needs --
+        // see RainbowEefWorldPosesFromMidCG in rainbow_ik_cg.hh.
+        auto param_eef_world_poses = trace_rby1_eef_world_poses_from_mid(language);
+        data["param_eef_world_poses_code"] = param_eef_world_poses.code;
+        data["param_eef_world_poses_code_vars"] = param_eef_world_poses.temp_variables;
+        data["param_eef_world_poses_code_output"] = param_eef_world_poses.outputs;
+
+        // Per-end-effector local spheres (gripper/finger geometry) for eefs_in_collision's
+        // no-attachment case -- see RainbowEefLocalSpheresFkCG in rainbow_ik_cg.hh. Generic
+        // over robot.end_effector_names, but eefs_in_collision itself is currently only
+        // emitted for the bimanual (num_end_effectors == 2) case, where end_effector_names is
+        // [ee_left, ee_right] -- counts[0]/[1] are that pair's sphere counts, in that order.
+        auto param_eef_spheres = trace_rby1_eef_local_spheres(robot, language);
+        data["param_eef_spheres_code"] = param_eef_spheres.traced.code;
+        data["param_eef_spheres_code_vars"] = param_eef_spheres.traced.temp_variables;
+        data["param_eef_spheres_code_output"] = param_eef_spheres.traced.outputs;
+        if (param_eef_spheres.counts.size() >= 2)
+        {
+            data["n_left_eef_spheres"] = param_eef_spheres.counts[0];
+            data["n_right_eef_spheres"] = param_eef_spheres.counts[1];
+        }
+
         // CoM position in the frame of robot base: reuses
         // trace_com_jacobian's error computation with compute_jac=false since
         // ParameterizedSpace::compute_com is a scalar, once-per-problem utility like

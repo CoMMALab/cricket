@@ -191,6 +191,28 @@ namespace cricket
     // ParameterizedSpace::compute_mid_pose in fk_template.hh).
     auto trace_rby1_mid_pose_fk(const RobotInfo &info, const std::string &language) -> Traced;
 
+    // Left/right end-effector WORLD poses (translation + rotation matrix, 12 floats each)
+    // derived from a T_mid pose plus the fixed t_mid_left/t_mid_right offsets -- the
+    // standalone "just the hands' world poses" half of RainbowConstrainedBimanualIkCG, broken
+    // out for ParameterizedSpace::eefs_in_collision (fk_template.hh) which doesn't need the
+    // arm IK that follows (see RainbowEefWorldPosesFromMidCG in rainbow_ik_cg.hh).
+    auto trace_rby1_eef_world_poses_from_mid(const std::string &language) -> Traced;
+
+    // Per-end-effector collision spheres rigidly attached to each of `info.end_effector_names`
+    // (in that order), expressed as a function of a candidate world-frame pose for that end
+    // effector (translation + rotation matrix, vamp::to_isometry's 12-float layout) rather
+    // than the ambient joint configuration -- a rotate + translate per sphere, no
+    // forwardKinematics needed (see RainbowEefLocalSpheresFkCG in rainbow_ik_cg.hh and
+    // ParameterizedSpace::eefs_in_collision in fk_template.hh). `counts[k]` reports how many
+    // spheres end effector k contributed to the trace, since the flat output size alone
+    // doesn't disambiguate the per-eef split.
+    struct EefLocalSpheres
+    {
+        Traced traced;
+        std::vector<std::size_t> counts;
+    };
+    auto trace_rby1_eef_local_spheres(const RobotInfo &info, const std::string &language) -> EefLocalSpheres;
+
     // Derives the RBY1 constrained-bimanual parameterized-IK kernels when the recipe has
     // "use_parameterized": true, setting the has_parameterized_space template gate either
     // way. Shared by the offline generator (fkcc_gen) and the JIT path

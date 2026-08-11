@@ -824,62 +824,96 @@ struct {{name}}
             return y;
         }
 
-        // Left/right end-effector WORLD poses derived directly from a T_mid pose (x, y, z, qx,
-        // qy, qz, qw) plus the fixed t_mid_left/t_mid_right offsets above: T_l = T_mid *
-        // t_mid_left, T_r = T_mid * t_mid_right. Pure SE3 composition -- no FK, no arm IK, same
-        // algebra as param_ik_code's mid-pose handling (see RainbowConstrainedBimanualIkCG in
-        // rainbow_ik_cg.hh) but exposed standalone for callers that only need the hands' world
-        // poses, e.g. eefs_in_collision below.
-        static inline auto eef_world_poses(const std::array<float, 7> &t_mid_pose) noexcept
-            -> std::pair<Eigen::Isometry3f, Eigen::Isometry3f>
+        // Left/right end-effector WORLD poses (translation + rotation matrix, 24 floats total
+        // -- vamp::to_isometry's 12-float layout, twice) derived from a StateBlock's T_mid
+        // slice plus the fixed t_mid_left/t_mid_right offsets above: T_l = T_mid * t_mid_left,
+        // T_r = T_mid * t_mid_right. Pure SE3 composition -- no FK, no arm IK, same algebra as
+        // param_ik_code's mid-pose handling (see RainbowConstrainedBimanualIkCG in
+        // rainbow_ik_cg.hh) but broken out standalone for callers that only need the hands'
+        // world poses, e.g. eefs_in_collision below. Generated (RainbowEefWorldPosesFromMidCG),
+        // branch-free, so this same code is valid for any `rake`: the generated arithmetic
+        // only uses operators FloatVector<rake, 1> overloads, scalar (rake == 1) included.
+        template <std::size_t rake>
+        static inline auto eef_world_poses(const StateBlock<rake> &x_in) noexcept -> std::array<FloatVector<rake, 1>, 24>
         {
-            auto to_iso = [](const std::array<float, 7> &p) {
-                Eigen::Isometry3f t = Eigen::Isometry3f::Identity();
-                t.translation() = Eigen::Vector3f(p[0], p[1], p[2]);
-                t.linear() = Eigen::Quaternionf(p[6], p[3], p[4], p[5]).toRotationMatrix();
-                return t;
-            };
+            using V = FloatVector<rake, 1>;
 
-            Eigen::Isometry3f t_mid_world = to_iso(t_mid_pose);
-            Eigen::Isometry3f t_mid_left_offset = to_iso(t_mid_left);
-            Eigen::Isometry3f t_mid_right_offset = to_iso(t_mid_right);
+            std::array<V, 21> x{
+                x_in[12], x_in[13], x_in[14], x_in[15], x_in[16], x_in[17], x_in[18],
+                V(t_mid_left[0]), V(t_mid_left[1]), V(t_mid_left[2]),
+                V(t_mid_left[3]), V(t_mid_left[4]), V(t_mid_left[5]), V(t_mid_left[6]),
+                V(t_mid_right[0]), V(t_mid_right[1]), V(t_mid_right[2]),
+                V(t_mid_right[3]), V(t_mid_right[4]), V(t_mid_right[5]), V(t_mid_right[6])};
 
-            return {t_mid_world * t_mid_left_offset, t_mid_world * t_mid_right_offset};
+            {% if param_eef_world_poses_code_vars > 0 %}std::array<V, {{param_eef_world_poses_code_vars}}> v;{% endif %}
+            std::array<V, {{param_eef_world_poses_code_output}}> y;
+
+            {{param_eef_world_poses_code}}
+
+            return y;
         }
 
         {% if num_end_effectors == 2 %}
-        // Fast partial collision pre-filter for a sampled parameterized State: computes the
-        // left/right hands' world poses via eef_world_poses() above (no arm IK) and checks
-        // their attachments against the environment and against each other. Does NOT check
-        // attachments against the robot's own body (torso/arms/base) -- that requires a
-        // resolved ambient `q` (see resolve_block + Ambient::fkcc_attach below), which this
-        // deliberately skips to stay IK-free. Intended to prune obviously-bad samples before
-        // paying for resolve_block(); a `false` return here is not a full validity guarantee.
+        // Fast partial collision pre-filter, batched over `rake` sampled parameterized
+        // states: computes the left/right hands' world poses via eef_world_poses<rake>()
+        // above (no arm IK) and checks:
+        //   1. each hand's OWN rigidly-attached spheres (gripper/finger geometry baked into
+        //      the URDF, see RainbowEefLocalSpheresFkCG in rainbow_ik_cg.hh) against the
+        //      environment -- this runs unconditionally, so a hand still gets checked even
+        //      when the caller hasn't attached anything to it;
+        //   2. IF the environment has attachments (e.g. a held object) registered for these
+        //      end effectors, those too, against the environment and against each other
+        //      (attachment_environment_collision / attachment_attachment_collision are
+        //      no-ops when `environment.attachments` is empty, so this is safe either way).
+        // Does NOT check either of the above against the robot's own body (torso/arms/base)
+        // -- that requires a resolved ambient `q` (see resolve_block + Ambient::fkcc_attach
+        // below), which this deliberately skips to stay IK-free. Intended to prune
+        // obviously-bad samples before paying for resolve_block(); a `false` return here is
+        // not a full validity guarantee.
         // Assumes end effector 0 is the left hand and 1 is the right hand (this robot's
         // configured order -- see GenOptions::end_effectors), matching t_mid_left/t_mid_right.
-        static inline auto eefs_in_collision(
-            const vamp::collision::Environment<float> &environment,
-            const State &x_in) noexcept -> bool
+        template <std::size_t rake>
+        static inline auto eefs_collision_free(
+            const vamp::collision::Environment<FloatVector<rake>> &environment,
+            const StateBlock<rake> &x_in) noexcept -> bool
         {
-            const auto x = x_in.to_array();
-            std::array<float, 7> t_mid_pose{x[12], x[13], x[14], x[15], x[16], x[17], x[18]};
+            using V = FloatVector<rake, 1>;
 
-            auto [left_world, right_world] = eef_world_poses(t_mid_pose);
+            auto world_poses = eef_world_poses<rake>(x_in);
 
-            set_attachment_pose(environment, 0, left_world);
-            set_attachment_pose(environment, 1, right_world);
+            //
+            // 1. each hand's own geometry vs. environment (no attachment needed)
+            //
+            {% if param_eef_spheres_code_vars > 0 %}std::array<V, {{param_eef_spheres_code_vars}}> v;{% endif %}
+            std::array<V, {{param_eef_spheres_code_output}}> y;
+            const auto &x = world_poses;
+
+            {{param_eef_spheres_code}}
+
+            {% for i in range(n_left_eef_spheres + n_right_eef_spheres) %}
+            if (sphere_environment_in_collision(environment, y[{{i}} * 4 + 0], y[{{i}} * 4 + 1], y[{{i}} * 4 + 2], y[{{i}} * 4 + 3]))
+            {
+                return false;
+            }
+            {% endfor %}
+
+            //
+            // 2. attachments (if any) vs. environment / vs. each other
+            //
+            set_attachment_pose(environment, 0, to_isometry(&world_poses[0]));
+            set_attachment_pose(environment, 1, to_isometry(&world_poses[12]));
 
             if (attachment_environment_collision(environment))
             {
-                return true;
+                return false;
             }
 
             if (attachment_attachment_collision(environment))
             {
-                return true;
+                return false;
             }
 
-            return false;
+            return true;
         }
         {% endif %}
 
