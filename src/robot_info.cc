@@ -741,11 +741,28 @@ namespace cricket
         json["links_with_geometry"] = links_with_geometry;
         json["bounding_sphere_index"] = bounding_sphere_index;
         nlohmann::json end_effector_collisions = nlohmann::json::array();
+        nlohmann::json end_effector_collision_owners = nlohmann::json::array();
         for (const auto &frame_index : end_effector_indexes)
         {
-            end_effector_collisions.push_back(get_frames_colliding_end_effector(frame_index));
+            const auto colliding_frames = get_frames_colliding_end_effector(frame_index);
+            end_effector_collisions.push_back(colliding_frames);
+
+            nlohmann::json owners = nlohmann::json::array();
+            for (const auto &link_index : colliding_frames)
+            {
+                const auto owner = owning_end_effector(link_index);
+                owners.push_back(owner.has_value() ? *owner : end_effector_indexes.size());
+            }
+            end_effector_collision_owners.push_back(owners);
         }
         json["end_effector_collisions"] = end_effector_collisions;
+        // Parallel to end_effector_collisions: for each (k, i), the index of the end-effector
+        // that owns link end_effector_collisions[k][i]'s frame (its own gripper/finger
+        // geometry), or num_end_effectors if the link isn't owned by any end-effector. Lets
+        // fkcc_attach's attachment_sphere_collision skip a robot link that is itself another
+        // end-effector's own geometry when that attachment excludes that end-effector (e.g. a
+        // second hand jointly grasping the same held object).
+        json["end_effector_collision_owners"] = end_effector_collision_owners;
         json["euclidean"] = is_euclidean(model);
         json["joint_topology"] = generate_joint_topology(model);
         json["nn_segments"] = generate_nn_segments(model);
@@ -863,9 +880,9 @@ namespace cricket
         return dof_to_joint_name;
     }
 
-    auto RobotInfo::get_frames_colliding_end_effector(std::size_t frame_index) -> std::vector<std::size_t>
+    auto RobotInfo::get_own_frames(std::size_t end_effector_frame_index) -> std::vector<std::size_t>
     {
-        std::size_t end_effector_joint = model.frames[frame_index].parentJoint;
+        std::size_t end_effector_joint = model.frames[end_effector_frame_index].parentJoint;
 
         std::vector<std::size_t> frames;
         for (auto i = 0U; i < model.frames.size(); ++i)
@@ -878,6 +895,27 @@ namespace cricket
                 }
             }
         }
+
+        return frames;
+    }
+
+    auto RobotInfo::owning_end_effector(std::size_t frame_index) -> std::optional<std::size_t>
+    {
+        for (auto k = 0U; k < end_effector_indexes.size(); ++k)
+        {
+            const auto frames = get_own_frames(end_effector_indexes[k]);
+            if (std::find(frames.begin(), frames.end(), frame_index) != frames.end())
+            {
+                return k;
+            }
+        }
+
+        return std::nullopt;
+    }
+
+    auto RobotInfo::get_frames_colliding_end_effector(std::size_t frame_index) -> std::vector<std::size_t>
+    {
+        const auto frames = get_own_frames(frame_index);
 
         std::set<std::size_t> end_effector_allowed_collisions;
         for (const auto &[first, second] : allowed_link_pairs)

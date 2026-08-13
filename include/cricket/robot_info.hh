@@ -134,7 +134,9 @@ namespace cricket
         auto reduce_model(const JointSelection &selection) -> void;
 
         auto dof_to_joint_names() -> std::vector<std::string>;
+        auto get_own_frames(std::size_t end_effector_frame_index) -> std::vector<std::size_t>;
         auto get_frames_colliding_end_effector(std::size_t frame_index) -> std::vector<std::size_t>;
+        auto owning_end_effector(std::size_t frame_index) -> std::optional<std::size_t>;
         auto extract_spheres() -> void;
         auto collision_pair_to_frame_pair(const pinocchio::CollisionPair &cp)
             -> std::pair<std::size_t, std::size_t>;

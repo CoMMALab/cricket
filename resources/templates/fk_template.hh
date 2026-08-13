@@ -7,6 +7,8 @@
 {% if has_flask %}#include <vamp/planning/flask.hh>{% endif %}
 
 #include <Eigen/Geometry>
+
+#include <optional>
 {% if has_flask %}
 #include <algorithm>
 #include <cmath>
@@ -334,17 +336,20 @@ struct {{name}}
 
         {% for k in range(num_end_effectors) %}
         {% set eef_collisions = at(end_effector_collisions, k) %}
+        {% set eef_collision_owners = at(end_effector_collision_owners, k) %}
         {% for i in range(length(eef_collisions)) %}
         {% set link_index = at(eef_collisions, i) %}
         {% set link_bs = at(bounding_sphere_index, link_index) %}
         {% set link_spheres = at(per_link_spheres, link_index) %}
+        {% set owner_eef = at(eef_collision_owners, i) %}
 
         // {{ at(end_effectors, k) }} attachments vs. {{ at(link_names, link_index )}}
         if (attachment_sphere_collision<decltype(x[0])>(environment, {{k}},
                                                         y[{{(n_spheres + link_bs) * 4 + 0}}],
                                                         y[{{(n_spheres + link_bs) * 4 + 1}}],
                                                         y[{{(n_spheres + link_bs) * 4 + 2}}],
-                                                        y[{{(n_spheres + link_bs) * 4 + 3}}])) [[unlikely]]
+                                                        y[{{(n_spheres + link_bs) * 4 + 3}}],
+                                                        {% if owner_eef == num_end_effectors %}std::nullopt{% else %}{{owner_eef}}{% endif %})) [[unlikely]]
         {
             {% for j in range(length(link_spheres)) %}
             {% set sphere_index = at(link_spheres, j) %}
@@ -352,7 +357,8 @@ struct {{name}}
                                                             y[{{sphere_index * 4 + 0}}],
                                                             y[{{sphere_index * 4 + 1}}],
                                                             y[{{sphere_index * 4 + 2}}],
-                                                            y[{{sphere_index * 4 + 3}}])) [[unlikely]]
+                                                            y[{{sphere_index * 4 + 3}}],
+                                                            {% if owner_eef == num_end_effectors %}std::nullopt{% else %}{{owner_eef}}{% endif %})) [[unlikely]]
             {
                 return false;
             }
