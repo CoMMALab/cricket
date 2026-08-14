@@ -515,10 +515,6 @@ namespace cricket
             data["n_right_eef_spheres"] = param_eef_spheres.counts[1];
         }
 
-        // CoM position in the frame of robot base: reuses
-        // trace_com_jacobian's error computation with compute_jac=false since
-        // ParameterizedSpace::compute_com is a scalar, once-per-problem utility like
-        // compute_mid_pose, not a per-lane hot-loop constraint.
         auto param_com = trace_com_jacobian(robot, {"base"}, language, false);
         data["param_com_code"] = param_com.code;
         data["param_com_code_vars"] = param_com.temp_variables;

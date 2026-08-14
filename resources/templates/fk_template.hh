@@ -868,13 +868,13 @@ struct {{name}}
                 ql.x(), ql.y(), ql.z(), ql.w()};
         }
 
-        // World-frame center-of-mass position for a reference whole-body configuration `q`.
-        // Scalar (non-rake) utility, same call pattern as compute_mid_pose above; traced with
-        // compute_jac=false so no Jacobian rows are computed or emitted.
-        static inline auto compute_com(const Ambient::ConfigurationArray &q) noexcept -> std::array<float, 3>
+        template <std::size_t rake>
+        static inline auto compute_com(const Ambient::ConfigurationBlock<rake> &q) noexcept
+            -> std::array<FloatVector<rake, 1>, 3>
         {
-            {% if param_com_code_vars > 0 %}std::array<float, {{param_com_code_vars}}> v;{% endif %}
-            std::array<float, {{param_com_code_output}}> y;
+            using V = FloatVector<rake, 1>;
+            {% if param_com_code_vars > 0 %}std::array<V, {{param_com_code_vars}}> v;{% endif %}
+            std::array<V, {{param_com_code_output}}> y;
             const auto &x = q;
 
             {{param_com_code}}
@@ -882,15 +882,7 @@ struct {{name}}
             return y;
         }
 
-        // Left/right end-effector WORLD poses (translation + rotation matrix, 24 floats total
-        // -- vamp::to_isometry's 12-float layout, twice) derived from a StateBlock's T_mid
-        // slice plus the fixed t_mid_left/t_mid_right offsets above: T_l = T_mid * t_mid_left,
-        // T_r = T_mid * t_mid_right. Pure SE3 composition -- no FK, no arm IK, same algebra as
-        // param_ik_code's mid-pose handling (see RainbowConstrainedBimanualIkCG in
-        // rainbow_ik_cg.hh) but broken out standalone for callers that only need the hands'
-        // world poses, e.g. eefs_in_collision below. Generated (RainbowEefWorldPosesFromMidCG),
-        // branch-free, so this same code is valid for any `rake`: the generated arithmetic
-        // only uses operators FloatVector<rake, 1> overloads, scalar (rake == 1) included.
+
         template <std::size_t rake>
         static inline auto eef_world_poses(const StateBlock<rake> &x_in) noexcept -> std::array<FloatVector<rake, 1>, 24>
         {
