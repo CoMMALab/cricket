@@ -707,13 +707,65 @@ struct {{name}}
 
         // GCP (branch) selectors for each rainbow arm's redundant self-motion manifold:
         // (elbow_sel, shoulder_sel, wrist_sel) -- see RainbowLeftArmParameterization /
-        // RainbowRightArmParameterization in rainbow_arm_parameterization.hh. Fixed for the
-        // whole planning problem (not part of State), so param_ik_code reads these class
-        // members directly by name (`left_gcp[i]` / `right_gcp[i]`) instead of taking them as
-        // part of resolve_block's input. Overwrite directly, e.g. from a binding as
-        // `robot.parameterized.left_gcp = [...]`.
-        inline static thread_local std::array<float, 3> left_gcp = {0.0f, 1.0f, 1.0f};
-        inline static thread_local std::array<float, 3> right_gcp = {0.0f, 1.0f, 1.0f};
+        // RainbowRightArmParameterization in rainbow_arm_parameterization.hh. Not part of
+        // State, so param_ik_code reads these class members directly by name (`left_gcp[i]` /
+        // `right_gcp[i]`) instead of taking them as part of resolve_block's input. Stored as a
+        // FloatVector (one lane per rake slot) rather than a single scalar triple, so a lane
+        // can hold its own branch -- the "same task-space state, many GCP candidates" sweep
+        // (set_gcp_lanes below, paired with resolve_block_mask) -- as well as the "many
+        // states, one shared branch" mode (set_gcp below) every other resolve_block caller
+        // uses. param_ik_code's generated `V(left_gcp[0])`-style wrapping is just a copy in
+        // this case (its operand is already a FloatVector), not a scalar broadcast. Fixed at
+        // vamp::FloatVectorWidth: resolve_block/resolve_block_mask are, in practice, only ever
+        // instantiated at rake == vamp::FloatVectorWidth (every caller in the codebase derives
+        // its `rake` from that constant), so there is no need to carry a separate width per
+        // instantiation. Don't overwrite directly; go through set_gcp/set_gcp_lanes so every
+        // lane stays consistent.
+        inline static thread_local std::array<FloatVector<vamp::FloatVectorWidth, 1>, 3> left_gcp = {
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(0.0f),
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f),
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f)};
+        inline static thread_local std::array<FloatVector<vamp::FloatVectorWidth, 1>, 3> right_gcp = {
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(0.0f),
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f),
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f)};
+
+        // Set the same GCP branch for every lane: the "many task-space states, one shared
+        // branch" mode ParameterizedLocalPlanner/resolve_and_check use while extending the
+        // tree, where the whole planning problem is meant to stay on a single branch. `left`/
+        // `right` are each (elbow_sel, shoulder_sel, wrist_sel).
+        static inline void set_gcp(const std::array<float, 3> &left, const std::array<float, 3> &right) noexcept
+        {
+            for (std::size_t k = 0; k < 3; ++k)
+            {
+                left_gcp[k] = FloatVector<vamp::FloatVectorWidth, 1>::fill(left[k]);
+                right_gcp[k] = FloatVector<vamp::FloatVectorWidth, 1>::fill(right[k]);
+            }
+        }
+
+        // Set a distinct GCP branch per lane: the "one (broadcast) task-space state, many GCP
+        // candidates" sweep mode -- pair with resolve_block_mask below to test up to
+        // vamp::FloatVectorWidth branch candidates for the same state in a single call, e.g.
+        // to pick a branch for the start state before locking it in with set_gcp and running
+        // RRTC.
+        static inline void set_gcp_lanes(
+            const std::array<std::array<float, 3>, vamp::FloatVectorWidth> &left,
+            const std::array<std::array<float, 3>, vamp::FloatVectorWidth> &right) noexcept
+        {
+            for (std::size_t k = 0; k < 3; ++k)
+            {
+                std::array<float, vamp::FloatVectorWidth> lc{};
+                std::array<float, vamp::FloatVectorWidth> rc{};
+                for (std::size_t lane = 0; lane < vamp::FloatVectorWidth; ++lane)
+                {
+                    lc[lane] = left[lane][k];
+                    rc[lane] = right[lane][k];
+                }
+
+                left_gcp[k] = FloatVector<vamp::FloatVectorWidth, 1>(lc);
+                right_gcp[k] = FloatVector<vamp::FloatVectorWidth, 1>(rc);
+            }
+        }
 
         // Fixed per-planning-problem SE3 offsets from the mid-frame T_mid to each hand (x, y,
         // z, qx, qy, qz, qw): T_l = T_mid * t_mid_left, T_r = T_mid * t_mid_right. Not part of
@@ -968,6 +1020,46 @@ struct {{name}}
             {% endfor %}
 
             return {true, q};
+        }
+
+        // Per-lane variant of resolve_block: instead of collapsing validity across the whole
+        // block into a single bool (resolve_block's "every lane must resolve" contract, the
+        // one edge interpolation wants), returns a per-lane validity mask -- for the "one
+        // (broadcast) task-space state, many GCP candidates" sweep (see set_gcp_lanes above):
+        // each lane can carry a different left_gcp/right_gcp, and callers need to know *which*
+        // lanes resolved, not just whether every one of them did. Same validity conditions as
+        // resolve_block (zero reach_violation, ambient q within joint limits), just
+        // accumulated into a mask instead of short-circuiting. Requires rake ==
+        // vamp::FloatVectorWidth, same reason as resolve_block.
+        template <std::size_t rake>
+        static inline auto resolve_block_mask(const StateBlock<rake> &x) noexcept
+            -> std::pair<FloatVector<rake, 1>, Ambient::ConfigurationBlock<rake>>
+        {
+            using V = FloatVector<rake, 1>;
+
+            std::array<V, 4> base{x[0], x[1], x[2], x[3]};
+            std::array<V, 6> torso{x[4], x[5], x[6], x[7], x[8], x[9]};
+            const auto psi_left = x[10];
+            const auto psi_right = x[11];
+            std::array<V, 7> t_mid_pose{x[12], x[13], x[14], x[15], x[16], x[17], x[18]};
+
+            FloatVector<rake, {{param_ik_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> q;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_left;
+            FloatVector<rake, 1> reach_violation_left;
+            FloatVector<rake, 1> loss_left;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_right;
+            FloatVector<rake, 1> reach_violation_right;
+            FloatVector<rake, 1> loss_right;
+
+            {{param_ik_code}}
+
+            V valid = (reach_violation_left[0] <= V(0.0f)) & (reach_violation_right[0] <= V(0.0f));
+            {% for i in range(n_q) %}
+            valid = valid & (q[{{i}}] >= V(Ambient::lower_bound[{{i}}])) & (q[{{i}}] <= V(Ambient::upper_bound[{{i}}]));
+            {% endfor %}
+
+            return {valid, q};
         }
     };
     {% endif %}
