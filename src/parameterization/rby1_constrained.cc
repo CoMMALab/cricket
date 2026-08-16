@@ -33,10 +33,4 @@ namespace cricket
         return RainbowEefWorldPosesFromMidCG(language);
     }
 
-    // Same "thin forward to force emission" reasoning as trace_rby1_mid_pose_fk above --
-    // RainbowEefLocalSpheresFkCG is `inline`-defined in rainbow_ik_cg.hh.
-    auto trace_rby1_eef_local_spheres(const RobotInfo &info, const std::string &language) -> EefLocalSpheres
-    {
-        return RainbowEefLocalSpheresFkCG(info, language);
-    }
 }  // namespace cricket

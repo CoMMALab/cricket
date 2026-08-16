@@ -202,21 +202,41 @@ namespace cricket
     // (in that order), expressed as a function of a candidate world-frame pose for that end
     // effector (translation + rotation matrix, vamp::to_isometry's 12-float layout) rather
     // than the ambient joint configuration -- a rotate + translate per sphere, no
-    // forwardKinematics needed (see RainbowEefLocalSpheresFkCG in rainbow_ik_cg.hh and
-    // ParameterizedSpace::eefs_in_collision in fk_template.hh). `counts[k]` reports how many
-    // spheres end effector k contributed to the trace, since the flat output size alone
-    // doesn't disambiguate the per-eef split.
+    // forwardKinematics needed (see trace_eef_local_spheres's definition in codegen.cc, next to
+    // trace_sphere_cc_fk, and ParameterizedSpace::eefs_in_collision / eefs_collision_free in
+    // fk_template.hh). `counts[k]` reports how many spheres end effector k contributed to the
+    // trace, since the flat output size alone doesn't disambiguate the per-eef split. Generic
+    // over the number of end effectors, not tied to any one robot or parameterization -- both
+    // derive_rby1_parameterized_traces (num_end_effectors == 2) and
+    // derive_iiwa_se3_parameterized_traces (num_end_effectors == 1) in codegen.cc call it.
     struct EefLocalSpheres
     {
         Traced traced;
         std::vector<std::size_t> counts;
     };
-    auto trace_rby1_eef_local_spheres(const RobotInfo &info, const std::string &language) -> EefLocalSpheres;
+    auto trace_eef_local_spheres(const RobotInfo &info, const std::string &language) -> EefLocalSpheres;
 
-    // Derives the RBY1 constrained-bimanual parameterized-IK kernels when the recipe has
-    // "use_parameterized": true, setting the has_parameterized_space template gate either
-    // way. Shared by the offline generator (fkcc_gen) and the JIT path
-    // (generate_robot_source) so both accept the same key.
+    // Single-arm SE3+psi task-space parameterized IK (see
+    // src/parameterization/iiwa_parameterization_gen.hh's IiwaSE3ParameterizationCG for the
+    // analytic IK math, and src/parameterization/se3_tracer.hh for the generic pose+psi
+    // sample/distance/interpolate kernels reused verbatim here -- unlike RBY1's mid-pose
+    // parameterization above, a single arm's task space *is* exactly se3_tracer.hh's
+    // 8-dim (pose(7) + psi(1)) Space, so no robot-specific sample/distance/interpolate
+    // tracing is needed). Selected by "param_kind": "iiwa_se3" (see derive_parameterized_traces).
+    auto trace_iiwa_se3_ik(const RobotInfo &info, const std::string &language) -> Traced;
+    auto trace_iiwa_se3_sample(
+        const pinocchio::Model &model,
+        const std::string &language,
+        const std::optional<Bounds> &bounds) -> Traced;
+    auto trace_iiwa_se3_distance(const std::string &language) -> Traced;
+    auto trace_iiwa_se3_interpolate(const std::string &language) -> Traced;
+    auto trace_iiwa_se3_interpolate_block(const std::string &language) -> Traced;
+
+    // Derives the parameterized-IK kernels when the recipe has "use_parameterized": true,
+    // setting the has_parameterized_space template gate either way. "param_kind" ("rby1_bimanual",
+    // the default, or "iiwa_se3") selects which robot-specific tracing path runs and which
+    // ParameterizedSpace branch fk_template.hh renders. Shared by the offline generator
+    // (fkcc_gen) and the JIT path (generate_robot_source) so both accept the same keys.
     auto derive_parameterized_traces(
         const RobotInfo &robot,
         nlohmann::json &data,

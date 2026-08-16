@@ -1,0 +1,848 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="iiwa" xmlns:drake="http://drake.mit.edu" path="assets/iiwa_marker/iiwa_marker.urdf">
+	<material name="Black">
+		<color rgba="0.0 0.0 0.0 1.0"></color>
+	</material>
+	<material name="Blue">
+		<color rgba="0.0 0.0 0.8 1.0"></color>
+	</material>
+	<material name="Green">
+		<color rgba="0.0 0.8 0.0 1.0"></color>
+	</material>
+	<material name="Grey">
+		<color rgba="0.4 0.4 0.4 1.0"></color>
+	</material>
+	<material name="Silver">
+		<color rgba="0.6 0.6 0.6 1.0"></color>
+	</material>
+	<material name="Orange">
+		<color rgba="1.0 0.423529411765 0.0392156862745 1.0"></color>
+	</material>
+	<material name="Brown">
+		<color rgba="0.870588235294 0.811764705882 0.764705882353 1.0"></color>
+	</material>
+	<material name="Red">
+		<color rgba="0.8 0.0 0.0 1.0"></color>
+	</material>
+	<material name="White">
+		<color rgba="1.0 1.0 1.0 1.0"></color>
+	</material>
+	<material name="iiwa_white">
+		<color rgba="1.0 1.0 1.0 1.0"></color>
+	</material>
+	<material name="marker_black">
+		<color rgba="0.0 0.0 0.0 1.0"></color>
+	</material>
+	<link name="base"></link>
+	<link name="iiwa_link_0">
+		<inertial>
+			<origin rpy="0 0 0" xyz="-0.1 0 0.07"></origin>
+			<mass value="5"></mass>
+			<inertia ixx="0.05" ixy="0" ixz="0" iyy="0.06" iyz="0" izz="0.03"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/link_0.obj"></mesh>
+			</geometry>
+			<material name="Grey"></material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.1034880056977272"></sphere>
+			</geometry>
+			<origin xyz="-0.0731288492679596 -0.056393545120954514 0.07968705147504807" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.10369265079498291"></sphere>
+			</geometry>
+			<origin xyz="-0.07320856302976608 0.052591610699892044 0.07975734025239944" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.10320371389389038"></sphere>
+			</geometry>
+			<origin xyz="0.048621803522109985 -0.05496708303689957 0.07696793228387833" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.10627460479736328"></sphere>
+			</geometry>
+			<origin xyz="0.04667096212506294 0.05521801859140396 0.0623198077082634" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa_link_1">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0 -0.03 0.12"></origin>
+			<mass value="5.76"></mass>
+			<inertia ixx="0.033" ixy="0" ixz="0" iyy="0.0333" iyz="0" izz="0.0123"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/link_1.obj"></mesh>
+			</geometry>
+			<material name="Grey"></material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.09822917729616165"></sphere>
+			</geometry>
+			<origin xyz="-0.005104419309645891 -0.046653326600790024 0.05171266570687294" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.07707267999649048"></sphere>
+			</geometry>
+			<origin xyz="-0.035237718373537064 0.023517845198512077 0.04842590168118477" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.07754990458488464"></sphere>
+			</geometry>
+			<origin xyz="0.02972353994846344 0.03128310292959213 0.049072377383708954" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09182965755462646"></sphere>
+			</geometry>
+			<origin xyz="-0.029324078932404518 -0.05163634195923805 0.2009325623512268" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09159313142299652"></sphere>
+			</geometry>
+			<origin xyz="0.027369854971766472 -0.052626680582761765 0.20069476962089539" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa_link_2">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0.0003 0.059 0.042"></origin>
+			<mass value="6.35"></mass>
+			<inertia ixx="0.0305" ixy="0" ixz="0" iyy="0.0304" iyz="0" izz="0.011"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/link_2.obj"></mesh>
+			</geometry>
+			<material name="Grey"></material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.08988676220178604"></sphere>
+			</geometry>
+			<origin xyz="-0.028428848832845688 -0.009966200217604637 0.05866687372326851" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08969686180353165"></sphere>
+			</geometry>
+			<origin xyz="0.03034178912639618 -0.008916699327528477 0.05766383185982704" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08787116408348083"></sphere>
+			</geometry>
+			<origin xyz="0.003301085438579321 0.10487979650497437 0.03684169054031372" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.07711803913116455"></sphere>
+			</geometry>
+			<origin xyz="-0.021013133227825165 0.17808935046195984 0.010369780473411083" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.07557239383459091"></sphere>
+			</geometry>
+			<origin xyz="0.023475883528590202 0.17827339470386505 0.010937889106571674" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa_link_3">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0 0.03 0.13"></origin>
+			<mass value="3.5"></mass>
+			<inertia ixx="0.025" ixy="0" ixz="0" iyy="0.0238" iyz="0" izz="0.0076"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/link_3.obj"></mesh>
+			</geometry>
+			<material name="Grey"></material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.0774102583527565"></sphere>
+			</geometry>
+			<origin xyz="0.0014288618694990873 0.041789304465055466 0.17431291937828064" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06575722992420197"></sphere>
+			</geometry>
+			<origin xyz="-0.027375567704439163 0.05177522823214531 0.23731039464473724" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06582160294055939"></sphere>
+			</geometry>
+			<origin xyz="0.026872828602790833 0.05255642160773277 0.23771214485168457" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.0774102583527565"></sphere>
+			</geometry>
+			<origin xyz="0.0003301507094874978 0.017914870753884315 0.07848664373159409" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06575722992420197"></sphere>
+			</geometry>
+			<origin xyz="-0.02988087572157383 -0.002663848688825965 0.01880493573844433" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06582160294055939"></sphere>
+			</geometry>
+			<origin xyz="0.024341218173503876 -0.0024542007595300674 0.016912639141082764" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa_link_4">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0 0.067 0.034"></origin>
+			<mass value="3.5"></mass>
+			<inertia ixx="0.017" ixy="0" ixz="0" iyy="0.0164" iyz="0" izz="0.006"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/link_4.obj"></mesh>
+			</geometry>
+			<material name="Grey"></material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.07999243587255478"></sphere>
+			</geometry>
+			<origin xyz="-0.02226356603205204 0.002757223090156913 0.05134107172489166" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.0815340131521225"></sphere>
+			</geometry>
+			<origin xyz="0.025256475433707237 0.005324997939169407 0.05100240930914879" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.0663609728217125"></sphere>
+			</geometry>
+			<origin xyz="-0.02638712339103222 0.1379103809595108 -0.023534078150987625" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06794817000627518"></sphere>
+			</geometry>
+			<origin xyz="0.023944666609168053 0.1376625895500183 -0.02343491092324257" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08451325446367264"></sphere>
+			</geometry>
+			<origin xyz="-0.006854837294667959 0.13523587584495544 0.045993659645318985" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa_link_5">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0.0001 0.021 0.076"></origin>
+			<mass value="3.5"></mass>
+			<inertia ixx="0.01" ixy="0" ixz="0" iyy="0.0087" iyz="0" izz="0.00449"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/link_5.obj"></mesh>
+			</geometry>
+			<material name="Grey"></material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.0599922351539135"></sphere>
+			</geometry>
+			<origin xyz="-0.022475266829133034 -0.022717980667948723 0.04106258973479271" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.056998081505298615"></sphere>
+			</geometry>
+			<origin xyz="0.029752692207694054 -0.02456074394285679 0.04173344373703003" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06430806964635849"></sphere>
+			</geometry>
+			<origin xyz="-0.025220561772584915 0.045295968651771545 0.04257286712527275" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06112276762723923"></sphere>
+			</geometry>
+			<origin xyz="0.024981115013360977 0.04173489660024643 0.0406162291765213" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06686635315418243"></sphere>
+			</geometry>
+			<origin xyz="-0.0027190835680812597 0.05226864293217659 0.13385291397571564" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.04509371891617775"></sphere>
+			</geometry>
+			<origin xyz="-0.015603851526975632 0.07827384024858475 0.22014601528644562" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.04663007706403732"></sphere>
+			</geometry>
+			<origin xyz="0.01699756272137165 0.07511170208454132 0.22703370451927185" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa_link_6">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0 0.0006 0.0004"></origin>
+			<mass value="1.8"></mass>
+			<inertia ixx="0.0049" ixy="0" ixz="0" iyy="0.0047" iyz="0" izz="0.0036"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/link_6.obj"></mesh>
+			</geometry>
+			<material name="Grey"></material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.07177253067493439"></sphere>
+			</geometry>
+			<origin xyz="-0.005625528749078512 -0.022071460261940956 -0.02306920289993286" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06905970722436905"></sphere>
+			</geometry>
+			<origin xyz="-0.0034803426824510098 -0.02701585926115513 0.022621558979153633" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.07205318659543991"></sphere>
+			</geometry>
+			<origin xyz="0.004113718867301941 0.028869960457086563 -0.026526307687163353" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.07132092118263245"></sphere>
+			</geometry>
+			<origin xyz="-0.003996532876044512 0.03058057278394699 0.019238166511058807" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa_link_7">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0 0 0.02"></origin>
+			<mass value="1.2"></mass>
+			<inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"></inertia>
+		</inertial>
+		<visual>
+			<origin rpy="0 0 0" xyz="0 0 0"></origin>
+			<geometry>
+				<mesh filename="meshes/link_7.obj"></mesh>
+			</geometry>
+			<material name="Grey"></material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.034012071788311005"></sphere>
+			</geometry>
+			<origin xyz="-0.0219445638358593 -0.012948552146553993 0.0142492251470685" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.02980879507958889"></sphere>
+			</geometry>
+			<origin xyz="-0.02918316423892975 0.021645937114953995 0.019453709945082664" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.03250670060515404"></sphere>
+			</geometry>
+			<origin xyz="-0.009223874658346176 0.024797899648547173 0.018317529931664467" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.034012071788311005"></sphere>
+			</geometry>
+			<origin xyz="0.011605102568864822 -0.022408384829759598 0.0144685423001647" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.02980879507958889"></sphere>
+			</geometry>
+			<origin xyz="0.035785261541604996 0.0033271140418946743 0.019878413528203964" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.03250670060515404"></sphere>
+			</geometry>
+			<origin xyz="0.02042766474187374 0.01643720269203186 0.018511364236474037" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa_link_ee_kuka"></link>
+	<link name="iiwa_link_ee"></link>
+	<link name="marker_attach"></link>
+	<link name="iiwa_marker_holder">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0 0 0.02"></origin>
+			<mass value="0.2"></mass>
+			<inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"></inertia>
+		</inertial>
+		<visual>
+			<geometry>
+				<mesh filename="marker/meshes/visual/marker_holder.obj"></mesh>
+			</geometry>
+			<material name="iiwa_white"></material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.015679605305194855"></sphere>
+			</geometry>
+			<origin xyz="0.011082340963184834 0.01039075292646885 0.008082617074251175" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.018929868936538696"></sphere>
+			</geometry>
+			<origin xyz="0.011509477160871029 0.01641910709440708 0.022303268313407898" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.02176062949001789"></sphere>
+			</geometry>
+			<origin xyz="0.009161445312201977 0.04993782564997673 0.015296455472707748" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.019374480471014977"></sphere>
+			</geometry>
+			<origin xyz="0.011185608804225922 0.031003685668110847 0.035811930894851685" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.01659444347023964"></sphere>
+			</geometry>
+			<origin xyz="0.010528342798352242 0.033495448529720306 0.05970653146505356" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa_marker">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0 0 0.05"></origin>
+			<mass value="0.05"></mass>
+			<inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0002" iyz="0" izz="0.0002"></inertia>
+		</inertial>
+		<visual>
+			<geometry>
+				<mesh filename="marker/meshes/visual/marker.obj"></mesh>
+			</geometry>
+			<material name="marker_black"></material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.007505904417484999"></sphere>
+			</geometry>
+			<origin xyz="0.08385065943002701 0.01059214398264885 0.0035164488945156336" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.007227350492030382"></sphere>
+			</geometry>
+			<origin xyz="0.0824940949678421 0.023172574117779732 0.0029582076240330935" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.005398083943873644"></sphere>
+			</geometry>
+			<origin xyz="0.08750306069850922 0.023101771250367165 0.00040850788354873657" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.005364664364606142"></sphere>
+			</geometry>
+			<origin xyz="0.08734244108200073 0.02348095178604126 0.006819616537541151" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.006131402216851711"></sphere>
+			</geometry>
+			<origin xyz="0.08089742064476013 0.03256341069936752 0.0006559317698702216" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.006172752473503351"></sphere>
+			</geometry>
+			<origin xyz="0.081110380589962 0.033352382481098175 0.0070263720117509365" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.00788757111877203"></sphere>
+			</geometry>
+			<origin xyz="0.08643417805433273 0.03251338377594948 0.003073689993470907" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.0084794070571661"></sphere>
+			</geometry>
+			<origin xyz="0.08196423202753067 0.044333942234516144 0.0039790114387869835" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.007988926023244858"></sphere>
+			</geometry>
+			<origin xyz="0.08654946088790894 0.044060301035642624 0.004042355343699455" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.008581318892538548"></sphere>
+			</geometry>
+			<origin xyz="0.08431132882833481 0.05613788962364197 0.0008274667779915035" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.008439170196652412"></sphere>
+			</geometry>
+			<origin xyz="0.08462421596050262 0.05701827630400658 0.0060188667848706245" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.008576828986406326"></sphere>
+			</geometry>
+			<origin xyz="0.08130963891744614 0.07020968943834305 0.003909851890057325" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.00884326919913292"></sphere>
+			</geometry>
+			<origin xyz="0.08698321133852005 0.07034214586019516 0.0039785695262253284" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.008726107887923717"></sphere>
+			</geometry>
+			<origin xyz="0.08461779356002808 0.08231993764638901 0.0005612363456748426" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.00885953102260828"></sphere>
+			</geometry>
+			<origin xyz="0.08366802334785461 0.08320090919733047 0.006161316763609648" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.008016557432711124"></sphere>
+			</geometry>
+			<origin xyz="0.08362296223640442 0.09530837833881378 0.0012477702694013715" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.008389079011976719"></sphere>
+			</geometry>
+			<origin xyz="0.08477785438299179 0.09443643689155579 0.006371956318616867" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa_tip">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0 0 0.02"></origin>
+			<mass value="0.01"></mass>
+			<inertia ixx="0.00005" ixy="0" ixz="0" iyy="0.00005" iyz="0" izz="0.00005"></inertia>
+		</inertial>
+		<visual>
+			<geometry>
+				<mesh filename="marker/meshes/visual/tip.obj"></mesh>
+			</geometry>
+			<material name="marker_black"></material>
+		</visual>
+		<collision>
+			<geometry>
+				<sphere radius="0.0010209220927208662"></sphere>
+			</geometry>
+			<origin xyz="-0.00031128223054111004 -8.049191092140973e-05 -0.0002994244860019535" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.0010348758660256863"></sphere>
+			</geometry>
+			<origin xyz="0.0003037557762581855 -8.431334572378546e-05 -0.00028533427393995225" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.0010131720919162035"></sphere>
+			</geometry>
+			<origin xyz="-7.066755642881617e-05 -0.00030267139663919806 0.0003278950462117791" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.001033954438753426"></sphere>
+			</geometry>
+			<origin xyz="8.332403376698494e-05 0.00031034983112476766 0.0003289642627350986" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="world"></link>
+	<joint name="iiwa_base_joint" type="fixed">
+		<origin rpy="0 0 0" xyz="0 0 0"></origin>
+		<parent link="base"></parent>
+		<child link="iiwa_link_0"></child>
+	</joint>
+	<joint name="iiwa_joint_1" type="revolute">
+		<parent link="iiwa_link_0"></parent>
+		<child link="iiwa_link_1"></child>
+		<origin rpy="0 0 0" xyz="0 0 0.1575"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit drake:acceleration="8.57" effort="320" lower="-2.96705972839" upper="2.96705972839" velocity="1.4835298641951802"></limit>
+		<dynamics damping="0.5"></dynamics>
+	</joint>
+	<joint name="iiwa_joint_2" type="revolute">
+		<parent link="iiwa_link_1"></parent>
+		<child link="iiwa_link_2"></child>
+		<origin rpy="1.570796326794897   0 3.141592653589793" xyz="0 0 0.2025"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit drake:acceleration="8.57" effort="320" lower="-2.09439510239" upper="2.09439510239" velocity="1.4835298641951802"></limit>
+		<dynamics damping="0.5"></dynamics>
+	</joint>
+	<joint name="iiwa_joint_3" type="revolute">
+		<parent link="iiwa_link_2"></parent>
+		<child link="iiwa_link_3"></child>
+		<origin rpy="1.570796326794897 0 3.141592653589793" xyz="0 0.2045 0"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit drake:acceleration="8.74" effort="176" lower="-2.96705972839" upper="2.96705972839" velocity="1.7453292519943295"></limit>
+		<dynamics damping="0.5"></dynamics>
+	</joint>
+	<joint name="iiwa_joint_4" type="revolute">
+		<parent link="iiwa_link_3"></parent>
+		<child link="iiwa_link_4"></child>
+		<origin rpy="1.570796326794897 0 0" xyz="0 0 0.2155"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit drake:acceleration="11.36" effort="176" lower="-2.09439510239" upper="2.09439510239" velocity="1.3089969389957472"></limit>
+		<dynamics damping="0.5"></dynamics>
+	</joint>
+	<joint name="iiwa_joint_5" type="revolute">
+		<parent link="iiwa_link_4"></parent>
+		<child link="iiwa_link_5"></child>
+		<origin rpy="-1.570796326794897 3.141592653589793 0" xyz="0 0.1845 0"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit drake:acceleration="12.23" effort="110" lower="-2.96705972839" upper="2.96705972839" velocity="2.2689280275926285"></limit>
+		<dynamics damping="0.5"></dynamics>
+	</joint>
+	<joint name="iiwa_joint_6" type="revolute">
+		<parent link="iiwa_link_5"></parent>
+		<child link="iiwa_link_6"></child>
+		<origin rpy="1.570796326794897 0 0" xyz="0 0 0.2155"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit drake:acceleration="15.72" effort="40" lower="-2.09439510239" upper="2.09439510239" velocity="2.356194490192345"></limit>
+		<dynamics damping="0.5"></dynamics>
+	</joint>
+	<joint name="iiwa_joint_7" type="revolute">
+		<parent link="iiwa_link_6"></parent>
+		<child link="iiwa_link_7"></child>
+		<origin rpy="-1.570796326794897 3.141592653589793 0" xyz="0 0.081 0"></origin>
+		<axis xyz="0 0 1"></axis>
+		<limit drake:acceleration="15.72" effort="40" lower="-3.05432619099" upper="3.05432619099" velocity="2.356194490192345"></limit>
+		<dynamics damping="0.5"></dynamics>
+	</joint>
+	<joint name="iiwa_joint_ee" type="fixed">
+		<parent link="iiwa_link_7"></parent>
+		<child link="iiwa_link_ee_kuka"></child>
+		<origin rpy="3.141592653589793 3.141592653589793 3.141592653589793" xyz="0 0 0.045"></origin>
+		<axis xyz="0 0 1"></axis>
+	</joint>
+	<joint name="tool0_joint" type="fixed">
+		<parent link="iiwa_link_7"></parent>
+		<child link="iiwa_link_ee"></child>
+		<origin rpy="0 -1.570796326794897 0" xyz="0 0 0.045"></origin>
+	</joint>
+	<joint name="iiwa_marker_holder_joint" type="fixed">
+		<parent link="marker_attach"></parent>
+		<child link="iiwa_marker_holder"></child>
+		<origin rpy="0 0 0" xyz="-0.01 -0.032 0.065"></origin>
+	</joint>
+	<joint name="iiwa_marker_joint" type="fixed">
+		<parent link="iiwa_marker_holder"></parent>
+		<child link="iiwa_marker"></child>
+		<origin rpy="-1.57079632679 0 0" xyz="-0.075 0.0285 0.15"></origin>
+	</joint>
+	<joint name="iiwa_tip_joint" type="fixed">
+		<parent link="iiwa_marker"></parent>
+		<child link="iiwa_tip"></child>
+		<origin rpy="0 0 0" xyz="0.08125 0.0035 0.003625"></origin>
+	</joint>
+	<joint name="iiwa_weld" type="fixed">
+		<parent link="world"></parent>
+		<child link="base"></child>
+		<origin rpy="0 0 0" xyz="0 0 0"></origin>
+	</joint>
+	<joint name="iiwa_marker_attach_weld" type="fixed">
+		<parent link="iiwa_link_7"></parent>
+		<child link="marker_attach"></child>
+		<origin rpy="0 0 0" xyz="0 0 0.0"></origin>
+	</joint>
+	<frame link="iiwa_link_ee" name="iiwa_frame_ee" rpy="3.141592653589793 0 1.570796326794897" xyz="0.09 0 0"></frame>
+	<gazebo>
+		<plugin filename="libgazebo_ros_control.so" name="gazebo_ros_controller">
+			<robotNamespace>/iiwa</robotNamespace>
+		</plugin>
+	</gazebo>
+	<gazebo reference="iiwa_link_0">
+		<material>Gazebo/Grey</material>
+		<mu1>0.2</mu1>
+		<mu2>0.2</mu2>
+	</gazebo>
+	<gazebo reference="iiwa_link_1">
+		<material>Gazebo/Orange</material>
+		<mu1>0.2</mu1>
+		<mu2>0.2</mu2>
+	</gazebo>
+	<gazebo reference="iiwa_link_2">
+		<material>Gazebo/Orange</material>
+		<mu1>0.2</mu1>
+		<mu2>0.2</mu2>
+	</gazebo>
+	<gazebo reference="iiwa_link_3">
+		<material>Gazebo/Orange</material>
+		<mu1>0.2</mu1>
+		<mu2>0.2</mu2>
+	</gazebo>
+	<gazebo reference="iiwa_link_4">
+		<material>Gazebo/Orange</material>
+		<mu1>0.2</mu1>
+		<mu2>0.2</mu2>
+	</gazebo>
+	<gazebo reference="iiwa_link_5">
+		<material>Gazebo/Orange</material>
+		<mu1>0.2</mu1>
+		<mu2>0.2</mu2>
+	</gazebo>
+	<gazebo reference="iiwa_link_6">
+		<material>Gazebo/Orange</material>
+		<mu1>0.2</mu1>
+		<mu2>0.2</mu2>
+	</gazebo>
+	<gazebo reference="iiwa_link_7">
+		<material>Gazebo/Grey</material>
+		<mu1>0.2</mu1>
+		<mu2>0.2</mu2>
+	</gazebo>
+	<transmission name="iiwa_tran_1">
+		<robotNamespace>/iiwa</robotNamespace>
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="iiwa_joint_1">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="iiwa_motor_1">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+			<drake:gear_ratio value="160.0"></drake:gear_ratio>
+			<drake:rotor_inertia value="0.0001321"></drake:rotor_inertia>
+		</actuator>
+	</transmission>
+	<transmission name="iiwa_tran_2">
+		<robotNamespace>/iiwa</robotNamespace>
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="iiwa_joint_2">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="iiwa_motor_2">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+			<drake:gear_ratio value="160.0"></drake:gear_ratio>
+			<drake:rotor_inertia value="0.0001321"></drake:rotor_inertia>
+		</actuator>
+	</transmission>
+	<transmission name="iiwa_tran_3">
+		<robotNamespace>/iiwa</robotNamespace>
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="iiwa_joint_3">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="iiwa_motor_3">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+			<drake:gear_ratio value="160.0"></drake:gear_ratio>
+			<drake:rotor_inertia value="0.0001321"></drake:rotor_inertia>
+		</actuator>
+	</transmission>
+	<transmission name="iiwa_tran_4">
+		<robotNamespace>/iiwa</robotNamespace>
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="iiwa_joint_4">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="iiwa_motor_4">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+			<drake:gear_ratio value="160.0"></drake:gear_ratio>
+			<drake:rotor_inertia value="0.0001321"></drake:rotor_inertia>
+		</actuator>
+	</transmission>
+	<transmission name="iiwa_tran_5">
+		<robotNamespace>/iiwa</robotNamespace>
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="iiwa_joint_5">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="iiwa_motor_5">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+			<drake:gear_ratio value="100.0"></drake:gear_ratio>
+			<drake:rotor_inertia value="0.0001321"></drake:rotor_inertia>
+		</actuator>
+	</transmission>
+	<transmission name="iiwa_tran_6">
+		<robotNamespace>/iiwa</robotNamespace>
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="iiwa_joint_6">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="iiwa_motor_6">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+			<drake:gear_ratio value="160.0"></drake:gear_ratio>
+			<drake:rotor_inertia value="0.0000454"></drake:rotor_inertia>
+		</actuator>
+	</transmission>
+	<transmission name="iiwa_tran_7">
+		<robotNamespace>/iiwa</robotNamespace>
+		<type>transmission_interface/SimpleTransmission</type>
+		<joint name="iiwa_joint_7">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+		</joint>
+		<actuator name="iiwa_motor_7">
+			<hardwareInterface>PositionJointInterface</hardwareInterface>
+			<mechanicalReduction>1</mechanicalReduction>
+			<drake:gear_ratio value="160.0"></drake:gear_ratio>
+			<drake:rotor_inertia value="0.0000454"></drake:rotor_inertia>
+		</actuator>
+	</transmission>
+	<drake:collision_filter_group name="group_shoulder">
+		<drake:member link="iiwa_link_0"></drake:member>
+		<drake:member link="iiwa_link_1"></drake:member>
+		<drake:member link="iiwa_link_2"></drake:member>
+		<drake:member link="iiwa_link_3"></drake:member>
+		<drake:ignored_collision_filter_group name="group_shoulder"></drake:ignored_collision_filter_group>
+	</drake:collision_filter_group>
+	<drake:collision_filter_group name="group_wrist">
+		<drake:member link="iiwa_link_4"></drake:member>
+		<drake:member link="iiwa_link_5"></drake:member>
+		<drake:member link="iiwa_link_6"></drake:member>
+		<drake:member link="iiwa_link_7"></drake:member>
+		<drake:ignored_collision_filter_group name="group_wrist"></drake:ignored_collision_filter_group>
+	</drake:collision_filter_group>
+</robot>

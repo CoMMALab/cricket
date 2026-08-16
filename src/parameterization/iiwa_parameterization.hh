@@ -57,6 +57,20 @@ T SafeArccos(const T &val, U a, U b)
     return acos(ScalarClip<T,U>(val, a, b));
 }
 
+// Smooth (C1) exterior penalty for a SafeArccos argument falling outside
+// [-clip, clip]: zero inside the band, grows quadratically outside, with
+// zero value and zero derivative exactly at the boundary. Used to build a
+// differentiable loss for optimizing psi against the self-motion-manifold
+// constraints, in place of (or alongside) the hard reject that SafeArccos's
+// silent clipping otherwise requires.
+template <typename T, typename U>
+T HingeSqPenalty(const T &val, U clip)
+{
+    T over = CondExpGe(val - static_cast<T>(clip), static_cast<T>(0), val - static_cast<T>(clip), static_cast<T>(0));
+    T under = CondExpGe(-val - static_cast<T>(clip), static_cast<T>(0), -val - static_cast<T>(clip), static_cast<T>(0));
+    return over * over + under * under;
+}
+
 // Result of a parameterization: the joint configuration `q`, plus the 4
 // pre-clip arguments that were fed to SafeArccos (in call order: phi,
 // theta_4v, shoulder q_subordinate(1), wrist q_subordinate(5)). A value
@@ -69,6 +83,7 @@ struct IKParamResult
 {
     Eigen::VectorX<T> q;
     Eigen::Vector4<T> unclipped;
+    T loss{};
 };
 
 template <typename T, typename InputVector>

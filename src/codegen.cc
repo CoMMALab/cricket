@@ -173,6 +173,133 @@ namespace cricket
         return Traced{function_code.str(), handler.getTemporaryVariableCount(), n_out};
     }
 
+    // Per-end-effector collision spheres rigidly attached to each of `info.end_effector_names`
+    // (gripper/finger/marker geometry, as opposed to an externally attached object), expressed
+    // as a function of a *candidate world-frame pose for that end effector* (translation +
+    // rotation matrix, vamp::to_isometry's 12-float layout) instead of the ambient joint
+    // configuration -- since these spheres are rigid with their end-effector frame, their
+    // world position is just `R * local + t`, with no forwardKinematics needed. Pose is taken
+    // as a rotation *matrix* rather than a quaternion so callers that already have one (e.g.
+    // ParameterizedSpace::eef_world_poses in fk_template.hh) never need an unsafe-to-trace
+    // matrix -> quaternion round trip. Branch-free, so the same "c++"-generated trace is valid
+    // whether a caller instantiates it scalar or rake-batched (FloatVector<rake,1>): operator
+    // overloading on that type makes the generated arithmetic work unchanged either way.
+    // Generic over the number of end effectors -- not tied to any particular robot or
+    // parameterization -- so it lives here next to trace_sphere_cc_fk rather than in one of
+    // the robot-specific src/parameterization/*.cc TUs; both derive_rby1_parameterized_traces
+    // (num_end_effectors == 2) and derive_iiwa_se3_parameterized_traces (num_end_effectors ==
+    // 1) below call it.
+    //
+    // Tape input layout (12 * num_end_effectors): each end effector's world pose (x, y, z,
+    // then rotation matrix column-major), in `info.end_effector_names` order.
+    //
+    // Output: each end effector's spheres (x, y, z, r) each, back to back, in
+    // `info.end_effector_names` order, and within an end effector, in the order they appear
+    // in `info.spheres`. `EefLocalSpheres::counts` reports how many spheres landed in each end
+    // effector's slice, since the flat output size alone doesn't disambiguate the per-eef
+    // split.
+    auto trace_eef_local_spheres(const RobotInfo &info, const std::string &language) -> EefLocalSpheres
+    {
+        const auto num_end_effectors = info.end_effector_indexes.size();
+
+        // Per end effector: local sphere offsets + radii relative to the end effector's own
+        // frame -- fixed, precomputed in double precision.
+        std::vector<std::vector<std::pair<Eigen::Vector3d, float>>> per_eef_spheres(num_end_effectors);
+        for (auto k = 0U; k < num_end_effectors; ++k)
+        {
+            const auto &frame = info.model.frames[info.end_effector_indexes[k]];
+
+            for (const auto &sphere : info.spheres)
+            {
+                if (sphere.parent_joint != frame.parentJoint)
+                {
+                    continue;
+                }
+
+                Eigen::Vector3d local_offset = frame.placement.inverse().act(sphere.relative.translation());
+                per_eef_spheres[k].emplace_back(local_offset, sphere.radius);
+                // we need a way of identifying the link the added sphere belongs to to print it
+            }
+        }
+
+        ADVectorXs ad_pose(12 * num_end_effectors);
+        for (auto i = 0U; i < ad_pose.size(); ++i)
+        {
+            ad_pose[i] = ADCG(0.0);
+        }
+        Independent(ad_pose);
+
+        std::size_t total_spheres = 0;
+        for (const auto &spheres : per_eef_spheres)
+        {
+            total_spheres += spheres.size();
+        }
+        ADVectorXs data(total_spheres * 4);
+
+        std::size_t data_offset = 0;
+        for (auto k = 0U; k < num_end_effectors; ++k)
+        {
+            const auto pose_offset = 12 * k;
+            Eigen::Matrix<ADCG, 3, 1> translation{
+                ad_pose[pose_offset + 0], ad_pose[pose_offset + 1], ad_pose[pose_offset + 2]};
+
+            // Column-major, matching vamp::to_isometry / trace_frame's layout.
+            Eigen::Matrix<ADCG, 3, 3> rotation;
+            rotation.col(0) << ad_pose[pose_offset + 3], ad_pose[pose_offset + 4], ad_pose[pose_offset + 5];
+            rotation.col(1) << ad_pose[pose_offset + 6], ad_pose[pose_offset + 7], ad_pose[pose_offset + 8];
+            rotation.col(2) << ad_pose[pose_offset + 9], ad_pose[pose_offset + 10], ad_pose[pose_offset + 11];
+
+            for (const auto &[local_offset, radius] : per_eef_spheres[k])
+            {
+                Eigen::Matrix<ADCG, 3, 1> local{ADCG(local_offset[0]), ADCG(local_offset[1]), ADCG(local_offset[2])};
+                Eigen::Matrix<ADCG, 3, 1> world = rotation * local + translation;
+
+                data[data_offset + 0] = world[0];
+                data[data_offset + 1] = world[1];
+                data[data_offset + 2] = world[2];
+                data[data_offset + 3] = ADCG(radius);
+                data_offset += 4;
+            }
+        }
+
+        ADFun<CGD> eef_local_spheres_func(ad_pose, data);
+
+        CodeHandler<double> handler;
+        CppAD::vector<CGD> ind_vars(static_cast<std::size_t>(ad_pose.size()));
+        handler.makeVariables(ind_vars);
+
+        CppAD::vector<CGD> result = eef_local_spheres_func.Forward(0, ind_vars);
+
+        LangCDefaultVariableNameGenerator<double> nameGen;
+        std::ostringstream function_code;
+
+        if (language == "c++")
+        {
+            LanguageCCustom<double> langC("double");
+            handler.generateCode(function_code, langC, result, nameGen);
+        }
+        else if (language == "rust")
+        {
+            LanguageRust<double> langRust("double");
+            handler.generateCode(function_code, langRust, result, nameGen);
+        }
+        else
+        {
+            throw std::runtime_error(fmt::format("unsupported language {}", language));
+        }
+
+        std::vector<std::size_t> counts;
+        counts.reserve(num_end_effectors);
+        for (const auto &spheres : per_eef_spheres)
+        {
+            counts.push_back(spheres.size());
+        }
+
+        return EefLocalSpheres{
+            Traced{function_code.str(), handler.getTemporaryVariableCount(), result.size()},
+            counts};
+    }
+
     auto derive_constraint_traces(const RobotInfo &robot, nlohmann::json &data, const std::string &language)
         -> void
     {
@@ -461,23 +588,75 @@ namespace cricket
         data["flask_struct"] = env.render(flask_temp, data);
     }
 
-    // RBY1 constrained-bimanual parameterized IK: "use_parameterized": true traces the
-    // whole-body-relative IK, the dual-hand FK used to derive t_mid_left/t_mid_right, and
-    // the sample/distance/interpolate kernels over that parameterized space -- all consumed
-    // by fk_template.hh's ParameterizedSpace struct (see rainbow_ik_cg.hh for the math).
-    auto derive_parameterized_traces(
+    // Single-arm SE3+psi task-space parameterized IK ("param_kind": "iiwa_se3"): the
+    // analytic per-pose IK plus se3_tracer.hh's generic pose+psi sample/distance/interpolate
+    // kernels -- see trace_iiwa_se3_* in codegen.hh for why no robot-specific tracing is
+    // needed beyond the IK itself. Populates exactly the same data[] keys
+    // derive_rby1_parameterized_traces does for the shared parts of ParameterizedSpace
+    // (State/Sample/StateBuffer/StateBlock, sample/distance/interpolate(_block)); the
+    // rby1-only keys (param_mid_pose_fk_code, param_eef_world_poses_code,
+    // param_eef_spheres_code, param_com_code, n_left/right_eef_spheres) are left unset --
+    // fk_template.hh only renders the template blocks that use them under
+    // `param_kind == "rby1_bimanual"`.
+    auto derive_iiwa_se3_parameterized_traces(
         const RobotInfo &robot,
         nlohmann::json &data,
         const std::string &language,
         const std::optional<Bounds> &bounds) -> void
     {
-        const bool use_parameterized = data.value("use_parameterized", false);
-        data["has_parameterized_space"] = use_parameterized;
-        if (not use_parameterized)
+        auto param_ik = trace_iiwa_se3_ik(robot, language);
+        data["param_ik_code"] = param_ik.code;
+        data["param_ik_code_vars"] = param_ik.temp_variables;
+        data["param_ik_code_output"] = param_ik.outputs;
+
+        // IKParamResult::unclipped (iiwa_parameterization.hh) is always a Vector4.
+        data["param_ik_num_unclipped"] = 4;
+
+        auto param_eef_spheres = trace_eef_local_spheres(robot, language);
+        data["param_eef_spheres_code"] = param_eef_spheres.traced.code;
+        data["param_eef_spheres_code_vars"] = param_eef_spheres.traced.temp_variables;
+        data["param_eef_spheres_code_output"] = param_eef_spheres.traced.outputs;
+        if (not param_eef_spheres.counts.empty())
         {
-            return;
+            data["n_eef_spheres"] = param_eef_spheres.counts[0];
         }
 
+        auto param_sample = trace_iiwa_se3_sample(robot.model, language, bounds);
+        data["param_sample_code"] = param_sample.code;
+        data["param_sample_code_vars"] = param_sample.temp_variables;
+        data["param_sample_code_output"] = param_sample.outputs;
+
+        auto param_distance = trace_iiwa_se3_distance(language);
+        data["param_distance_code"] = param_distance.code;
+        data["param_distance_code_vars"] = param_distance.temp_variables;
+
+        auto param_interpolate = trace_iiwa_se3_interpolate(language);
+        data["param_interpolate_code"] = param_interpolate.code;
+        data["param_interpolate_code_vars"] = param_interpolate.temp_variables;
+
+        auto param_interpolate_block = trace_iiwa_se3_interpolate_block(language);
+        data["param_interpolate_block_code"] = param_interpolate_block.code;
+        data["param_interpolate_block_code_vars"] = param_interpolate_block.temp_variables;
+
+        // State layout (8): pose(7, [x,y,z,qx,qy,qz,qw]) + psi(1). Sample layout (7): the
+        // raw [0,1) values trace_map_to_se3 maps via map_bounded/map_so3_shoemake -- see
+        // se3_tracer.hh. Non-Euclidean: the orientation quaternion block sits at offset 3.
+        data["param_dimension"] = 8;
+        data["param_sample_dimension"] = 7;
+        data["param_euclidean"] = false;
+        data["param_so3_offsets"] = std::vector<std::size_t>{3};
+    }
+
+    // RBY1 constrained-bimanual parameterized IK: "use_parameterized": true traces the
+    // whole-body-relative IK, the dual-hand FK used to derive t_mid_left/t_mid_right, and
+    // the sample/distance/interpolate kernels over that parameterized space -- all consumed
+    // by fk_template.hh's ParameterizedSpace struct (see rainbow_ik_cg.hh for the math).
+    auto derive_rby1_parameterized_traces(
+        const RobotInfo &robot,
+        nlohmann::json &data,
+        const std::string &language,
+        const std::optional<Bounds> &bounds) -> void
+    {
         auto param_ik = trace_rby1_constrained_ik(robot, language);
         data["param_ik_code"] = param_ik.code;
         data["param_ik_code_vars"] = param_ik.temp_variables;
@@ -501,11 +680,11 @@ namespace cricket
         data["param_eef_world_poses_code_output"] = param_eef_world_poses.outputs;
 
         // Per-end-effector local spheres (gripper/finger geometry) for eefs_in_collision's
-        // no-attachment case -- see RainbowEefLocalSpheresFkCG in rainbow_ik_cg.hh. Generic
+        // no-attachment case -- see trace_eef_local_spheres above. Generic
         // over robot.end_effector_names, but eefs_in_collision itself is currently only
         // emitted for the bimanual (num_end_effectors == 2) case, where end_effector_names is
         // [ee_left, ee_right] -- counts[0]/[1] are that pair's sphere counts, in that order.
-        auto param_eef_spheres = trace_rby1_eef_local_spheres(robot, language);
+        auto param_eef_spheres = trace_eef_local_spheres(robot, language);
         data["param_eef_spheres_code"] = param_eef_spheres.traced.code;
         data["param_eef_spheres_code_vars"] = param_eef_spheres.traced.temp_variables;
         data["param_eef_spheres_code_output"] = param_eef_spheres.traced.outputs;
@@ -546,6 +725,42 @@ namespace cricket
         // genuine SO(3) quaternion block at local offset 12 + 3 == 15.
         data["param_euclidean"] = false;
         data["param_so3_offsets"] = std::vector<std::size_t>{15};
+    }
+
+    // Dispatches to the robot-specific parameterized-IK tracing above when the recipe has
+    // "use_parameterized": true, setting the has_parameterized_space template gate either
+    // way. "param_kind" ("rby1_bimanual", the default -- matching every existing recipe that
+    // predates this key -- or "iiwa_se3") also lands in `data` unchanged so fk_template.hh's
+    // ParameterizedSpace can gate its own robot-specific members on it.
+    auto derive_parameterized_traces(
+        const RobotInfo &robot,
+        nlohmann::json &data,
+        const std::string &language,
+        const std::optional<Bounds> &bounds) -> void
+    {
+        const bool use_parameterized = data.value("use_parameterized", false);
+        data["has_parameterized_space"] = use_parameterized;
+        if (not use_parameterized)
+        {
+            return;
+        }
+
+        const std::string param_kind = data.value("param_kind", std::string("rby1_bimanual"));
+        data["param_kind"] = param_kind;
+
+        if (param_kind == "iiwa_se3")
+        {
+            derive_iiwa_se3_parameterized_traces(robot, data, language, bounds);
+        }
+        else if (param_kind == "rby1_bimanual")
+        {
+            derive_rby1_parameterized_traces(robot, data, language, bounds);
+        }
+        else
+        {
+            throw std::runtime_error(
+                fmt::format("derive_parameterized_traces: unknown \"param_kind\" \"{}\"", param_kind));
+        }
     }
 
     namespace
@@ -634,6 +849,7 @@ namespace cricket
             "lead_screw",
             "twist",
             "use_parameterized",
+            "param_kind",
         };
         static const std::vector<std::string_view> bounds_keys = {"lower", "upper"};
         static const std::vector<std::string_view> flask_keys = {

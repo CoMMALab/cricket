@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="iiwa">
+
+  <!--
+    This XACRO composes a single IIWA arm with an expo marker attachment
+    (replacing the WSG gripper). Since there is only one arm, link/joint
+    names are used as-is (no prefixing needed to avoid collisions).
+  -->
+
+  <!-- Paths (use relative paths since not running inside a ROS package) -->
+  <xacro:property name="iiwa_urdf" value="iiwa7_convex_decimated_collision.urdf"/>
+  <xacro:property name="marker_urdf" value="marker/expo.urdf"/>
+
+  <xacro:include filename="${iiwa_urdf}"/>
+  <xacro:include filename="${marker_urdf}"/>
+
+  <link name="world"/>
+
+  <!-- weld the robot base to the world -->
+  <joint name="iiwa_weld" type="fixed">
+    <parent link="world"/>
+    <child link="base"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- attach the marker assembly to the end effector -->
+  <!-- carried over from the WSG mount origin; rotation was tuned for the
+       gripper and will likely need retuning for the marker -->
+  <joint name="iiwa_marker_attach_weld" type="fixed">
+    <parent link="iiwa_link_7"/>
+    <child link="marker_attach"/>
+    <origin xyz="0 0 0.0" rpy="0 0 0"/>
+  </joint>
+
+</robot>

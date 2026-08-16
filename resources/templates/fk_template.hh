@@ -705,6 +705,7 @@ struct {{name}}
         // Ambient configuration-space robot that resolve_block() maps into.
         using Ambient = {{name}};
 
+        {% if param_kind == "rby1_bimanual" %}
         // GCP (branch) selectors for each rainbow arm's redundant self-motion manifold:
         // (elbow_sel, shoulder_sel, wrist_sel) -- see RainbowLeftArmParameterization /
         // RainbowRightArmParameterization in rainbow_arm_parameterization.hh. Not part of
@@ -774,6 +775,45 @@ struct {{name}}
         // overwrite directly or via compute_mid_pose() below.
         inline static thread_local std::array<float, 7> t_mid_left = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
         inline static thread_local std::array<float, 7> t_mid_right = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+        {% else if param_kind == "iiwa_se3" %}
+        // GC2/GC4/GC6 (shoulder/elbow/wrist) self-motion-manifold branch selectors -- see
+        // IiwaSE3Parameterization in iiwa_parameterization.hh. Not part of State, so
+        // param_ik_code reads this class member directly by name (`smm[i]`) instead of taking
+        // it as part of resolve_block's input -- same mechanism as left_gcp/right_gcp in the
+        // rby1_bimanual branch above, just a single triple instead of one per arm.
+        inline static thread_local std::array<FloatVector<vamp::FloatVectorWidth, 1>, 3> smm = {
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f),
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f),
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f)};
+
+        // Set the same GC branch for every lane -- the "many task-space states, one shared
+        // branch" mode resolve_block/resolve_and_check use while extending the tree. `gc` is
+        // (elbow_sel, shoulder_sel, wrist_sel), matching set_gcp's `left`/`right` shape.
+        static inline void set_smm(const std::array<float, 3> &gc) noexcept
+        {
+            for (std::size_t k = 0; k < 3; ++k)
+            {
+                smm[k] = FloatVector<vamp::FloatVectorWidth, 1>::fill(gc[k]);
+            }
+        }
+
+        // Set a distinct GC branch per lane -- the "one (broadcast) task-space state, many GC
+        // candidates" sweep mode, matching set_gcp_lanes above.
+        static inline void set_smm_lanes(
+            const std::array<std::array<float, 3>, vamp::FloatVectorWidth> &gc) noexcept
+        {
+            for (std::size_t k = 0; k < 3; ++k)
+            {
+                std::array<float, vamp::FloatVectorWidth> c{};
+                for (std::size_t lane = 0; lane < vamp::FloatVectorWidth; ++lane)
+                {
+                    c[lane] = gc[lane][k];
+                }
+
+                smm[k] = FloatVector<vamp::FloatVectorWidth, 1>(c);
+            }
+        }
+        {% endif %}
 
         using State = FloatVector<dimension>;
         struct alignas(FloatVectorAlignment) StateArray
@@ -833,6 +873,7 @@ struct {{name}}
             {{param_interpolate_block_code}}
         }
 
+        {% if param_kind == "rby1_bimanual" %}
         // Derives t_mid_left/t_mid_right from a reference whole-body configuration `q`: FK to
         // both hands (ee_left, ee_right), take T_w_mid as the midpoint of their translations
         // with identity rotation, then t_mid_left/t_mid_right are each hand's pose relative to
@@ -881,8 +922,9 @@ struct {{name}}
 
             return y;
         }
+        {% endif %}
 
-
+        {% if param_kind == "rby1_bimanual" %}
         template <std::size_t rake>
         static inline auto eef_world_poses(const StateBlock<rake> &x_in) noexcept -> std::array<FloatVector<rake, 1>, 24>
         {
@@ -908,7 +950,7 @@ struct {{name}}
         // states: computes the left/right hands' world poses via eef_world_poses<rake>()
         // above (no arm IK) and checks:
         //   1. each hand's OWN rigidly-attached spheres (gripper/finger geometry baked into
-        //      the URDF, see RainbowEefLocalSpheresFkCG in rainbow_ik_cg.hh) against the
+        //      the URDF, see trace_eef_local_spheres in codegen.cc) against the
         //      environment -- this runs unconditionally, so a hand still gets checked even
         //      when the caller hasn't attached anything to it;
         //   2. IF the environment has attachments (e.g. a held object) registered for these
@@ -966,7 +1008,80 @@ struct {{name}}
             return true;
         }
         {% endif %}
+        {% else if param_kind == "iiwa_se3" %}
+        // World pose of the single end effector -- unlike the rby1_bimanual case above, the
+        // task-space State's own pose block (x_in[0:7)) already *is* the end effector's world
+        // pose (this is a fixed-base robot, no mobile base / t_mid offset to compose through),
+        // so this is a plain (untaped) quaternion -> rotation-matrix conversion, not a traced
+        // kernel. Output layout matches trace_eef_local_spheres's expectation (translation
+        // xyz + rotation matrix, column-major) -- see param_eef_spheres_code below.
+        template <std::size_t rake>
+        static inline auto eef_world_poses(const StateBlock<rake> &x_in) noexcept -> std::array<FloatVector<rake, 1>, 12>
+        {
+            using V = FloatVector<rake, 1>;
 
+            const V tx = x_in[0];
+            const V ty = x_in[1];
+            const V tz = x_in[2];
+            const V qx = x_in[3];
+            const V qy = x_in[4];
+            const V qz = x_in[5];
+            const V qw = x_in[6];
+
+            const V one(1.0f);
+            const V two(2.0f);
+
+            const V r00 = one - two * (qy * qy + qz * qz);
+            const V r01 = two * (qx * qy - qw * qz);
+            const V r02 = two * (qx * qz + qw * qy);
+            const V r10 = two * (qx * qy + qw * qz);
+            const V r11 = one - two * (qx * qx + qz * qz);
+            const V r12 = two * (qy * qz - qw * qx);
+            const V r20 = two * (qx * qz - qw * qy);
+            const V r21 = two * (qy * qz + qw * qx);
+            const V r22 = one - two * (qx * qx + qy * qy);
+
+            return {tx, ty, tz, r00, r10, r20, r01, r11, r21, r02, r12, r22};
+        }
+
+        // Fast partial collision pre-filter, batched over `rake` sampled parameterized
+        // states: computes the end effector's world pose via eef_world_poses<rake>() above
+        // (no arm IK) and checks its own rigidly-attached spheres (gripper/marker geometry
+        // baked into the URDF, see trace_eef_local_spheres in codegen.cc) against the
+        // environment. No attachment check here (unlike the rby1_bimanual branch above) -- a
+        // single arm's marker/gripper end effector isn't expected to jointly hold an object
+        // with another eef the way rby1's two hands can. Does NOT check against the robot's
+        // own body (that requires a resolved ambient `q` -- see resolve_block +
+        // Ambient::fkcc_attach below), which this deliberately skips to stay IK-free. Intended
+        // to prune obviously-bad samples before paying for resolve_block(); a `false` return
+        // here is not a full validity guarantee.
+        template <std::size_t rake>
+        static inline auto eefs_collision_free(
+            const vamp::collision::Environment<FloatVector<rake>> &environment,
+            const StateBlock<rake> &x_in) noexcept -> bool
+        {
+            using V = FloatVector<rake, 1>;
+
+            auto world_pose = eef_world_poses<rake>(x_in);
+
+            {% if param_eef_spheres_code_vars > 0 %}std::array<V, {{param_eef_spheres_code_vars}}> v;{% endif %}
+            std::array<V, {{param_eef_spheres_code_output}}> y;
+            const auto &x = world_pose;
+
+            {{param_eef_spheres_code}}
+
+            {% for i in range(n_eef_spheres) %}
+            if (sphere_environment_in_collision(environment, y[{{n_eef_spheres - 1 - i}} * 4 + 0], y[{{n_eef_spheres - 1 - i}} * 4 + 1], y[{{n_eef_spheres - 1 - i}} * 4 + 2], y[{{n_eef_spheres - 1 - i}} * 4 + 3]))
+            {
+                return false;
+            }
+            {% endfor %}
+
+            return true;
+        }
+        {% endif %}
+
+        {% if param_kind == "rby1_bimanual" %}
         // Batched task-space -> ambient-configuration resolve, for the FK/collision-checking
         // boundary; the counterpart of a future ParameterizedLocalPlanner's per-lane IK solve.
         // `x` decomposes exactly as trace_rby1_constrained_sample's State layout: base(4) +
@@ -1053,6 +1168,78 @@ struct {{name}}
 
             return {valid, q};
         }
+        {% else if param_kind == "iiwa_se3" %}
+        // Batched task-space -> ambient-configuration resolve, single-arm SE3+psi
+        // counterpart of the rby1_bimanual resolve_block above. `x` decomposes as
+        // pose(7, [x,y,z,qx,qy,qz,qw]) + psi(1) -- exactly se3_tracer.hh's Space. param_ik_code
+        // additionally reads the `smm` class member (see above) directly by name rather than
+        // taking it from `x`. Rejects (returns {false, _}) if any of the 4 pre-clip SafeArccos
+        // arguments IiwaSE3ParameterizationCG's `u` output falls outside [-1, 1] (no valid IK
+        // solution on this GC branch for the requested pose/psi -- see IKParamResult in
+        // iiwa_parameterization.hh) or the resolved ambient configuration falls outside the
+        // robot's own joint limits.
+        template <std::size_t rake>
+        static inline auto resolve_block(const StateBlock<rake> &x) noexcept
+            -> std::pair<bool, Ambient::ConfigurationBlock<rake>>
+        {
+            using V = FloatVector<rake, 1>;
+
+            std::array<V, 7> pose{x[0], x[1], x[2], x[3], x[4], x[5], x[6]};
+            const auto psi = x[7];
+
+            FloatVector<rake, {{param_ik_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> y;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u;
+
+            {{param_ik_code}}
+
+            {% for i in range(param_ik_num_unclipped) %}
+            if ((u[{{i}}] > V(1.0f)).any() or (u[{{i}}] < V(-1.0f)).any())
+            {
+                return {false, y};
+            }
+            {% endfor %}
+
+            {% for i in range(n_q) %}
+            if ((y[{{i}}] < V(Ambient::lower_bound[{{i}}])).any() or (y[{{i}}] > V(Ambient::upper_bound[{{i}}])).any())
+            {
+                return {false, y};
+            }
+            {% endfor %}
+
+            return {true, y};
+        }
+
+        // Per-lane variant of resolve_block -- see the rby1_bimanual resolve_block_mask above
+        // for why (the "one (broadcast) task-space state, many GC candidates" sweep, pairing
+        // with set_smm_lanes). Same validity conditions as resolve_block, accumulated into a
+        // mask instead of short-circuiting.
+        template <std::size_t rake>
+        static inline auto resolve_block_mask(const StateBlock<rake> &x) noexcept
+            -> std::pair<FloatVector<rake, 1>, Ambient::ConfigurationBlock<rake>>
+        {
+            using V = FloatVector<rake, 1>;
+
+            std::array<V, 7> pose{x[0], x[1], x[2], x[3], x[4], x[5], x[6]};
+            const auto psi = x[7];
+
+            FloatVector<rake, {{param_ik_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> y;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u;
+
+            {{param_ik_code}}
+
+            V valid = (u[0] <= V(1.0f)) & (u[0] >= V(-1.0f));
+            {% for i in range(param_ik_num_unclipped) %}{% if i > 0 %}
+            valid = valid & (u[{{i}}] <= V(1.0f)) & (u[{{i}}] >= V(-1.0f));
+            {% endif %}{% endfor %}
+            {% for i in range(n_q) %}
+            valid = valid & (y[{{i}}] >= V(Ambient::lower_bound[{{i}}])) & (y[{{i}}] <= V(Ambient::upper_bound[{{i}}]));
+            {% endfor %}
+
+            return {valid, y};
+        }
+        {% endif %}
     };
     {% endif %}
 };

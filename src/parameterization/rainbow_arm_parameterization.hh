@@ -25,11 +25,9 @@
 //      .hh`'s `CondExpGe`/`CondExpLe` do), but `CondExpGe`/`CondExpLe`
 //      themselves are *not* redeclared here -- this file includes
 //      `iiwa_parameterization.hh` and reuses its copies (and its
-//      `ScalarClip`/`SafeArccos`) to avoid a duplicate-definition clash if
-//      both headers ever land in the same translation unit. `HingeSqPenalty`
-//      is defined locally below instead (not reused from
-//      `iiwa_parameterization.hh`, which doesn't currently have it) so this
-//      file doesn't depend on that one carrying it.
+//      `ScalarClip`/`SafeArccos`/`HingeSqPenalty`) to avoid a
+//      duplicate-definition clash if both headers ever land in the same
+//      translation unit.
 //   3. `ElbowBranch` / `ShoulderBranch` were compile-time `int` non-type
 //      template parameters in the split file (resolved outside the tape, one
 //      function per GCP combination). Here they become ordinary `T` tape
@@ -124,22 +122,11 @@ T RainbowRelu(const T &f)
     return CondExpGt(f, static_cast<T>(0.0), f, static_cast<T>(0.0));
 }
 
-// Smooth (C1) exterior penalty for a RainbowAsin/RainbowAcos argument
-// falling outside [-clip, clip]: zero inside the band, grows quadratically
-// outside, with zero value and zero derivative exactly at the boundary.
-// Used to build a differentiable `loss` for optimizing the free joint angle
-// against the self-motion-manifold constraints, in place of (or alongside)
-// the hard reject that RainbowAsin/RainbowAcos's silent clipping otherwise
-// requires. Local copy of the same helper iiwa_parameterization.hh used to
-// have under this name, built from RainbowRelu above instead of re-deriving
-// the CondExp pair by hand.
-template <typename T, typename U>
-T HingeSqPenalty(const T &val, U clip)
-{
-    T over = RainbowRelu(val - static_cast<T>(clip));
-    T under = RainbowRelu(static_cast<T>(-clip) - val);
-    return over * over + under * under;
-}
+// `HingeSqPenalty` (smooth exterior penalty for a RainbowAsin/RainbowAcos
+// argument falling outside [-clip, clip], used to build a differentiable
+// `loss` for optimizing the free joint angle against the self-motion-
+// manifold constraints) is reused from `iiwa_parameterization.hh` -- see
+// this file's header comment, point 2.
 
 // Fixed affine change of frame from the caller's end-effector frame into the
 // solver's internal frame. Identical across all branches; verbatim port of

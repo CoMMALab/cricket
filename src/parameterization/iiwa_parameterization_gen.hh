@@ -1,20 +1,19 @@
-// TODO (siyer) -- ask tommy
-// 1. URDF of the iiwa along with end effector
-// 2. Why not sample
-
 #pragma once
 
-#include "housekeeping.hh"
-#include "robot_info.hh"
-#include "tracer_utils.hh"
+#include <cricket/codegen.hh>
+
+#include "../tracing/internal.hh"
 #include "iiwa_parameterization.hh"
-#include "internal.hh"
 
 #include <Eigen/Dense>
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
-
+namespace cricket
+{
+    using namespace CppAD;
+    using namespace CppAD::cg;
 
 template <typename T>
 auto IiwaBimanualParameterizationCG(
@@ -94,6 +93,18 @@ auto IiwaBimanualParameterizationCG(
 }
 
 
+// CppAD-CodeGen wrapper around IiwaSE3Parameterization -- the single-arm
+// counterpart of RainbowIkCG (rainbow_ik_cg.hh), used by fk_template.hh's
+// ParameterizedSpace for the `param_kind == "iiwa_se3"` case. Tape input
+// layout (size 11): [0:7) end-effector pose (x, y, z, qx, qy, qz, qw) in the
+// robot's own base frame, [7] psi (self-motion-manifold free parameter),
+// [8:11) GC2/GC4/GC6 (shoulder/elbow/wrist configuration selectors, expected
+// +-1). Output: "y" (7 joint angles), "u" (4 pre-clip SafeArccos arguments --
+// see IKParamResult in iiwa_parameterization.hh for what a value outside
+// [-1, 1] means and why callers must check it themselves rather than trust
+// `y`). `loss` (see IKParamResult) is intentionally not part of the CG
+// output here -- ParameterizedSpace::resolve_block only needs the hard
+// accept/reject `u` gives it, not a smooth optimization target.
 template <typename T>
 auto IiwaSE3ParameterizationCG(
     const std::string &language,
@@ -180,3 +191,4 @@ auto IiwaSE3ParameterizationCG(
         handler.getTemporaryVariableCount(),
         result.size()};
 }
+}  // namespace cricket

@@ -112,6 +112,7 @@ add_library(cricket SHARED
     src/tracing/flask.cc
     src/tracing/constraints.cc
     src/parameterization/rby1_constrained.cc
+    src/parameterization/iiwa_se3_constrained.cc
 )
 add_library(cricket::cricket ALIAS cricket)
 set_target_properties(cricket PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -178,6 +179,18 @@ target_compile_definitions(fkcc_gen PRIVATE
 # bin/ and lib/ are siblings in both install layouts, so resolve it relative to the executable.
 set_target_properties(fkcc_gen PROPERTIES
     INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+)
+
+# Standalone eef-local-spheres debugger (see src/parameterization/iiwa_se3_debug_main.cc) --
+# loads a model straight from URDF/SRDF, no JSON recipe or codegen pipeline involved.
+add_executable(iiwa_se3_debug src/parameterization/iiwa_se3_debug_main.cc)
+target_link_libraries(iiwa_se3_debug
+    PRIVATE
+        cricket::cricket
+        fmt::fmt
+)
+target_compile_definitions(iiwa_se3_debug PRIVATE
+    CRICKET_RESOURCES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources"
 )
 
 if(CRICKET_BUILD_JIT)

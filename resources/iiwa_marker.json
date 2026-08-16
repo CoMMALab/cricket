@@ -1,0 +1,16 @@
+{
+    "name": "IiwaMarker",
+    "urdf": "iiwa_marker/iiwa_marker_spherized.urdf",
+    "srdf": "iiwa_marker/moveit/config/iiwa.srdf",
+    "end_effector": "iiwa_link_7",
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "iiwa_marker_fk.hh",
+    "use_parameterized": true,
+    "param_kind": "iiwa_se3",
+    "bounds": {
+        "upper": [2, 2, 2],
+        "lower": [-2, -2, -2]
+    }
+}
