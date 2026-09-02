@@ -1,0 +1,16 @@
+{
+    "name": "BimanualIiwa",
+    "urdf": "bimanual_iiwa/bimanual_iiwa_spherized.urdf",
+    "srdf": "bimanual_iiwa/bimanual_iiwa.srdf",
+    "end_effector": ["iiwa_left_iiwa_link_ee_kuka", "iiwa_right_iiwa_link_ee_kuka"],
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "bimanual_iiwa_fk.hh",
+    "use_parameterized": true,
+    "param_kind": "iiwa_bimanual",
+    "bounds": {
+        "upper": [1.5, 1.5, 1.5],
+        "lower": [-1.5, -1.5, -1.5]
+    }
+}

@@ -727,11 +727,150 @@ namespace cricket
         data["param_so3_offsets"] = std::vector<std::size_t>{15};
     }
 
+    // Bimanual iiwa leader-follower IK ("param_kind": "iiwa_bimanual"): the leader/left arm's
+    // joint angles pass straight through the analytic IK (see IiwaBimanualParameterization in
+    // iiwa_parameterization.hh), so State is just q(7) + psi(1) -- fully Euclidean, no task-
+    // space pose to sample. This is fk_template.hh's LeaderFollowerSpace, not
+    // ParameterizedSpace: unlike derive_rby1_parameterized_traces's t_mid (a sampled
+    // task-space pose that both arms are IK'd from), the leader here is sampled directly in
+    // its own joint space and only the follower/right arm is expressed relatively, via psi +
+    // the FIXED `rel_pose` class member (LeaderFollowerSpace::compute_rel_pose -- a single
+    // fixed hand-to-hand offset, not a midpoint, and there's no eef-world-poses-from-
+    // mid/eefs_collision_free prefilter for this kind). The leader arm's own sample range
+    // (trace_iiwa_bimanual_sample) is read directly off `robot.model`'s q-indices [0:7) -- the
+    // bimanual URDF places the "iiwa_left" chain's 7 revolute joints first in kinematic-tree
+    // order, matching IiwaBimanualParameterization's q_full.head(7) == q_controlled
+    // convention, so those are the leader arm's own joint limits.
+    auto derive_iiwa_bimanual_leader_follower_traces(
+        const RobotInfo &robot,
+        nlohmann::json &data,
+        const std::string &language,
+        const std::optional<Bounds> &bounds) -> void
+    {
+        (void)bounds;  // no task-space pose in this State -- nothing here needs Cartesian bounds.
+
+        auto lf_ik = trace_iiwa_bimanual_ik(robot, language);
+        data["lf_ik_code"] = lf_ik.code;
+        data["lf_ik_code_vars"] = lf_ik.temp_variables;
+        data["lf_ik_code_output"] = lf_ik.outputs;
+
+        // IKParamResult::unclipped (iiwa_parameterization.hh) is always a Vector4.
+        data["lf_ik_num_unclipped"] = 4;
+
+        auto lf_rel_pose_fk = trace_iiwa_bimanual_rel_pose_fk(robot, language);
+        data["lf_rel_pose_fk_code"] = lf_rel_pose_fk.code;
+        data["lf_rel_pose_fk_code_vars"] = lf_rel_pose_fk.temp_variables;
+        data["lf_rel_pose_fk_code_output"] = lf_rel_pose_fk.outputs;
+
+        auto lf_sample = trace_iiwa_bimanual_sample(robot.model, language);
+        data["lf_sample_code"] = lf_sample.code;
+        data["lf_sample_code_vars"] = lf_sample.temp_variables;
+        data["lf_sample_code_output"] = lf_sample.outputs;
+
+        auto lf_distance = trace_iiwa_bimanual_distance(language);
+        data["lf_distance_code"] = lf_distance.code;
+        data["lf_distance_code_vars"] = lf_distance.temp_variables;
+
+        auto lf_interpolate = trace_iiwa_bimanual_interpolate(language);
+        data["lf_interpolate_code"] = lf_interpolate.code;
+        data["lf_interpolate_code_vars"] = lf_interpolate.temp_variables;
+
+        auto lf_interpolate_block = trace_iiwa_bimanual_interpolate_block(language);
+        data["lf_interpolate_block_code"] = lf_interpolate_block.code;
+        data["lf_interpolate_block_code_vars"] = lf_interpolate_block.temp_variables;
+
+        // State layout (8): q(7, leader/left arm joint angles) + psi(1, follower/right arm's
+        // self-motion-manifold parameter). Sample layout (8): the raw [0,1) values
+        // trace_iiwa_bimanual_sample maps via map_bounded -- 1:1, no SO3 expansion. Fully
+        // Euclidean: no orientation block in State at all (rel_pose is fixed, not sampled).
+        data["lf_dimension"] = 8;
+        data["lf_sample_dimension"] = 8;
+        data["lf_euclidean"] = true;
+        data["lf_so3_offsets"] = std::vector<std::size_t>{};
+    }
+
+    // Bimanual iiwa "mid-pose" parameterized IK ("param_kind": "iiwa_bimanual", rendered
+    // alongside derive_iiwa_bimanual_leader_follower_traces above): populates
+    // fk_template.hh's ParameterizedSpace the same way derive_rby1_parameterized_traces does
+    // (t_mid_left/t_mid_right, compute_mid_pose, eef_world_poses/eefs_collision_free,
+    // sample/distance/interpolate(_block)) but without RBY1's base/torso/COM pieces -- see
+    // IiwaBimanualMidParameterizationCG's header comment (iiwa_parameterization_gen.hh) for
+    // the IK math and trace_bimanual_mid_sample/_distance/_interpolate(_block)
+    // (iiwa_bimanual_tracer.hh) for the State kernels. State layout (9): T_mid pose(7,
+    // [x,y,z,qx,qy,qz,qw]) + psi_left(1) + psi_right(1) -- same shape as se3_tracer.hh's
+    // pose+psi Space, just two psis instead of one. Non-Euclidean: T_mid's orientation
+    // quaternion sits at offset 3 (so3_offsets == {3}, same offset iiwa_se3 uses for its own
+    // single pose block).
+    auto derive_iiwa_bimanual_mid_parameterized_traces(
+        const RobotInfo &robot,
+        nlohmann::json &data,
+        const std::string &language,
+        const std::optional<Bounds> &bounds) -> void
+    {
+        auto param_ik = trace_iiwa_bimanual_mid_ik(robot, language);
+        data["param_ik_code"] = param_ik.code;
+        data["param_ik_code_vars"] = param_ik.temp_variables;
+        data["param_ik_code_output"] = param_ik.outputs;
+
+        // IKParamResult::unclipped (iiwa_parameterization.hh) is always a Vector4, per arm.
+        data["param_ik_num_unclipped"] = 4;
+
+        // trace_iiwa_bimanual_rel_pose_fk's dual-eef FK is exactly what compute_mid_pose
+        // needs (leader/left, follower/right world poses) -- reused verbatim, same as
+        // derive_iiwa_bimanual_leader_follower_traces's lf_rel_pose_fk_code above.
+        auto param_mid_pose_fk = trace_iiwa_bimanual_rel_pose_fk(robot, language);
+        data["param_mid_pose_fk_code"] = param_mid_pose_fk.code;
+        data["param_mid_pose_fk_code_vars"] = param_mid_pose_fk.temp_variables;
+        data["param_mid_pose_fk_code_output"] = param_mid_pose_fk.outputs;
+
+        auto param_eef_world_poses = trace_iiwa_bimanual_eef_world_poses_from_mid(language);
+        data["param_eef_world_poses_code"] = param_eef_world_poses.code;
+        data["param_eef_world_poses_code_vars"] = param_eef_world_poses.temp_variables;
+        data["param_eef_world_poses_code_output"] = param_eef_world_poses.outputs;
+
+        auto param_eef_spheres = trace_eef_local_spheres(robot, language);
+        data["param_eef_spheres_code"] = param_eef_spheres.traced.code;
+        data["param_eef_spheres_code_vars"] = param_eef_spheres.traced.temp_variables;
+        data["param_eef_spheres_code_output"] = param_eef_spheres.traced.outputs;
+        if (param_eef_spheres.counts.size() >= 2)
+        {
+            data["n_left_eef_spheres"] = param_eef_spheres.counts[0];
+            data["n_right_eef_spheres"] = param_eef_spheres.counts[1];
+        }
+
+        auto param_sample = trace_iiwa_bimanual_mid_sample(language, bounds);
+        data["param_sample_code"] = param_sample.code;
+        data["param_sample_code_vars"] = param_sample.temp_variables;
+        data["param_sample_code_output"] = param_sample.outputs;
+
+        auto param_distance = trace_iiwa_bimanual_mid_distance(language);
+        data["param_distance_code"] = param_distance.code;
+        data["param_distance_code_vars"] = param_distance.temp_variables;
+
+        auto param_interpolate = trace_iiwa_bimanual_mid_interpolate(language);
+        data["param_interpolate_code"] = param_interpolate.code;
+        data["param_interpolate_code_vars"] = param_interpolate.temp_variables;
+
+        auto param_interpolate_block = trace_iiwa_bimanual_mid_interpolate_block(language);
+        data["param_interpolate_block_code"] = param_interpolate_block.code;
+        data["param_interpolate_block_code_vars"] = param_interpolate_block.temp_variables;
+
+        data["param_dimension"] = 9;
+        data["param_sample_dimension"] = 8;
+        data["param_euclidean"] = false;
+        data["param_so3_offsets"] = std::vector<std::size_t>{3};
+    }
+
     // Dispatches to the robot-specific parameterized-IK tracing above when the recipe has
-    // "use_parameterized": true, setting the has_parameterized_space template gate either
-    // way. "param_kind" ("rby1_bimanual", the default -- matching every existing recipe that
-    // predates this key -- or "iiwa_se3") also lands in `data` unchanged so fk_template.hh's
-    // ParameterizedSpace can gate its own robot-specific members on it.
+    // "use_parameterized": true, setting the has_parameterized_space/has_leader_follower_space
+    // template gates either way. "param_kind" ("rby1_bimanual", the default -- matching every
+    // existing recipe that predates this key -- or "iiwa_se3") selects
+    // fk_template.hh's ParameterizedSpace (a sampled task-space pose that IK resolves both/the
+    // one arm from); "iiwa_bimanual" instead selects LeaderFollowerSpace (the leader arm
+    // sampled directly in its own joint space, the follower solved relative to a fixed
+    // offset) -- see derive_iiwa_bimanual_leader_follower_traces above for why that doesn't
+    // fit ParameterizedSpace's shape. Shared by the offline generator (fkcc_gen) and the JIT
+    // path (generate_robot_source) so both accept the same keys.
     auto derive_parameterized_traces(
         const RobotInfo &robot,
         nlohmann::json &data,
@@ -739,22 +878,35 @@ namespace cricket
         const std::optional<Bounds> &bounds) -> void
     {
         const bool use_parameterized = data.value("use_parameterized", false);
-        data["has_parameterized_space"] = use_parameterized;
         if (not use_parameterized)
         {
+            data["has_parameterized_space"] = false;
+            data["has_leader_follower_space"] = false;
             return;
         }
 
         const std::string param_kind = data.value("param_kind", std::string("rby1_bimanual"));
         data["param_kind"] = param_kind;
+        data["joint_limit_margin"] = data.value("joint_limit_margin", 0.0);
 
         if (param_kind == "iiwa_se3")
         {
+            data["has_parameterized_space"] = true;
+            data["has_leader_follower_space"] = false;
             derive_iiwa_se3_parameterized_traces(robot, data, language, bounds);
         }
         else if (param_kind == "rby1_bimanual")
         {
+            data["has_parameterized_space"] = true;
+            data["has_leader_follower_space"] = false;
             derive_rby1_parameterized_traces(robot, data, language, bounds);
+        }
+        else if (param_kind == "iiwa_bimanual")
+        {
+            data["has_parameterized_space"] = true;
+            data["has_leader_follower_space"] = true;
+            derive_iiwa_bimanual_leader_follower_traces(robot, data, language, bounds);
+            derive_iiwa_bimanual_mid_parameterized_traces(robot, data, language, bounds);
         }
         else
         {
@@ -850,6 +1002,7 @@ namespace cricket
             "twist",
             "use_parameterized",
             "param_kind",
+            "joint_limit_margin",
         };
         static const std::vector<std::string_view> bounds_keys = {"lower", "upper"};
         static const std::vector<std::string_view> flask_keys = {

@@ -113,6 +113,7 @@ add_library(cricket SHARED
     src/tracing/constraints.cc
     src/parameterization/rby1_constrained.cc
     src/parameterization/iiwa_se3_constrained.cc
+    src/parameterization/iiwa_bimanual_constrained.cc
 )
 add_library(cricket::cricket ALIAS cricket)
 set_target_properties(cricket PROPERTIES POSITION_INDEPENDENT_CODE ON)

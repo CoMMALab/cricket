@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<sdf version="1.7">
+  <model name="wooden_table">
+    <link name="body">
+      <visual name="table_visual">
+        <pose> 0.0 0 0 0 0 1.57</pose>
+        <geometry>
+          <box>
+            <size> 1.525 .508 0.02</size>
+          </box>
+        </geometry>
+        <material>
+          <diffuse>0.941 0.792 0.6 1.0</diffuse>
+        </material>
+      </visual>
+      <collision name="table_top">
+        <pose> 0.0 0 0 0 0 1.57</pose>
+        <geometry>
+          <box>
+            <size> 1.525 .508 0.02</size>
+          </box>
+        </geometry>
+          <drake:proximity_properties>
+          <drake:compliant_hydroelastic/>
+            <!-- <drake:dynamic_friction>5.0</drake:dynamic_friction> -->
+            <drake:hydroelastic_modulus>1.0e8</drake:hydroelastic_modulus>
+            <!-- <drake:hunt_crossley_dissipation>10.0</drake:hunt_crossley_dissipation> -->
+            <!-- <drake:mesh_resolution_hint>0.02</drake:mesh_resolution_hint> -->
+        </drake:proximity_properties>
+      </collision>
+    </link>
+  </model>
+</sdf>

@@ -132,10 +132,15 @@ template <typename Matrix, typename Scalar>
 inline auto so3_log_smooth(const Matrix &R) -> Matrix
 {
     // Clamp for acos domain safety (trace can drift slightly outside [-1, 1]
-    // due to floating point).
+    // due to floating point). Two flat CondExp calls, not one nested inside the
+    // other's else-branch -- CppADCodeGen was collapsing the nested form away
+    // entirely (unlike slerp_se3's single, un-nested CondExpGt clamp below, which
+    // survives codegen fine), silently dropping the clamp from the generated code
+    // and letting acos see out-of-domain input (-> NaN) whenever two nearly-equal
+    // rotations pushed cos_theta_raw a hair past +-1.
     const Scalar cos_theta_raw = (R.trace() - 1) / 2;
-    const Scalar cos_theta = CondExpGt(cos_theta_raw, Scalar(1.0), Scalar(1.0),
-        CondExpLt(cos_theta_raw, Scalar(-1.0), Scalar(-1.0), cos_theta_raw));
+    const Scalar cos_theta_hi = CondExpGt(cos_theta_raw, Scalar(1.0), Scalar(1.0), cos_theta_raw);
+    const Scalar cos_theta = CondExpLt(cos_theta_hi, Scalar(-1.0), Scalar(-1.0), cos_theta_hi);
     const Scalar theta = acos(cos_theta);
 
     Matrix vee = Matrix::Zero(3, 1);

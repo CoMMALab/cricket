@@ -1,0 +1,26 @@
+controller_list:
+  - name: fake_left_arm_controller
+    type: $(arg fake_execution_type)
+    joints:
+      - iiwa_left_iiwa_joint_1
+      - iiwa_left_iiwa_joint_2
+      - iiwa_left_iiwa_joint_3
+      - iiwa_left_iiwa_joint_4
+      - iiwa_left_iiwa_joint_5
+      - iiwa_left_iiwa_joint_6
+      - iiwa_left_iiwa_joint_7
+  - name: fake_right_arm_controller
+    type: $(arg fake_execution_type)
+    joints:
+      - iiwa_right_iiwa_joint_1
+      - iiwa_right_iiwa_joint_2
+      - iiwa_right_iiwa_joint_3
+      - iiwa_right_iiwa_joint_4
+      - iiwa_right_iiwa_joint_5
+      - iiwa_right_iiwa_joint_6
+      - iiwa_right_iiwa_joint_7
+initial:  # Define initial robot poses per group
+#  - group: left_arm
+#    pose: home
+
+  []

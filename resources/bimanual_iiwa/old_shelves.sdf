@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<sdf version="1.7">
+  <model name="old_shelves">
+    <link name="base">
+      <inertial>
+        <mass>1</mass>
+        <inertia>
+          <ixx>1</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>1</iyy>
+          <iyz>0</iyz>
+          <izz>1</izz>
+        </inertia>
+      </inertial>
+
+      <visual name="shelf_1_visual">
+        <pose>0 0 0.3 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.4 1.0 0.014</size>
+          </box>
+        </geometry>
+      </visual>
+      <visual name="shelf_2_visual">
+        <pose>0 0 0.6 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.4 1.0 0.014</size>
+          </box>
+        </geometry>
+      </visual>
+      <visual name="back_visual">
+        <pose>0.2 0 0.45 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.03 1.0 0.9</size>
+          </box>
+        </geometry>
+      </visual>
+      <!-- <visual name="left_support_visual">
+        <pose>0 -0.3 0.147 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.256 0.03 0.294</size>
+          </box>
+        </geometry>
+      </visual>
+      <visual name="right_support_visual">
+        <pose>0 0.3 0.147 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.256 0.03 0.294</size>
+          </box>
+        </geometry>
+      </visual> -->
+
+      <collision name="shelf_1_collision">
+        <pose>0 0 0.3 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.4 1.0 0.014</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="shelf_2_collision">
+        <pose>0 0 0.6 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.4 1.0 0.014</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="back_collision">
+        <pose>0.2 0 0.45 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.03 1.0 0.9</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

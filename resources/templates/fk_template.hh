@@ -15,7 +15,6 @@
 #include <limits>
 {% endif %}
 
-// clang-format off
 // NOLINTBEGIN(*-magic-numbers)
 namespace vamp::robots
 {
@@ -701,6 +700,7 @@ struct {{name}}
         static constexpr std::size_t sample_dimension = {{param_sample_dimension}};
         static constexpr bool euclidean = {{param_euclidean}};
         static constexpr std::array<std::size_t, {{length(param_so3_offsets)}}> so3_offsets = { {{join(param_so3_offsets, ", ")}} };
+        static constexpr float joint_limit_margin = {{joint_limit_margin}}f;
 
         // Ambient configuration-space robot that resolve_block() maps into.
         using Ambient = {{name}};
@@ -773,6 +773,60 @@ struct {{name}}
         // State -- param_ik_code reads these class members directly by name, same mechanism
         // as left_gcp/right_gcp above. Default identity (both hands coincide with T_mid);
         // overwrite directly or via compute_mid_pose() below.
+        inline static thread_local std::array<float, 7> t_mid_left = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+        inline static thread_local std::array<float, 7> t_mid_right = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+        {% else if param_kind == "iiwa_bimanual" %}
+        // Per-arm GC2/GC4/GC6 (shoulder/elbow/wrist) self-motion-manifold branch selectors --
+        // see IiwaSE3Parameterization in iiwa_parameterization.hh, called once per arm by
+        // IiwaBimanualMidParameterizationCG. Not part of State, so param_ik_code reads these
+        // class members directly by name (`left_gc[i]` / `right_gc[i]`), same mechanism as
+        // the rby1_bimanual branch's left_gcp/right_gcp above (just one triple per arm instead
+        // of the 3-tuple + reach_violation/loss rby1's redundant-manifold arms carry).
+        inline static thread_local std::array<FloatVector<vamp::FloatVectorWidth, 1>, 3> left_gc = {
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f),
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f),
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f)};
+        inline static thread_local std::array<FloatVector<vamp::FloatVectorWidth, 1>, 3> right_gc = {
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f),
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f),
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f)};
+
+        // Set the same GC branch for every lane -- the "many task-space states, one shared
+        // branch" mode, matching rby1_bimanual's set_gcp above. `left`/`right` are each
+        // (elbow_sel, shoulder_sel, wrist_sel).
+        static inline void set_gc(const std::array<float, 3> &left, const std::array<float, 3> &right) noexcept
+        {
+            for (std::size_t k = 0; k < 3; ++k)
+            {
+                left_gc[k] = FloatVector<vamp::FloatVectorWidth, 1>::fill(left[k]);
+                right_gc[k] = FloatVector<vamp::FloatVectorWidth, 1>::fill(right[k]);
+            }
+        }
+
+        // Set a distinct GC branch per lane, matching rby1_bimanual's set_gcp_lanes above.
+        static inline void set_gc_lanes(
+            const std::array<std::array<float, 3>, vamp::FloatVectorWidth> &left,
+            const std::array<std::array<float, 3>, vamp::FloatVectorWidth> &right) noexcept
+        {
+            for (std::size_t k = 0; k < 3; ++k)
+            {
+                std::array<float, vamp::FloatVectorWidth> lc{};
+                std::array<float, vamp::FloatVectorWidth> rc{};
+                for (std::size_t lane = 0; lane < vamp::FloatVectorWidth; ++lane)
+                {
+                    lc[lane] = left[lane][k];
+                    rc[lane] = right[lane][k];
+                }
+
+                left_gc[k] = FloatVector<vamp::FloatVectorWidth, 1>(lc);
+                right_gc[k] = FloatVector<vamp::FloatVectorWidth, 1>(rc);
+            }
+        }
+
+        // Fixed per-planning-problem SE3 offsets from the mid-frame T_mid to each hand, same
+        // meaning and mechanism as the rby1_bimanual branch's t_mid_left/t_mid_right above:
+        // T_l = T_mid * t_mid_left, T_r = T_mid * t_mid_right (T_mid in the left arm's own
+        // base/DH frame -- see IiwaBimanualMidParameterizationCG's header comment).
         inline static thread_local std::array<float, 7> t_mid_left = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
         inline static thread_local std::array<float, 7> t_mid_right = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
         {% else if param_kind == "iiwa_se3" %}
@@ -873,13 +927,15 @@ struct {{name}}
             {{param_interpolate_block_code}}
         }
 
-        {% if param_kind == "rby1_bimanual" %}
+        {% if param_kind == "rby1_bimanual" or param_kind == "iiwa_bimanual" %}
         // Derives t_mid_left/t_mid_right from a reference whole-body configuration `q`: FK to
-        // both hands (ee_left, ee_right), take T_w_mid as the midpoint of their translations
-        // with identity rotation, then t_mid_left/t_mid_right are each hand's pose relative to
-        // that mid-frame. Scalar (non-rake) utility, called once per planning problem, not in
-        // a hot loop. Overwrites t_mid_left/t_mid_right in place; callers that want a fixed
-        // offset can still assign over them afterwards.
+        // both hands (end effector 0, end effector 1), take T_w_mid as the midpoint of their
+        // translations with identity rotation, then t_mid_left/t_mid_right are each hand's
+        // pose relative to that mid-frame. Scalar (non-rake) utility, called once per planning
+        // problem, not in a hot loop. Overwrites t_mid_left/t_mid_right in place; callers that
+        // want a fixed offset can still assign over them afterwards. Shared verbatim between
+        // rby1_bimanual and iiwa_bimanual -- param_mid_pose_fk_code is the same "dual-eef FK"
+        // shape for both (RainbowMidPoseFkCG / trace_iiwa_bimanual_rel_pose_fk respectively).
         static inline void compute_mid_pose(const Ambient::ConfigurationArray &q) noexcept
         {
             {% if param_mid_pose_fk_code_vars > 0 %}std::array<float, {{param_mid_pose_fk_code_vars}}> v;{% endif %}
@@ -908,7 +964,9 @@ struct {{name}}
                 T_mid_left_iso.translation().x(), T_mid_left_iso.translation().y(), T_mid_left_iso.translation().z(),
                 ql.x(), ql.y(), ql.z(), ql.w()};
         }
+        {% endif %}
 
+        {% if param_kind == "rby1_bimanual" %}
         template <std::size_t rake>
         static inline auto compute_com(const Ambient::ConfigurationBlock<rake> &q) noexcept
             -> std::array<FloatVector<rake, 1>, 3>
@@ -944,8 +1002,36 @@ struct {{name}}
 
             return y;
         }
+        {% else if param_kind == "iiwa_bimanual" %}
+        // Same shape as the rby1_bimanual eef_world_poses above (param_eef_world_poses_code
+        // is the same "T_mid * t_mid_left/right" composition, trace_bimanual_eef_world_poses_
+        // from_mid rather than RainbowEefWorldPosesFromMidCG) -- the only difference is where
+        // T_mid sits in State: rby1_bimanual's State carries base+torso+psi's before its
+        // t_mid_pose block (offset 12), while iiwa_bimanual's State (see
+        // IiwaBimanualMidParameterizationCG's header) is just t_mid_pose(7) + psi_left(1) +
+        // psi_right(1), so t_mid_pose sits at offset 0.
+        template <std::size_t rake>
+        static inline auto eef_world_poses(const StateBlock<rake> &x_in) noexcept -> std::array<FloatVector<rake, 1>, 24>
+        {
+            using V = FloatVector<rake, 1>;
 
-        {% if num_end_effectors == 2 %}
+            std::array<V, 21> x{
+                x_in[0], x_in[1], x_in[2], x_in[3], x_in[4], x_in[5], x_in[6],
+                V(t_mid_left[0]), V(t_mid_left[1]), V(t_mid_left[2]),
+                V(t_mid_left[3]), V(t_mid_left[4]), V(t_mid_left[5]), V(t_mid_left[6]),
+                V(t_mid_right[0]), V(t_mid_right[1]), V(t_mid_right[2]),
+                V(t_mid_right[3]), V(t_mid_right[4]), V(t_mid_right[5]), V(t_mid_right[6])};
+
+            {% if param_eef_world_poses_code_vars > 0 %}std::array<V, {{param_eef_world_poses_code_vars}}> v;{% endif %}
+            std::array<V, {{param_eef_world_poses_code_output}}> y;
+
+            {{param_eef_world_poses_code}}
+
+            return y;
+        }
+        {% endif %}
+
+        {% if (param_kind == "rby1_bimanual" or param_kind == "iiwa_bimanual") and num_end_effectors == 2 %}
         // Fast partial collision pre-filter, batched over `rake` sampled parameterized
         // states: computes the left/right hands' world poses via eef_world_poses<rake>()
         // above (no arm IK) and checks:
@@ -1008,7 +1094,7 @@ struct {{name}}
             return true;
         }
         {% endif %}
-        {% else if param_kind == "iiwa_se3" %}
+        {% if param_kind == "iiwa_se3" %}
         // World pose of the single end effector -- unlike the rby1_bimanual case above, the
         // task-space State's own pose block (x_in[0:7)) already *is* the end effector's world
         // pose (this is a fixed-base robot, no mobile base / t_mid offset to compose through),
@@ -1120,7 +1206,7 @@ struct {{name}}
             }
 
             {% for i in range(n_q) %}
-            if ((q[{{i}}] < V(Ambient::lower_bound[{{i}}])).any() or (q[{{i}}] > V(Ambient::upper_bound[{{i}}])).any())
+            if ((q[{{i}}] < V({{ at(lower, i) + joint_limit_margin}})).any() or (q[{{i}}] > V({{ at(upper, i) - joint_limit_margin}})).any())
             {
                 return {false, q};
             }
@@ -1163,7 +1249,7 @@ struct {{name}}
 
             V valid = (reach_violation_left[0] <= V(0.0f)) & (reach_violation_right[0] <= V(0.0f));
             {% for i in range(n_q) %}
-            valid = valid & (q[{{i}}] >= V(Ambient::lower_bound[{{i}}])) & (q[{{i}}] <= V(Ambient::upper_bound[{{i}}]));
+            valid = valid & (q[{{i}}] >= V({{ at(lower, i) + joint_limit_margin}})) & (q[{{i}}] <= V({{ at(upper, i) - joint_limit_margin}}));
             {% endfor %}
 
             return {valid, q};
@@ -1201,7 +1287,7 @@ struct {{name}}
             {% endfor %}
 
             {% for i in range(n_q) %}
-            if ((y[{{i}}] < V(Ambient::lower_bound[{{i}}])).any() or (y[{{i}}] > V(Ambient::upper_bound[{{i}}])).any())
+            if ((y[{{i}}] < V({{ at(lower, i) + joint_limit_margin}})).any() or (y[{{i}}] > V({{ at(upper, i) - joint_limit_margin}})).any())
             {
                 return {false, y};
             }
@@ -1234,7 +1320,319 @@ struct {{name}}
             valid = valid & (u[{{i}}] <= V(1.0f)) & (u[{{i}}] >= V(-1.0f));
             {% endif %}{% endfor %}
             {% for i in range(n_q) %}
-            valid = valid & (y[{{i}}] >= V(Ambient::lower_bound[{{i}}])) & (y[{{i}}] <= V(Ambient::upper_bound[{{i}}]));
+            valid = valid & (y[{{i}}] >= V({{ at(lower, i) + joint_limit_margin}})) & (y[{{i}}] <= V({{ at(upper, i) - joint_limit_margin}}));
+            {% endfor %}
+
+            return {valid, y};
+        }
+        {% else if param_kind == "iiwa_bimanual" %}
+        // Batched task-space -> ambient-configuration resolve, mid-pose counterpart of
+        // LeaderFollowerSpace's resolve_block for this same "iiwa_bimanual" param_kind. `x`
+        // decomposes as IiwaBimanualMidParameterizationCG's State: t_mid_pose(7,
+        // [x,y,z,qx,qy,qz,qw]) + psi_left(1) + psi_right(1). param_ik_code additionally reads
+        // left_gc/right_gc/t_mid_left/t_mid_right directly by name (see those members above)
+        // rather than taking them from `x`. Rejects (returns {false, _}) if any of either
+        // arm's 4 pre-clip SafeArccos arguments falls outside [-1, 1] (no valid IK solution on
+        // this GC branch for the requested pose/psi -- see IKParamResult in
+        // iiwa_parameterization.hh) or the resolved ambient configuration falls outside the
+        // robot's own joint limits. Unlike rby1_bimanual's resolve_block above, there's no
+        // reach_violation/loss output here -- IiwaSE3Parameterization (called per arm) doesn't
+        // compute those, only `u`.
+        template <std::size_t rake>
+        static inline auto resolve_block(const StateBlock<rake> &x) noexcept
+            -> std::pair<bool, Ambient::ConfigurationBlock<rake>>
+        {
+            using V = FloatVector<rake, 1>;
+
+            std::array<V, 7> t_mid{x[0], x[1], x[2], x[3], x[4], x[5], x[6]};
+            const auto psi_left = x[7];
+            const auto psi_right = x[8];
+
+            FloatVector<rake, {{param_ik_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> q;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_left;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_right;
+
+            {{param_ik_code}}
+
+            {% for i in range(param_ik_num_unclipped) %}
+            if ((u_left[{{i}}] > V(1.0f)).any() or (u_left[{{i}}] < V(-1.0f)).any())
+            {
+                return {false, q};
+            }
+            if ((u_right[{{i}}] > V(1.0f)).any() or (u_right[{{i}}] < V(-1.0f)).any())
+            {
+                return {false, q};
+            }
+            {% endfor %}
+
+            {% for i in range(n_q) %}
+            if ((q[{{i}}] < V({{ at(lower, i) + joint_limit_margin}})).any() or (q[{{i}}] > V({{ at(upper, i) - joint_limit_margin}})).any())
+            {
+                return {false, q};
+            }
+            {% endfor %}
+
+            return {true, q};
+        }
+
+        // Per-lane variant of resolve_block -- same "one (broadcast) task-space state, many GC
+        // candidates" sweep as rby1_bimanual/iiwa_se3's resolve_block_mask above (pairing with
+        // set_gc_lanes). Same validity conditions as resolve_block, accumulated into a mask
+        // instead of short-circuiting.
+        template <std::size_t rake>
+        static inline auto resolve_block_mask(const StateBlock<rake> &x) noexcept
+            -> std::pair<FloatVector<rake, 1>, Ambient::ConfigurationBlock<rake>>
+        {
+            using V = FloatVector<rake, 1>;
+
+            std::array<V, 7> t_mid{x[0], x[1], x[2], x[3], x[4], x[5], x[6]};
+            const auto psi_left = x[7];
+            const auto psi_right = x[8];
+
+            FloatVector<rake, {{param_ik_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> q;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_left;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_right;
+
+            {{param_ik_code}}
+
+            V valid = V(1.0f) > V(0.0f);
+            {% for i in range(param_ik_num_unclipped) %}
+            valid = valid & (u_left[{{i}}] <= V(1.0f)) & (u_left[{{i}}] >= V(-1.0f));
+            valid = valid & (u_right[{{i}}] <= V(1.0f)) & (u_right[{{i}}] >= V(-1.0f));
+            {% endfor %}
+            {% for i in range(n_q) %}
+            valid = valid & (q[{{i}}] >= V({{ at(lower, i) + joint_limit_margin}})) & (q[{{i}}] <= V({{ at(upper, i) - joint_limit_margin}}));
+            {% endfor %}
+
+            return {valid, q};
+        }
+        {% endif %}
+    };
+    {% endif %}
+
+    {% if has_leader_follower_space %}
+    //
+    // LeaderFollowerSpace: an alternative Space to plan over, for parameterizations where the
+    // leader arm is sampled directly in its own joint space (no IK to invert for it) and the
+    // follower arm is solved analytically relative to a FIXED transform from the leader's own
+    // end effector (`rel_pose` below) -- the counterpart of ParameterizedSpace above for
+    // "param_kind"s that don't fit that struct's "sample a task-space pose, IK both arms from
+    // it" shape (rby1_bimanual's t_mid, iiwa_se3's single-arm pose+psi). Exposes the same
+    // dimension/State/StateArray/StateBlock<rake>/StateBuffer family as ParameterizedSpace and
+    // the outer struct's own default Space.
+    //
+
+    struct LeaderFollowerSpace
+    {
+        static constexpr const char *name = "leader_follower_space";
+        static constexpr std::size_t dimension = {{lf_dimension}};
+        static constexpr std::size_t sample_dimension = {{lf_sample_dimension}};
+        static constexpr bool euclidean = {{lf_euclidean}};
+        static constexpr std::array<std::size_t, {{length(lf_so3_offsets)}}> so3_offsets = { {{join(lf_so3_offsets, ", ")}} };
+
+        // Ambient configuration-space robot that resolve_block() maps into.
+        using Ambient = {{name}};
+
+        {% if param_kind == "iiwa_bimanual" %}
+        // GC2/GC4/GC6 (shoulder/elbow/wrist) self-motion-manifold branch selectors for the
+        // follower arm -- see IiwaBimanualParameterization in iiwa_parameterization.hh. Not
+        // part of State, so lf_ik_code reads this class member directly by name (`smm[i]`)
+        // instead of taking it as part of resolve_block's input -- same mechanism as
+        // ParameterizedSpace's own smm/left_gcp/right_gcp members above.
+        inline static thread_local std::array<FloatVector<vamp::FloatVectorWidth, 1>, 3> smm = {
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f),
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f),
+            FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f)};
+
+        // Set the same GC branch for every lane -- the "many task-space states, one shared
+        // branch" mode resolve_block/resolve_and_check use while extending the tree.
+        static inline void set_smm(const std::array<float, 3> &gc) noexcept
+        {
+            for (std::size_t k = 0; k < 3; ++k)
+            {
+                smm[k] = FloatVector<vamp::FloatVectorWidth, 1>::fill(gc[k]);
+            }
+        }
+
+        // Set a distinct GC branch per lane -- the "one (broadcast) task-space state, many GC
+        // candidates" sweep mode, pairing with resolve_block_mask below.
+        static inline void set_smm_lanes(
+            const std::array<std::array<float, 3>, vamp::FloatVectorWidth> &gc) noexcept
+        {
+            for (std::size_t k = 0; k < 3; ++k)
+            {
+                std::array<float, vamp::FloatVectorWidth> c{};
+                for (std::size_t lane = 0; lane < vamp::FloatVectorWidth; ++lane)
+                {
+                    c[lane] = gc[lane][k];
+                }
+
+                smm[k] = FloatVector<vamp::FloatVectorWidth, 1>(c);
+            }
+        }
+
+        // Fixed per-planning-problem SE3 offset from the leader end effector's frame to the
+        // follower end effector's frame (x, y, z, qx, qy, qz, qw): T_follower = T_leader *
+        // rel_pose. Not part of State -- lf_ik_code reads this class member directly by name
+        // (`rel_pose[i]`), same mechanism as smm above. This is LeaderFollowerSpace's
+        // counterpart of ParameterizedSpace's compute_mid_pose -- a single fixed hand-to-hand
+        // offset rather than a midpoint, since there's no shared mid-frame here. Default
+        // identity; overwrite directly or via compute_rel_pose() below.
+        inline static thread_local std::array<float, 7> rel_pose = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+
+        // Derives rel_pose from a reference whole-body configuration `q`: FK to both end
+        // effectors (Ambient::end_effector[0] == leader, [1] == follower -- see
+        // trace_iiwa_bimanual_rel_pose_fk in codegen.cc), then rel_pose is the follower hand's
+        // pose relative to the leader hand's frame. Scalar (non-rake) utility, called once per
+        // planning problem, not in a hot loop. Overwrites rel_pose in place; callers that want
+        // a fixed offset can still assign over it afterwards.
+        static inline void compute_rel_pose(const Ambient::ConfigurationArray &q) noexcept
+        {
+            {% if lf_rel_pose_fk_code_vars > 0 %}std::array<float, {{lf_rel_pose_fk_code_vars}}> v;{% endif %}
+            std::array<float, {{lf_rel_pose_fk_code_output}}> y;
+            const auto &x = q;
+
+            {{lf_rel_pose_fk_code}}
+
+            Eigen::Isometry3f T_w_leader = to_isometry(&y[0]);
+            Eigen::Isometry3f T_w_follower = to_isometry(&y[12]);
+
+            Eigen::Isometry3f T_rel = T_w_leader.inverse() * T_w_follower;
+
+            Eigen::Quaternionf q_rel(T_rel.rotation());
+            rel_pose = {
+                T_rel.translation().x(), T_rel.translation().y(), T_rel.translation().z(),
+                q_rel.x(), q_rel.y(), q_rel.z(), q_rel.w()};
+        }
+        {% endif %}
+
+        using State = FloatVector<dimension>;
+        struct alignas(FloatVectorAlignment) StateArray
+            : std::array<FloatT, dimension>
+        {
+        };
+        using Sample = FloatVector<sample_dimension>;
+
+        struct alignas(FloatVectorAlignment) StateBuffer
+            : std::array<float, State::num_scalars_rounded>
+        {
+        };
+
+        template <std::size_t rake>
+        using StateBlock = FloatVector<rake, dimension>;
+
+        static inline auto sample(const Sample &x_in) -> State
+        {
+            {% if lf_sample_code_vars > 0 %}std::array<float, {{lf_sample_code_vars}}> v;{% endif %}
+            StateBuffer y{};
+            const auto x = x_in.to_array();
+            {{lf_sample_code}}
+            return State(y.data());
+        }
+
+        static inline auto distance(const State &a_in, const State &b_in) -> float
+        {
+            {% if lf_distance_code_vars > 0 %}std::array<float, {{lf_distance_code_vars}}> v;{% endif %}
+            std::array<float, 1> y;
+            const auto a = a_in.to_array();
+            const auto b = b_in.to_array();
+            {{lf_distance_code}}
+            return y[0];
+        }
+
+        static inline auto interpolate(const State &a_in, const State &b_in, float t) -> State
+        {
+            {% if lf_interpolate_code_vars > 0 %}std::array<float, {{lf_interpolate_code_vars}}> v;{% endif %}
+            StateBuffer y{};
+            const auto a = a_in.to_array();
+            const auto b = b_in.to_array();
+            {{lf_interpolate_code}}
+            return State(y.data());
+        }
+
+        template <std::size_t rake>
+        static inline void interpolate_block(
+            const State &a,
+            const State &b,
+            const FloatVector<rake> &t,
+            StateBlock<rake> &out) noexcept
+        {
+            using V = FloatVector<rake, 1>;
+            {% if lf_interpolate_block_code_vars > 0 %}std::array<V, {{lf_interpolate_block_code_vars}}> v;{% endif %}
+            {{lf_interpolate_block_code}}
+        }
+
+        {% if param_kind == "iiwa_bimanual" %}
+        // Batched task-space -> ambient-configuration resolve. `x` decomposes as q(7,
+        // leader/left arm joint angles, passed straight through to y[0:7)) + psi(1,
+        // follower/right arm's self-motion-manifold parameter) -- exactly
+        // trace_bimanual_state_sample's (iiwa_bimanual_tracer.hh) State layout. lf_ik_code
+        // additionally reads the `smm` and `rel_pose` class members (see above) directly by
+        // name rather than taking them from `x`: `smm` selects the follower arm's branch,
+        // `rel_pose` is the fixed leader-to-follower eef offset. Rejects (returns
+        // {false, _}) if any of the 4 pre-clip SafeArccos arguments
+        // IiwaBimanualParameterizationCG's `u` output falls outside [-1, 1] (no valid IK
+        // solution on this GC branch for the requested q/psi -- see IKParamResult in
+        // iiwa_parameterization.hh) or the resolved ambient configuration falls outside the
+        // robot's own joint limits.
+        template <std::size_t rake>
+        static inline auto resolve_block(const StateBlock<rake> &x) noexcept
+            -> std::pair<bool, Ambient::ConfigurationBlock<rake>>
+        {
+            using V = FloatVector<rake, 1>;
+
+            std::array<V, 7> q{x[0], x[1], x[2], x[3], x[4], x[5], x[6]};
+            const auto psi = x[7];
+
+            FloatVector<rake, {{lf_ik_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> y;
+            FloatVector<rake, {{lf_ik_num_unclipped}}> u;
+
+            {{lf_ik_code}}
+
+            {% for i in range(lf_ik_num_unclipped) %}
+            if ((u[{{i}}] > V(1.0f)).any() or (u[{{i}}] < V(-1.0f)).any())
+            {
+                return {false, y};
+            }
+            {% endfor %}
+
+            {% for i in range(n_q) %}
+            if ((y[{{i}}] < V({{ at(lower, i) + joint_limit_margin}})).any() or (y[{{i}}] > V({{ at(upper, i) - joint_limit_margin}})).any())
+            {
+                return {false, y};
+            }
+            {% endfor %}
+
+            return {true, y};
+        }
+
+        // Per-lane variant of resolve_block -- see ParameterizedSpace's own resolve_block_mask
+        // above for why. Same validity conditions as resolve_block, accumulated into a mask
+        // instead of short-circuiting.
+        template <std::size_t rake>
+        static inline auto resolve_block_mask(const StateBlock<rake> &x) noexcept
+            -> std::pair<FloatVector<rake, 1>, Ambient::ConfigurationBlock<rake>>
+        {
+            using V = FloatVector<rake, 1>;
+
+            std::array<V, 7> q{x[0], x[1], x[2], x[3], x[4], x[5], x[6]};
+            const auto psi = x[7];
+
+            FloatVector<rake, {{lf_ik_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> y;
+            FloatVector<rake, {{lf_ik_num_unclipped}}> u;
+
+            {{lf_ik_code}}
+
+            V valid = (u[0] <= V(1.0f)) & (u[0] >= V(-1.0f));
+            {% for i in range(lf_ik_num_unclipped) %}{% if i > 0 %}
+            valid = valid & (u[{{i}}] <= V(1.0f)) & (u[{{i}}] >= V(-1.0f));
+            {% endif %}{% endfor %}
+            {% for i in range(n_q) %}
+            valid = valid & (y[{{i}}] >= V({{ at(lower, i) + joint_limit_margin}})) & (y[{{i}}] <= V({{ at(upper, i) - joint_limit_margin}}));
             {% endfor %}
 
             return {valid, y};

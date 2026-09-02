@@ -11,5 +11,6 @@
     "bounds": {
         "upper": [2, 2, 2],
         "lower": [-2, -2, -2]
-    }
+    },
+    "joint_limit_margin": 0.015
 }

@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<sdf version="1.7">
+  <model name="wall">
+    <link name="body">
+      <collision name="wall_collision">
+        <pose> 0 0 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size> 1 2 0.2</size>
+          </box>
+        </geometry>
+      </collision>
+      <!-- <visual name="wall_visual">
+        <pose> 0 0 0 0 0 0</pose>
+        <geometry>
+          <box>
+            <size> 1 2 0.2</size>
+          </box>
+        </geometry>
+      </visual> -->
+    </link>
+  </model>
+</sdf>

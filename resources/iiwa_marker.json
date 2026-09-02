@@ -4,6 +4,7 @@
     "srdf": "iiwa_marker/moveit/config/iiwa.srdf",
     "end_effector": "iiwa_link_7",
     "resolution": 32,
+    "constraints": true,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
     "output": "iiwa_marker_fk.hh",

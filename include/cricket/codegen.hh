@@ -232,11 +232,57 @@ namespace cricket
     auto trace_iiwa_se3_interpolate(const std::string &language) -> Traced;
     auto trace_iiwa_se3_interpolate_block(const std::string &language) -> Traced;
 
+    // Bimanual iiwa leader-follower IK (see IiwaBimanualParameterizationCG in
+    // iiwa_parameterization_gen.hh and the kernels in iiwa_bimanual_tracer.hh). This is
+    // fk_template.hh's LeaderFollowerSpace, not ParameterizedSpace -- unlike iiwa_se3/
+    // rby1_bimanual above (a sampled task-space pose that IK resolves the arm(s) from), the
+    // leader/left arm here is carried as its own joint angles (q(7)) directly -- there is no
+    // IK to invert for that arm. State (8): q(7) + psi(1), fully Euclidean. Only the
+    // follower/right arm is expressed relatively, via psi + a FIXED relative pose (`rel_pose`,
+    // LeaderFollowerSpace's counterpart of rby1_bimanual's t_mid_left/t_mid_right -- see
+    // trace_iiwa_bimanual_rel_pose_fk and LeaderFollowerSpace::compute_rel_pose in
+    // fk_template.hh). Selected by "param_kind": "iiwa_bimanual". No eef-world-poses-from-mid /
+    // eefs_collision_free IK-free prefilter for this kind (unlike rby1_bimanual).
+    auto trace_iiwa_bimanual_ik(const RobotInfo &info, const std::string &language) -> Traced;
+    auto trace_iiwa_bimanual_sample(const pinocchio::Model &model, const std::string &language) -> Traced;
+    auto trace_iiwa_bimanual_distance(const std::string &language) -> Traced;
+    auto trace_iiwa_bimanual_interpolate(const std::string &language) -> Traced;
+    auto trace_iiwa_bimanual_interpolate_block(const std::string &language) -> Traced;
+
+    // Dual-eef FK (leader/left, follower/right world poses, 12 floats each) used to derive
+    // the fixed `rel_pose` offset -- see LeaderFollowerSpace::compute_rel_pose in
+    // fk_template.hh, the "iiwa_bimanual" counterpart of trace_rby1_mid_pose_fk above.
+    auto trace_iiwa_bimanual_rel_pose_fk(const RobotInfo &info, const std::string &language) -> Traced;
+
+    // Bimanual iiwa "mid-pose" parameterized IK (see IiwaBimanualMidParameterizationCG in
+    // iiwa_parameterization_gen.hh for the math): unlike trace_iiwa_bimanual_ik above
+    // (LeaderFollowerSpace -- the leader arm's own joint angles sampled directly), this
+    // resolves both arms from a single sampled mid-frame pose T_mid plus one free joint angle
+    // per arm, the iiwa_bimanual counterpart of trace_rby1_constrained_ik. Populates
+    // fk_template.hh's ParameterizedSpace for "param_kind": "iiwa_bimanual" (rendered
+    // alongside LeaderFollowerSpace for that param_kind -- see derive_parameterized_traces
+    // below).
+    auto trace_iiwa_bimanual_mid_ik(const RobotInfo &info, const std::string &language) -> Traced;
+    auto trace_iiwa_bimanual_mid_sample(const std::string &language, const std::optional<Bounds> &bounds) -> Traced;
+    auto trace_iiwa_bimanual_mid_distance(const std::string &language) -> Traced;
+    auto trace_iiwa_bimanual_mid_interpolate(const std::string &language) -> Traced;
+    auto trace_iiwa_bimanual_mid_interpolate_block(const std::string &language) -> Traced;
+
+    // T_mid -> left/right hand WORLD poses (translation + rotation matrix), the standalone
+    // piece ParameterizedSpace::eefs_in_collision needs for "param_kind": "iiwa_bimanual" --
+    // the iiwa_bimanual counterpart of trace_rby1_eef_world_poses_from_mid above.
+    auto trace_iiwa_bimanual_eef_world_poses_from_mid(const std::string &language) -> Traced;
+
     // Derives the parameterized-IK kernels when the recipe has "use_parameterized": true,
-    // setting the has_parameterized_space template gate either way. "param_kind" ("rby1_bimanual",
-    // the default, or "iiwa_se3") selects which robot-specific tracing path runs and which
-    // ParameterizedSpace branch fk_template.hh renders. Shared by the offline generator
-    // (fkcc_gen) and the JIT path (generate_robot_source) so both accept the same keys.
+    // setting the has_parameterized_space/has_leader_follower_space template gates either way.
+    // "param_kind" ("rby1_bimanual", the default, or "iiwa_se3") selects fk_template.hh's
+    // ParameterizedSpace only; "iiwa_bimanual" selects BOTH ParameterizedSpace (mid-pose
+    // sampling, trace_iiwa_bimanual_mid_ik above) and LeaderFollowerSpace (leader arm sampled
+    // directly in its own joint space, trace_iiwa_bimanual_ik) -- see trace_iiwa_bimanual_ik's
+    // header comment for why iiwa_bimanual's leader-follower shape doesn't replace
+    // ParameterizedSpace, just sits alongside it as a second option. Shared by the offline
+    // generator (fkcc_gen) and the JIT path (generate_robot_source) so both accept the same
+    // keys.
     auto derive_parameterized_traces(
         const RobotInfo &robot,
         nlohmann::json &data,
