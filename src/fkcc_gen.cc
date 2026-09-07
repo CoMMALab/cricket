@@ -103,6 +103,10 @@ int main(int argc, char **argv)
 
     cricket::GenOptions gen_options;
     gen_options.urdf = parent_path / data["urdf"];
+    if (data.contains("dynamics_urdf"))
+    {
+        gen_options.dynamics_urdf = parent_path / data["dynamics_urdf"].get<std::string>();
+    }
     gen_options.srdf = srdf_path;
     gen_options.end_effector = end_effector_name;
     gen_options.template_path = parent_path / data["template"];

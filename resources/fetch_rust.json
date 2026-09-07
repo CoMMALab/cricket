@@ -1,6 +1,7 @@
 {
     "name": "Fetch",
     "urdf": "fetch/fetch_spherized.urdf",
+    "dynamics_urdf": "fetch/fetch.urdf",
     "srdf": "fetch/fetch.srdf",
     "end_effector": "gripper_link",
     "resolution": 32,
@@ -9,5 +10,6 @@
         { "name": "ccfk", "template": "templates/ccfk_template.rs" }
     ],
     "output": "fetch_fk.rs",
-    "language": "rust"
+    "language": "rust",
+    "forward_dynamics": true
 }

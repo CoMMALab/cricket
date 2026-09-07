@@ -13,7 +13,7 @@ use core::simd::Simd;
 use carom_core::{
     Attach, AttachValidate, Ball, Block, BlockValidate, Collide3, PosedAttachment, Robot, SimdArithmetic, cos, sin,
     sphere_environment_in_collision, sphere_sphere_self_collision, Isometry,
-    {% if forward_dynamics %}Dynamics,{% endif %}
+    {% if forward_dynamics %}DynamicsKernel,{% endif %}
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -123,7 +123,7 @@ where
 }
 
 {% if forward_dynamics %}
-impl Dynamics<{DIM}, {{n_v}}, f32> for {{name}} {
+impl DynamicsKernel<{DIM}, {{n_v}}, f32> for {{name}} {
     fn forward_dynamics<const L: usize>(
         &self,
         q: &[Simd<f32, L>; DIM],

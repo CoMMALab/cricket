@@ -44,6 +44,7 @@ namespace cricket
     struct GenOptions
     {
         std::filesystem::path urdf;
+        std::optional<std::filesystem::path> dynamics_urdf;
         std::optional<std::filesystem::path> srdf;
         std::optional<std::string> end_effector;
         std::filesystem::path template_path;

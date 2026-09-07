@@ -99,6 +99,7 @@ NB_MODULE(_core_ext, m)
             "language"_a = std::string("c++"),
             "data"_a = nb::dict())
         .def_rw("urdf", &cricket::GenOptions::urdf)
+        .def_rw("dynamics_urdf", &cricket::GenOptions::dynamics_urdf)
         .def_rw("srdf", &cricket::GenOptions::srdf)
         .def_rw("end_effector", &cricket::GenOptions::end_effector)
         .def_rw("template_path", &cricket::GenOptions::template_path)

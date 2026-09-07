@@ -9,5 +9,6 @@
         { "name": "ccfk", "template": "templates/ccfk_template.rs" }
     ],
     "output": "ur5_fk.rs",
-    "language": "rust"
+    "language": "rust",
+    "forward_dynamics": true
 }

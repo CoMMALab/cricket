@@ -7,6 +7,7 @@
 
 #include <pinocchio/algorithm/frames.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
+#include <pinocchio/parsers/urdf.hpp>
 
 #include <fmt/format.h>
 #include <inja/inja.hpp>
@@ -214,12 +215,25 @@ namespace cricket
 
         if (opts.forward_dynamics)
         {
-            auto dynamics = trace_forward_dynamics(robot.model, opts.language);
+            pinocchio::Model dynamics_model;
+            if (opts.dynamics_urdf)
+            {
+                pinocchio::urdf::buildModel(*opts.dynamics_urdf, dynamics_model, false, true);
+                if (dynamics_model.nq != robot.model.nq || dynamics_model.nv != robot.model.nv)
+                {
+                    throw std::runtime_error("dynamics URDF dimensions do not match collision URDF");
+                }
+            }
+            else
+            {
+                dynamics_model = robot.model;
+            }
+            auto dynamics = trace_forward_dynamics(dynamics_model, opts.language);
             data["forward_dynamics_code"] = dynamics.code;
             data["forward_dynamics_code_vars"] = dynamics.temp_variables;
             data["forward_dynamics_code_output"] = dynamics.outputs;
 
-            auto integration = trace_integrate_configuration(robot.model, opts.language);
+            auto integration = trace_integrate_configuration(dynamics_model, opts.language);
             data["integrate_configuration_code"] = integration.code;
             data["integrate_configuration_code_vars"] = integration.temp_variables;
             data["integrate_configuration_code_output"] = integration.outputs;
