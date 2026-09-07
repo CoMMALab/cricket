@@ -37,6 +37,9 @@ namespace cricket
     auto trace_interpolate(const pinocchio::Model &model, const std::string &language) -> Traced;
     auto trace_interpolate_block(const pinocchio::Model &model, const std::string &language) -> Traced;
     auto trace_distance(const pinocchio::Model &model, const std::string &language) -> Traced;
+    auto trace_forward_dynamics(const pinocchio::Model &model, const std::string &language) -> Traced;
+    auto trace_integrate_configuration(const pinocchio::Model &model, const std::string &language)
+        -> Traced;
 
     struct GenOptions
     {

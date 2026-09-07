@@ -49,10 +49,7 @@ namespace cricket
             SegmentedVariableNameGenerator<double> nameGen(
                 std::move(input_segments), std::move(output_segments));
 
-            return Traced{
-                generate_code(handler, result, language, nameGen),
-                handler.getTemporaryVariableCount(),
-                static_cast<std::size_t>(nq)};
+            return emit_traced(handler, result, language, static_cast<std::size_t>(nq), nameGen);
         }
     }  // namespace
 

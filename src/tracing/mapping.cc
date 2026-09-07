@@ -57,8 +57,7 @@ namespace cricket
                 case JointType::SO3:
                 {
                     ADCG x, y, z, w;
-                    map_so3_shoemake(
-                        ad_u[jm.idx_u], ad_u[jm.idx_u + 1], ad_u[jm.idx_u + 2], x, y, z, w);
+                    map_so3_shoemake(ad_u[jm.idx_u], ad_u[jm.idx_u + 1], ad_u[jm.idx_u + 2], x, y, z, w);
                     ad_q[jm.idx_q] = x;
                     ad_q[jm.idx_q + 1] = y;
                     ad_q[jm.idx_q + 2] = z;
@@ -73,8 +72,7 @@ namespace cricket
                             map_bounded(ad_u[jm.idx_u + i], bounds->lower[i], bounds->upper[i]);
                     }
                     ADCG x, y, z, w;
-                    map_so3_shoemake(
-                        ad_u[jm.idx_u + 3], ad_u[jm.idx_u + 4], ad_u[jm.idx_u + 5], x, y, z, w);
+                    map_so3_shoemake(ad_u[jm.idx_u + 3], ad_u[jm.idx_u + 4], ad_u[jm.idx_u + 5], x, y, z, w);
                     ad_q[jm.idx_q + 3] = x;
                     ad_q[jm.idx_q + 4] = y;
                     ad_q[jm.idx_q + 5] = z;
@@ -107,9 +105,6 @@ namespace cricket
 
         CppAD::vector<CGD> result = map_func.Forward(0, ind_vars);
 
-        return Traced{
-            generate_code(handler, result, language),
-            handler.getTemporaryVariableCount(),
-            static_cast<std::size_t>(nq)};
+        return emit_traced(handler, result, language, static_cast<std::size_t>(nq));
     }
 }  // namespace cricket

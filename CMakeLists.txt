@@ -110,6 +110,8 @@ add_library(cricket
     src/tracing/mapping.cc
     src/tracing/interpolate.cc
     src/tracing/distance.cc
+    src/tracing/forward_dynamics.cc
+    src/tracing/integrate_configuration.cc
 )
 add_library(cricket::cricket ALIAS cricket)
 set_target_properties(cricket PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -169,6 +171,12 @@ if(BUILD_TESTING)
   add_test(NAME robot_info_test COMMAND robot_info_test)
   set_tests_properties(robot_info_test PROPERTIES
       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources/ur5")
+
+  add_executable(tracing_test tests/tracing_test.cc)
+  target_link_libraries(tracing_test PRIVATE cricket::cricket)
+  target_compile_definitions(tracing_test PRIVATE
+      CRICKET_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+  add_test(NAME tracing_test COMMAND tracing_test)
 endif()
 
 add_executable(fkcc_gen src/fkcc_gen.cc)

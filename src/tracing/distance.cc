@@ -39,9 +39,6 @@ namespace cricket
         const auto nq_size = static_cast<std::size_t>(nq);
         SegmentedVariableNameGenerator<double> nameGen({{"a", nq_size, true}, {"b", nq_size, true}});
 
-        return Traced{
-            generate_code(handler, result, language, nameGen),
-            handler.getTemporaryVariableCount(),
-            1};
+        return emit_traced(handler, result, language, 1, nameGen);
     }
 }  // namespace cricket

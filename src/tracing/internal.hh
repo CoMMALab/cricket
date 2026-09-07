@@ -61,4 +61,26 @@ namespace cricket
         CppAD::cg::LangCDefaultVariableNameGenerator<double> nameGen;
         return generate_code(handler, result, language, nameGen);
     }
+
+    template <typename NameGen>
+    inline auto emit_traced(
+        CppAD::cg::CodeHandler<double> &handler,
+        CppAD::vector<CGD> &result,
+        const std::string &language,
+        std::size_t outputs,
+        NameGen &nameGen) -> Traced
+    {
+        return Traced{
+            generate_code(handler, result, language, nameGen), handler.getTemporaryVariableCount(), outputs};
+    }
+
+    inline auto emit_traced(
+        CppAD::cg::CodeHandler<double> &handler,
+        CppAD::vector<CGD> &result,
+        const std::string &language,
+        std::size_t outputs) -> Traced
+    {
+        CppAD::cg::LangCDefaultVariableNameGenerator<double> nameGen;
+        return emit_traced(handler, result, language, outputs, nameGen);
+    }
 }  // namespace cricket
