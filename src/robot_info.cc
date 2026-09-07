@@ -263,6 +263,7 @@ namespace cricket
 
         nlohmann::json json;
         json["n_q"] = model.nq;
+        json["n_v"] = model.nv;
         json["n_u"] = get_randomness_dimension(model);
         json["n_spheres"] = spheres.size();
         json["bound_lower"] = std::vector<float>(lower_bound.data(), lower_bound.data() + model.nq);

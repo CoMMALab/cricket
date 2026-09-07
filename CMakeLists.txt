@@ -3,6 +3,8 @@ project(cricket
   LANGUAGES CXX
 )
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -158,6 +160,16 @@ target_include_directories(cricket_inja INTERFACE
 
 add_executable(dump_srdf src/dump_srdf.cc)
 target_link_libraries(dump_srdf PRIVATE cricket::cricket fmt::fmt)
+
+if(BUILD_TESTING)
+  add_executable(robot_info_test tests/robot_info_test.cc)
+  target_link_libraries(robot_info_test PRIVATE cricket::cricket)
+  target_compile_definitions(robot_info_test PRIVATE
+      CRICKET_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+  add_test(NAME robot_info_test COMMAND robot_info_test)
+  set_tests_properties(robot_info_test PROPERTIES
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources/ur5")
+endif()
 
 add_executable(fkcc_gen src/fkcc_gen.cc)
 
