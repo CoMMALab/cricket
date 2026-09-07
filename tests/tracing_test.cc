@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <filesystem>
+#include <string>
 
 int main()
 {
@@ -25,11 +26,14 @@ int main()
     assert(dynamics.outputs == static_cast<std::size_t>(model.nv));
     assert(dynamics.temp_variables > 0);
     assert(not dynamics.code.empty());
+    assert(dynamics.code.find("Simd::<f32, L>") != std::string::npos);
+    assert(dynamics.code.find("sin(") != std::string::npos);
+    assert(dynamics.code.find("cos(") != std::string::npos);
 
     const auto integration = cricket::trace_integrate_configuration(model, "rust");
     assert(integration.outputs == static_cast<std::size_t>(model.nq));
-    assert(integration.temp_variables > 0);
     assert(not integration.code.empty());
+    assert(integration.code.find("x[0] + x[6]") != std::string::npos);
 
     return 0;
 }
