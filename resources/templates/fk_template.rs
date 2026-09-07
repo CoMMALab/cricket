@@ -13,6 +13,7 @@ use core::simd::Simd;
 use carom_core::{
     Attach, AttachValidate, Ball, Block, BlockValidate, Collide3, PosedAttachment, Robot, SimdArithmetic, cos, sin,
     sphere_environment_in_collision, sphere_sphere_self_collision, Isometry,
+    {% if forward_dynamics %}Dynamics,{% endif %}
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -121,6 +122,26 @@ where
     }
 }
 
+{% if forward_dynamics %}
+impl Dynamics<{DIM}, {{n_v}}, f32> for {{name}} {
+    fn forward_dynamics<const L: usize>(
+        &self,
+        q: &[Simd<f32, L>; DIM],
+        v: &[Simd<f32, L>; {{n_v}}],
+        tau: &[Simd<f32, L>; {{n_v}}],
+    ) -> [Simd<f32, L>; {{n_v}}] {
+        forward_dynamics(q, v, tau)
+    }
+
+    fn integrate_configuration<const L: usize>(
+        &self,
+        q: &[Simd<f32, L>; DIM],
+        dq: &[Simd<f32, L>; {{n_v}}],
+    ) -> [Simd<f32, L>; DIM] {
+        integrate_configuration(q, dq)
+    }
+}
+{% endif %}
 
 fn fkcc<const L: usize>(x: &ConfigurationBlock<L>, environment: &impl Collide3<f32>) -> bool {
     let mut v = [Simd::splat(0.0); {{ccfk_code_vars}}];
@@ -214,3 +235,45 @@ fn eefk<const L: usize>(x: &ConfigurationBlock<L>) -> Isometry<Simd<f32, L>, 3>
 
     Isometry::from_carom_buf(y)
 }
+
+{% if forward_dynamics %}
+fn forward_dynamics<const L: usize>(
+    q: &[Simd<f32, L>; {{n_q}}],
+    v: &[Simd<f32, L>; {{n_v}}],
+    tau: &[Simd<f32, L>; {{n_v}}],
+) -> [Simd<f32, L>; {{n_v}}]
+{
+    let mut x = [Simd::splat(0.0); {{n_q + 2 * n_v}}];
+    let mut y = [Simd::splat(0.0); {{forward_dynamics_code_output}}];
+    x[..{{n_q}}].copy_from_slice(q);
+    x[{{n_q}}..{{n_q + n_v}}].copy_from_slice(v);
+    x[{{n_q + n_v}}..].copy_from_slice(tau);
+    {% if forward_dynamics_code_vars > 0 %}
+    let mut v: [Simd<f32, L>; {{forward_dynamics_code_vars}}] =
+        [Simd::splat(0.0); {{forward_dynamics_code_vars}}];
+    {% endif %}
+
+    {{forward_dynamics_code}}
+
+    y
+}
+
+fn integrate_configuration<const L: usize>(
+    q: &[Simd<f32, L>; {{n_q}}],
+    dq: &[Simd<f32, L>; {{n_v}}],
+) -> [Simd<f32, L>; {{n_q}}]
+{
+    let mut x = [Simd::splat(0.0); {{n_q + n_v}}];
+    let mut y = [Simd::splat(0.0); {{integrate_configuration_code_output}}];
+    x[..{{n_q}}].copy_from_slice(q);
+    x[{{n_q}}..].copy_from_slice(dq);
+    {% if integrate_configuration_code_vars > 0 %}
+    let mut v: [Simd<f32, L>; {{integrate_configuration_code_vars}}] =
+        [Simd::splat(0.0); {{integrate_configuration_code_vars}}];
+    {% endif %}
+
+    {{integrate_configuration_code}}
+
+    y
+}
+{% endif %}
