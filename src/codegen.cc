@@ -212,6 +212,19 @@ namespace cricket
         data["distance_code"] = dist.code;
         data["distance_code_vars"] = dist.temp_variables;
 
+        if (opts.forward_dynamics)
+        {
+            auto dynamics = trace_forward_dynamics(robot.model, opts.language);
+            data["forward_dynamics_code"] = dynamics.code;
+            data["forward_dynamics_code_vars"] = dynamics.temp_variables;
+            data["forward_dynamics_code_output"] = dynamics.outputs;
+
+            auto integration = trace_integrate_configuration(robot.model, opts.language);
+            data["integrate_configuration_code"] = integration.code;
+            data["integrate_configuration_code_vars"] = integration.temp_variables;
+            data["integrate_configuration_code_output"] = integration.outputs;
+        }
+
         inja::Environment env;
         inja::Template main_template;
         if (use_embedded)

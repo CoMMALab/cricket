@@ -103,7 +103,8 @@ NB_MODULE(_core_ext, m)
         .def_rw("end_effector", &cricket::GenOptions::end_effector)
         .def_rw("template_path", &cricket::GenOptions::template_path)
         .def_rw("subtemplates", &cricket::GenOptions::subtemplates)
-        .def_rw("language", &cricket::GenOptions::language);
+        .def_rw("language", &cricket::GenOptions::language)
+        .def_rw("forward_dynamics", &cricket::GenOptions::forward_dynamics);
 
     nb::class_<cricket::GenResult>(m, "GenResult")
         .def_ro("source", &cricket::GenResult::source)

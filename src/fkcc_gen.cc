@@ -5,7 +5,6 @@
 
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
-#include <inja/inja.hpp>
 #include <cxxopts.hpp>
 
 #include <filesystem>
@@ -102,54 +101,22 @@ int main(int argc, char **argv)
         bounds = b;
     }
 
-    cricket::RobotInfo robot(parent_path / data["urdf"], srdf_path, end_effector_name);
-
-    data.update(robot.json(bounds));
-
-    auto traced_eefk_code = cricket::trace_sphere_cc_fk(robot, language, false, false, true);
-    data["eefk_code"] = traced_eefk_code.code;
-    data["eefk_code_vars"] = traced_eefk_code.temp_variables;
-    data["eefk_code_output"] = traced_eefk_code.outputs;
-
-    auto traced_spherefk_code = cricket::trace_sphere_cc_fk(robot, language, true, false, false);
-    data["spherefk_code"] = traced_spherefk_code.code;
-    data["spherefk_code_vars"] = traced_spherefk_code.temp_variables;
-    data["spherefk_code_output"] = traced_spherefk_code.outputs;
-
-    auto traced_ccfk_code = cricket::trace_sphere_cc_fk(robot, language, true, true, false);
-    data["ccfk_code"] = traced_ccfk_code.code;
-    data["ccfk_code_vars"] = traced_ccfk_code.temp_variables;
-    data["ccfk_code_output"] = traced_ccfk_code.outputs;
-
-    auto traced_ccfkee_code = cricket::trace_sphere_cc_fk(robot, language, true, true, true);
-    data["ccfkee_code"] = traced_ccfkee_code.code;
-    data["ccfkee_code_vars"] = traced_ccfkee_code.temp_variables;
-    data["ccfkee_code_output"] = traced_ccfkee_code.outputs;
-
-    auto mapconfig = cricket::trace_map_to_configuration(robot.model, language, bounds);
-    data["mapconfig_code"] = mapconfig.code;
-    data["mapconfig_code_vars"] = mapconfig.temp_variables;
-    data["mapconfig_code_output"] = mapconfig.outputs;
-
-    auto interp = cricket::trace_interpolate(robot.model, language);
-    data["interpolate_code"] = interp.code;
-    data["interpolate_code_vars"] = interp.temp_variables;
-
-    auto interp_block = cricket::trace_interpolate_block(robot.model, language);
-    data["interpolate_block_code"] = interp_block.code;
-    data["interpolate_block_code_vars"] = interp_block.temp_variables;
-
-    auto dist = cricket::trace_distance(robot.model, language);
-    data["distance_code"] = dist.code;
-    data["distance_code_vars"] = dist.temp_variables;
-
-    inja::Environment env;
-
+    cricket::GenOptions gen_options;
+    gen_options.urdf = parent_path / data["urdf"];
+    gen_options.srdf = srdf_path;
+    gen_options.end_effector = end_effector_name;
+    gen_options.template_path = parent_path / data["template"];
+    gen_options.language = language;
+    gen_options.bounds = bounds;
+    gen_options.forward_dynamics = data.value("forward_dynamics", false);
+    gen_options.data = data;
     for (const auto &subt : data["subtemplates"])
     {
-        inja::Template temp = env.parse_template(parent_path / subt["template"]);
-        env.include_template(subt["name"], temp);
+        gen_options.subtemplates.emplace(
+            subt["name"].get<std::string>(), parent_path / subt["template"].get<std::string>());
     }
+
+    const auto generated = cricket::generate_robot_source(gen_options);
 
     std::string output_template;
     if (result.count("output_template"))
@@ -161,8 +128,9 @@ int main(int argc, char **argv)
         output_template = data["output"];
     }
 
-    inja::Template temp = env.parse_template(parent_path / data["template"]);
-    env.write(temp, data, output_template);
+    std::ofstream generated_file(output_template);
+    generated_file << generated.source;
+    generated_file.close();
 
     std::string output_filename;
     if (result.count("output_filename"))
@@ -175,7 +143,7 @@ int main(int argc, char **argv)
     }
 
     std::ofstream output_file(output_filename);
-    output_file << data.dump();
+    output_file << generated.data.dump();
     output_file.close();
 
     return 0;

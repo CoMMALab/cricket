@@ -50,6 +50,7 @@ namespace cricket
         std::map<std::string, std::filesystem::path> subtemplates;
         std::string language = "c++";
         std::optional<Bounds> bounds;
+        bool forward_dynamics = false;
         nlohmann::json data;
     };
 
