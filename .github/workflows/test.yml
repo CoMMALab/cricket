@@ -1,0 +1,39 @@
+name: Test
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up build environment
+        uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-file: environment.yaml
+          cache-environment: true
+          cache-downloads: true
+
+      - name: Cache CPM packages
+        uses: actions/cache@v4
+        with:
+          path: .cpm-cache
+          key: cpm-cache-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'CppADCodeGen.patch') }}
+
+      - name: Configure
+        shell: micromamba-shell {0}
+        run: cmake -GNinja -Bbuild -DCRICKET_BUILD_JIT=OFF -DCRICKET_BUILD_PYTHON=OFF -DBUILD_TESTING=ON .
+
+      - name: Build
+        shell: micromamba-shell {0}
+        run: cmake --build build
+
+      - name: Run tests
+        shell: micromamba-shell {0}
+        run: ctest --test-dir build --output-on-failure
