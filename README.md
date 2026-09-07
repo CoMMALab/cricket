@@ -104,6 +104,10 @@ The configuration file specifies:
 - Output template and sub-templates to use
 - Output filename
 
+The optional `dynamics_urdf` field selects a separate URDF for forward dynamics tracing.
+Use it when the collision URDF has simplified or removed inertial data.
+The dynamics URDF must describe the same configuration and velocity dimensions as `urdf`.
+
 An example for the Franka Panda is given below:
 ```json
 {
