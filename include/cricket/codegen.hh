@@ -232,6 +232,29 @@ namespace cricket
     auto trace_iiwa_se3_interpolate(const std::string &language) -> Traced;
     auto trace_iiwa_se3_interpolate_block(const std::string &language) -> Traced;
 
+    // Single-arm SE3+psi task-space parameterized IK for FR3/Panda (see
+    // src/parameterization/fr3_parameterization_gen.hh's Fr3SE3ParameterizationCG for the
+    // analytic IK math -- a CppAD retemplating of src/parameterization/fr3_parameterization.hh's
+    // franka_IK_EE_CC port -- and se3_tracer.hh for the generic pose+psi distance/interpolate
+    // kernels reused verbatim and the sample kernel reused with one extra argument (psi
+    // sampled from FR3's actual joint 7 limits instead of iiwa_se3's full [0, 2*pi) circle --
+    // see trace_map_to_se3's `psi_dof_index` header comment), same reasoning as
+    // trace_iiwa_se3_sample et al. above). Selected by "param_kind": "fr3_se3" (see
+    // derive_parameterized_traces). Unlike
+    // iiwa_se3's GC2/GC4/GC6 shoulder-elbow-wrist selectors, FR3's "smm"-shaped fixed
+    // per-planning-problem triple (see fk_template.hh) is (case6_sel, case1_sel, unused) --
+    // SolveArmBranchTaped's two real branch selectors, plus a third slot carried only so
+    // fr3_se3's smm stays the same width as iiwa_se3's (see that function's header comment
+    // in fr3_parameterization.hh for why FR3 has one fewer real branch axis than iiwa).
+    auto trace_fr3_se3_ik(const RobotInfo &info, const std::string &language) -> Traced;
+    auto trace_fr3_se3_sample(
+        const pinocchio::Model &model,
+        const std::string &language,
+        const std::optional<Bounds> &bounds) -> Traced;
+    auto trace_fr3_se3_distance(const std::string &language) -> Traced;
+    auto trace_fr3_se3_interpolate(const std::string &language) -> Traced;
+    auto trace_fr3_se3_interpolate_block(const std::string &language) -> Traced;
+
     // Bimanual iiwa leader-follower IK (see IiwaBimanualParameterizationCG in
     // iiwa_parameterization_gen.hh and the kernels in iiwa_bimanual_tracer.hh). This is
     // fk_template.hh's LeaderFollowerSpace, not ParameterizedSpace -- unlike iiwa_se3/

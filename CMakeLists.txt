@@ -114,6 +114,7 @@ add_library(cricket SHARED
     src/parameterization/rby1_constrained.cc
     src/parameterization/iiwa_se3_constrained.cc
     src/parameterization/iiwa_bimanual_constrained.cc
+    src/parameterization/fr3_se3_constrained.cc
 )
 add_library(cricket::cricket ALIAS cricket)
 set_target_properties(cricket PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -192,6 +193,17 @@ target_link_libraries(iiwa_se3_debug
 )
 target_compile_definitions(iiwa_se3_debug PRIVATE
     CRICKET_RESOURCES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources"
+)
+
+# Standalone psi-sweep helper for FR3/Panda's "fr3_se3" IK (see
+# src/parameterization/fr3_se3_psi_sweep_main.cc) -- pure Fr3SE3Parameterization<double> math,
+# no pinocchio model, JSON recipe, or codegen pipeline involved, so this only needs Eigen. No
+# CLI args -- edit the constants at the top of that file directly and rebuild.
+add_executable(fr3_se3_psi_sweep src/parameterization/fr3_se3_psi_sweep_main.cc)
+target_link_libraries(fr3_se3_psi_sweep
+    PRIVATE
+        Eigen3::Eigen
+        fmt::fmt
 )
 
 if(CRICKET_BUILD_JIT)

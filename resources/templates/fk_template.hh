@@ -829,12 +829,19 @@ struct {{name}}
         // base/DH frame -- see IiwaBimanualMidParameterizationCG's header comment).
         inline static thread_local std::array<float, 7> t_mid_left = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
         inline static thread_local std::array<float, 7> t_mid_right = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
-        {% else if param_kind == "iiwa_se3" %}
-        // GC2/GC4/GC6 (shoulder/elbow/wrist) self-motion-manifold branch selectors -- see
-        // IiwaSE3Parameterization in iiwa_parameterization.hh. Not part of State, so
+        {% else if param_kind == "iiwa_se3" or param_kind == "fr3_se3" %}
+        // Fixed per-planning-problem branch-selector triple, not part of State, so
         // param_ik_code reads this class member directly by name (`smm[i]`) instead of taking
         // it as part of resolve_block's input -- same mechanism as left_gcp/right_gcp in the
-        // rby1_bimanual branch above, just a single triple instead of one per arm.
+        // rby1_bimanual branch above, just a single triple instead of one per arm. Meaning
+        // depends on param_kind: for "iiwa_se3" this is GC2/GC4/GC6 (shoulder/elbow/wrist
+        // self-motion-manifold selectors -- see IiwaSE3Parameterization in
+        // iiwa_parameterization.hh); for "fr3_se3" it is (case6_sel, case1_sel, unused) --
+        // SolveArmBranchTaped's two real branch selectors (fr3_parameterization.hh), plus a
+        // third slot that's read off the tape but never affects the result, kept only so
+        // fr3_se3's `smm` stays the same width as iiwa_se3's (set_smm/set_smm_lanes below are
+        // shared verbatim across both param_kinds, so every caller passes one uniform
+        // array-of-3 regardless of which robot it's driving).
         inline static thread_local std::array<FloatVector<vamp::FloatVectorWidth, 1>, 3> smm = {
             FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f),
             FloatVector<vamp::FloatVectorWidth, 1>::fill(1.0f),
@@ -1094,13 +1101,15 @@ struct {{name}}
             return true;
         }
         {% endif %}
-        {% if param_kind == "iiwa_se3" %}
+        {% if param_kind == "iiwa_se3" or param_kind == "fr3_se3" %}
         // World pose of the single end effector -- unlike the rby1_bimanual case above, the
         // task-space State's own pose block (x_in[0:7)) already *is* the end effector's world
         // pose (this is a fixed-base robot, no mobile base / t_mid offset to compose through),
         // so this is a plain (untaped) quaternion -> rotation-matrix conversion, not a traced
         // kernel. Output layout matches trace_eef_local_spheres's expectation (translation
-        // xyz + rotation matrix, column-major) -- see param_eef_spheres_code below.
+        // xyz + rotation matrix, column-major) -- see param_eef_spheres_code below. Same shape
+        // for both "iiwa_se3" and "fr3_se3": both are single fixed-base arms whose State pose
+        // block already is the end effector's world pose.
         template <std::size_t rake>
         static inline auto eef_world_poses(const StateBlock<rake> &x_in) noexcept -> std::array<FloatVector<rake, 1>, 12>
         {
@@ -1319,6 +1328,75 @@ struct {{name}}
             {% for i in range(param_ik_num_unclipped) %}{% if i > 0 %}
             valid = valid & (u[{{i}}] <= V(1.0f)) & (u[{{i}}] >= V(-1.0f));
             {% endif %}{% endfor %}
+            {% for i in range(n_q) %}
+            valid = valid & (y[{{i}}] >= V({{ at(lower, i) + joint_limit_margin}})) & (y[{{i}}] <= V({{ at(upper, i) - joint_limit_margin}}));
+            {% endfor %}
+
+            return {valid, y};
+        }
+        {% else if param_kind == "fr3_se3" %}
+        // Batched task-space -> ambient-configuration resolve, FR3/Panda counterpart of the
+        // iiwa_se3 resolve_block above. `x` decomposes as pose(7, [x,y,z,qx,qy,qz,qw]) + psi(1)
+        // -- same shape as se3_tracer.hh's Space and the same tape/State variable name as
+        // iiwa_se3, even though `psi` here is FR3's joint 7 angle directly rather than a
+        // shoulder-elbow-wrist self-motion parameter (see Fr3SE3Parameterization's header in
+        // fr3_parameterization.hh). param_ik_code additionally reads the `smm` class member
+        // (see above) directly by name rather than taking it from `x`. Unlike iiwa_se3 (which
+        // rejects on any of 4 pre-clip SafeArccos arguments leaving [-1, 1]),
+        // Fr3SE3ParameterizationCG's `u` output is a single folded reach-violation residual
+        // (see Fr3IKParamResult in fr3_parameterization.hh): rejects (returns {false, _}) if
+        // `u[0] > 0` (no valid IK solution on this branch for the requested pose/psi) or the
+        // resolved ambient configuration falls outside the robot's own joint limits.
+        template <std::size_t rake>
+        static inline auto resolve_block(const StateBlock<rake> &x) noexcept
+            -> std::pair<bool, Ambient::ConfigurationBlock<rake>>
+        {
+            using V = FloatVector<rake, 1>;
+
+            std::array<V, 7> pose{x[0], x[1], x[2], x[3], x[4], x[5], x[6]};
+            const auto psi = x[7];
+
+            FloatVector<rake, {{param_ik_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> y;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u;
+
+            {{param_ik_code}}
+
+            if ((u[0] > V(0.0f)).any())
+            {
+                return {false, y};
+            }
+
+            {% for i in range(n_q) %}
+            if ((y[{{i}}] < V({{ at(lower, i) + joint_limit_margin}})).any() or (y[{{i}}] > V({{ at(upper, i) - joint_limit_margin}})).any())
+            {
+                return {false, y};
+            }
+            {% endfor %}
+
+            return {true, y};
+        }
+
+        // Per-lane variant of resolve_block -- see the rby1_bimanual resolve_block_mask above
+        // for why (the "one (broadcast) task-space state, many branch candidates" sweep,
+        // pairing with set_smm_lanes). Same validity conditions as resolve_block, accumulated
+        // into a mask instead of short-circuiting.
+        template <std::size_t rake>
+        static inline auto resolve_block_mask(const StateBlock<rake> &x) noexcept
+            -> std::pair<FloatVector<rake, 1>, Ambient::ConfigurationBlock<rake>>
+        {
+            using V = FloatVector<rake, 1>;
+
+            std::array<V, 7> pose{x[0], x[1], x[2], x[3], x[4], x[5], x[6]};
+            const auto psi = x[7];
+
+            FloatVector<rake, {{param_ik_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> y;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u;
+
+            {{param_ik_code}}
+
+            V valid = (u[0] <= V(0.0f));
             {% for i in range(n_q) %}
             valid = valid & (y[{{i}}] >= V({{ at(lower, i) + joint_limit_margin}})) & (y[{{i}}] <= V({{ at(upper, i) - joint_limit_margin}}));
             {% endfor %}

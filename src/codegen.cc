@@ -647,6 +647,72 @@ namespace cricket
         data["param_so3_offsets"] = std::vector<std::size_t>{3};
     }
 
+    // Single-arm SE3+psi task-space parameterized IK for FR3/Panda ("param_kind": "fr3_se3"):
+    // the fr3_se3_constrained.cc analytic IK plus the same se3_tracer.hh generic pose+psi
+    // sample/distance/interpolate kernels derive_iiwa_se3_parameterized_traces reuses above --
+    // FR3's task space is exactly the same 8-dim (pose(7) + free-param(1)) shape, just solved
+    // by a different closed form (see Fr3SE3ParameterizationCG's header). Populates exactly
+    // the same data[] keys as derive_iiwa_se3_parameterized_traces; the only semantic
+    // difference downstream is fk_template.hh's `param_kind == "fr3_se3"` resolve_block, which
+    // rejects on `u[0] > 0` (a single folded reach-violation residual) instead of iiwa_se3's
+    // per-element `u[i]` in [-1, 1] check.
+    auto derive_fr3_se3_parameterized_traces(
+        const RobotInfo &robot,
+        nlohmann::json &data,
+        const std::string &language,
+        const std::optional<Bounds> &bounds) -> void
+    {
+        auto param_ik = trace_fr3_se3_ik(robot, language);
+        data["param_ik_code"] = param_ik.code;
+        data["param_ik_code_vars"] = param_ik.temp_variables;
+        data["param_ik_code_output"] = param_ik.outputs;
+
+        // Fr3IKParamResult::reach_violation (fr3_parameterization.hh) is always a single
+        // scalar -- see Fr3SE3ParameterizationCG's header for why this differs from
+        // iiwa_se3's 4-element unclipped Vector4.
+        data["param_ik_num_unclipped"] = 1;
+
+        auto param_eef_spheres = trace_eef_local_spheres(robot, language);
+        data["param_eef_spheres_code"] = param_eef_spheres.traced.code;
+        data["param_eef_spheres_code_vars"] = param_eef_spheres.traced.temp_variables;
+        data["param_eef_spheres_code_output"] = param_eef_spheres.traced.outputs;
+        if (not param_eef_spheres.counts.empty())
+        {
+            data["n_eef_spheres"] = param_eef_spheres.counts[0];
+        }
+
+        auto param_sample = trace_fr3_se3_sample(robot.model, language, bounds);
+        data["param_sample_code"] = param_sample.code;
+        data["param_sample_code_vars"] = param_sample.temp_variables;
+        data["param_sample_code_output"] = param_sample.outputs;
+
+        auto param_distance = trace_fr3_se3_distance(language);
+        data["param_distance_code"] = param_distance.code;
+        data["param_distance_code_vars"] = param_distance.temp_variables;
+
+        auto param_interpolate = trace_fr3_se3_interpolate(language);
+        data["param_interpolate_code"] = param_interpolate.code;
+        data["param_interpolate_code_vars"] = param_interpolate.temp_variables;
+
+        auto param_interpolate_block = trace_fr3_se3_interpolate_block(language);
+        data["param_interpolate_block_code"] = param_interpolate_block.code;
+        data["param_interpolate_block_code_vars"] = param_interpolate_block.temp_variables;
+
+        // State layout (8): pose(7, [x,y,z,qx,qy,qz,qw]) + psi(1) -- named to match
+        // derive_iiwa_se3_parameterized_traces's State, even though `psi` here is FR3's joint 7
+        // angle directly (see Fr3SE3Parameterization's header comment). Sample layout (7): the
+        // raw [0,1) values trace_map_to_se3 maps via map_bounded/map_so3_shoemake -- see
+        // se3_tracer.hh -- except psi itself, which trace_fr3_se3_sample maps into joint 7's
+        // actual [lower, upper] limit rather than the full [0, 2*pi) circle iiwa_se3's psi
+        // uses, since here it IS that joint's angle (see trace_map_to_se3's `psi_dof_index`
+        // header comment for why). Non-Euclidean: the orientation quaternion block sits at
+        // offset 3.
+        data["param_dimension"] = 8;
+        data["param_sample_dimension"] = 7;
+        data["param_euclidean"] = false;
+        data["param_so3_offsets"] = std::vector<std::size_t>{3};
+    }
+
     // RBY1 constrained-bimanual parameterized IK: "use_parameterized": true traces the
     // whole-body-relative IK, the dual-hand FK used to derive t_mid_left/t_mid_right, and
     // the sample/distance/interpolate kernels over that parameterized space -- all consumed
@@ -894,6 +960,12 @@ namespace cricket
             data["has_parameterized_space"] = true;
             data["has_leader_follower_space"] = false;
             derive_iiwa_se3_parameterized_traces(robot, data, language, bounds);
+        }
+        else if (param_kind == "fr3_se3")
+        {
+            data["has_parameterized_space"] = true;
+            data["has_leader_follower_space"] = false;
+            derive_fr3_se3_parameterized_traces(robot, data, language, bounds);
         }
         else if (param_kind == "rby1_bimanual")
         {

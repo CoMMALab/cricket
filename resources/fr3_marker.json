@@ -1,0 +1,17 @@
+{
+    "name": "FR3Marker",
+    "urdf": "fr3_marker/fr3_expo_spherized.urdf",
+    "srdf": "fr3_marker/fr3_expo_spherized.srdf",
+    "end_effector": "fr3_hand_tcp",
+    "resolution": 32,
+    "constraints": true,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "fr3_se3_fk.hh",
+    "use_parameterized": true,
+    "param_kind": "fr3_se3",
+    "bounds": {
+        "upper": [2, 2, 2],
+        "lower": [-2, -2, -2]
+    }
+}

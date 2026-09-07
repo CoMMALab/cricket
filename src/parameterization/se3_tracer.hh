@@ -173,10 +173,26 @@ inline auto so3_log_smooth(const Matrix &R) -> Matrix
     return w0 * taylor + w_pi * pi_axis + w_generic * generic;
 }
 
+// `psi_dof_index`: for rby1_bimanual/iiwa_se3/iiwa_bimanual's mid-pose sampling, `psi` is a
+// genuine self-motion-manifold free parameter with no direct joint-limit meaning of its own
+// (only the *resulting* solved joints are checked against limits), so it's sampled over its
+// full natural period [0, 2*pi) -- the default (nullopt) here. FR3's "psi" is different:
+// Fr3SE3Parameterization passes it straight through as one specific solved joint's angle
+// (`q_out[6] = psi`, joint 7 -- see that function's header), so any sample landing outside
+// that joint's actual [lower, upper] limit is guaranteed to be rejected by resolve_block's
+// per-joint check -- wasted, not just redundant. Pass that joint's `model` DOF index (as
+// trace_fr3_se3_sample does, with FR3's joint 7 index) to sample psi directly from
+// `model.lowerPositionLimit`/`upperPositionLimit` there instead of the full circle, so no
+// sample is thrown away purely for landing outside psi's own range. Deliberately an explicit
+// index rather than e.g. `model.nq - 1`: recipes without an "active_joints" selection (see
+// JointSelection in robot_info.hh) keep every URDF joint in `model`, including any
+// end-effector DOF (gripper fingers, etc.) that sorts after the arm in joint order, so "the
+// model's last DOF" would silently pick the wrong one.
 inline auto trace_map_to_se3(
     const pinocchio::Model &model,
     const std::string &language,
-    const std::optional<Bounds> &bounds) -> Traced
+    const std::optional<Bounds> &bounds,
+    std::optional<std::size_t> psi_dof_index = std::nullopt) -> Traced
 {
 
     ADVectorXs ad_u(7);
@@ -201,7 +217,15 @@ inline auto trace_map_to_se3(
     ad_se3[4] = y;
     ad_se3[5] = z;
     ad_se3[6] = w;
-    ad_se3[7] = map_bounded(ad_u[6], 0.0, 2 * M_PI); // psi is bounded between 0 and 2*pi
+
+    double psi_lower = 0.0;
+    double psi_upper = 2 * M_PI;
+    if (psi_dof_index)
+    {
+        psi_lower = model.lowerPositionLimit[*psi_dof_index];
+        psi_upper = model.upperPositionLimit[*psi_dof_index];
+    }
+    ad_se3[7] = map_bounded(ad_u[6], psi_lower, psi_upper);
 
     CppAD::ADFun<CGD> map_func(ad_u, ad_se3);
 
