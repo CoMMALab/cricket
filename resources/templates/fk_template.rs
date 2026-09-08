@@ -134,9 +134,7 @@ where
 
 {% if forward_dynamics %}
 impl DynamicsKernel<{DIM}, {{n_v}}, f32> for {{name}} {
-    fn velocity_bounds(&self) -> [[f32; {{n_v}}]; 2] {
-        Self::VELOCITY_BOUNDS
-    }
+    const VELOCITY_BOUNDS: [[f32; {{n_v}}]; 2] = Self::VELOCITY_BOUNDS;
 
     fn forward_dynamics<const L: usize>(
         &self,
