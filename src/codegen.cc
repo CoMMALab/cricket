@@ -230,13 +230,19 @@ namespace cricket
             }
             std::vector<float> effort_lower(dynamics_model.nv);
             std::vector<float> effort_upper(dynamics_model.nv);
+            std::vector<float> velocity_lower(dynamics_model.nv);
+            std::vector<float> velocity_upper(dynamics_model.nv);
             for (auto i = 0; i < dynamics_model.nv; ++i)
             {
                 effort_lower[i] = static_cast<float>(-dynamics_model.effortLimit[i]);
                 effort_upper[i] = static_cast<float>(dynamics_model.effortLimit[i]);
+                velocity_lower[i] = static_cast<float>(-dynamics_model.velocityLimit[i]);
+                velocity_upper[i] = static_cast<float>(dynamics_model.velocityLimit[i]);
             }
             data["effort_lower"] = effort_lower;
             data["effort_upper"] = effort_upper;
+            data["velocity_lower"] = velocity_lower;
+            data["velocity_upper"] = velocity_upper;
             auto dynamics = trace_forward_dynamics(dynamics_model, opts.language);
             data["forward_dynamics_code"] = dynamics.code;
             data["forward_dynamics_code_vars"] = dynamics.temp_variables;

@@ -39,6 +39,10 @@ impl {{name}} {
         [{{join(effort_lower, ", ")}}],
         [{{join(effort_upper, ", ")}}],
     ];
+    pub const VELOCITY_BOUNDS: [[f32; {{n_v}}]; 2] = [
+        [{{join(velocity_lower, ", ")}}],
+        [{{join(velocity_upper, ", ")}}],
+    ];
 {% endif %}
 
     const BOUND_LOWER: [f32; DIM] = [{{join(bound_lower, ", ")}}];
@@ -130,6 +134,10 @@ where
 
 {% if forward_dynamics %}
 impl DynamicsKernel<{DIM}, {{n_v}}, f32> for {{name}} {
+    fn velocity_bounds(&self) -> [[f32; {{n_v}}]; 2] {
+        Self::VELOCITY_BOUNDS
+    }
+
     fn forward_dynamics<const L: usize>(
         &self,
         q: &[Simd<f32, L>; DIM],
