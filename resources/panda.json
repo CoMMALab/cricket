@@ -10,6 +10,8 @@
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
     "output": "panda_fk.hh",
+    "use_parameterized": true,
+    "param_kind": "fr3_se3",
     "flask": {
         "rho": 32.0,
         "resolution": 64

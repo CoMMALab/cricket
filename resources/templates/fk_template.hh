@@ -1215,7 +1215,7 @@ struct {{name}}
             }
 
             {% for i in range(n_q) %}
-            if ((q[{{i}}] < V({{ at(lower, i) + joint_limit_margin}})).any() or (q[{{i}}] > V({{ at(upper, i) - joint_limit_margin}})).any())
+            if ((q[{{i}}] < V({{ at(lower, i) + at(joint_limit_margins, i)}})).any() or (q[{{i}}] > V({{ at(upper, i) - at(joint_limit_margins, i)}})).any())
             {
                 return {false, q};
             }
@@ -1258,7 +1258,7 @@ struct {{name}}
 
             V valid = (reach_violation_left[0] <= V(0.0f)) & (reach_violation_right[0] <= V(0.0f));
             {% for i in range(n_q) %}
-            valid = valid & (q[{{i}}] >= V({{ at(lower, i) + joint_limit_margin}})) & (q[{{i}}] <= V({{ at(upper, i) - joint_limit_margin}}));
+            valid = valid & (q[{{i}}] >= V({{ at(lower, i) + at(joint_limit_margins, i)}})) & (q[{{i}}] <= V({{ at(upper, i) - at(joint_limit_margins, i)}}));
             {% endfor %}
 
             return {valid, q};
@@ -1296,7 +1296,7 @@ struct {{name}}
             {% endfor %}
 
             {% for i in range(n_q) %}
-            if ((y[{{i}}] < V({{ at(lower, i) + joint_limit_margin}})).any() or (y[{{i}}] > V({{ at(upper, i) - joint_limit_margin}})).any())
+            if ((y[{{i}}] < V({{ at(lower, i) + at(joint_limit_margins, i)}})).any() or (y[{{i}}] > V({{ at(upper, i) - at(joint_limit_margins, i)}})).any())
             {
                 return {false, y};
             }
@@ -1329,7 +1329,7 @@ struct {{name}}
             valid = valid & (u[{{i}}] <= V(1.0f)) & (u[{{i}}] >= V(-1.0f));
             {% endif %}{% endfor %}
             {% for i in range(n_q) %}
-            valid = valid & (y[{{i}}] >= V({{ at(lower, i) + joint_limit_margin}})) & (y[{{i}}] <= V({{ at(upper, i) - joint_limit_margin}}));
+            valid = valid & (y[{{i}}] >= V({{ at(lower, i) + at(joint_limit_margins, i)}})) & (y[{{i}}] <= V({{ at(upper, i) - at(joint_limit_margins, i)}}));
             {% endfor %}
 
             return {valid, y};
@@ -1368,7 +1368,7 @@ struct {{name}}
             }
 
             {% for i in range(n_q) %}
-            if ((y[{{i}}] < V({{ at(lower, i) + joint_limit_margin}})).any() or (y[{{i}}] > V({{ at(upper, i) - joint_limit_margin}})).any())
+            if ((y[{{i}}] < V({{ at(lower, i) + at(joint_limit_margins, i)}})).any() or (y[{{i}}] > V({{ at(upper, i) - at(joint_limit_margins, i)}})).any())
             {
                 return {false, y};
             }
@@ -1398,7 +1398,7 @@ struct {{name}}
 
             V valid = (u[0] <= V(0.0f));
             {% for i in range(n_q) %}
-            valid = valid & (y[{{i}}] >= V({{ at(lower, i) + joint_limit_margin}})) & (y[{{i}}] <= V({{ at(upper, i) - joint_limit_margin}}));
+            valid = valid & (y[{{i}}] >= V({{ at(lower, i) + at(joint_limit_margins, i)}})) & (y[{{i}}] <= V({{ at(upper, i) - at(joint_limit_margins, i)}}));
             {% endfor %}
 
             return {valid, y};
@@ -1445,7 +1445,7 @@ struct {{name}}
             {% endfor %}
 
             {% for i in range(n_q) %}
-            if ((q[{{i}}] < V({{ at(lower, i) + joint_limit_margin}})).any() or (q[{{i}}] > V({{ at(upper, i) - joint_limit_margin}})).any())
+            if ((q[{{i}}] < V({{ at(lower, i) + at(joint_limit_margins, i)}})).any() or (q[{{i}}] > V({{ at(upper, i) - at(joint_limit_margins, i)}})).any())
             {
                 return {false, q};
             }
@@ -1481,7 +1481,7 @@ struct {{name}}
             valid = valid & (u_right[{{i}}] <= V(1.0f)) & (u_right[{{i}}] >= V(-1.0f));
             {% endfor %}
             {% for i in range(n_q) %}
-            valid = valid & (q[{{i}}] >= V({{ at(lower, i) + joint_limit_margin}})) & (q[{{i}}] <= V({{ at(upper, i) - joint_limit_margin}}));
+            valid = valid & (q[{{i}}] >= V({{ at(lower, i) + at(joint_limit_margins, i)}})) & (q[{{i}}] <= V({{ at(upper, i) - at(joint_limit_margins, i)}}));
             {% endfor %}
 
             return {valid, q};
@@ -1678,7 +1678,7 @@ struct {{name}}
             {% endfor %}
 
             {% for i in range(n_q) %}
-            if ((y[{{i}}] < V({{ at(lower, i) + joint_limit_margin}})).any() or (y[{{i}}] > V({{ at(upper, i) - joint_limit_margin}})).any())
+            if ((y[{{i}}] < V({{ at(lower, i) + at(joint_limit_margins, i)}})).any() or (y[{{i}}] > V({{ at(upper, i) - at(joint_limit_margins, i)}})).any())
             {
                 return {false, y};
             }
@@ -1710,7 +1710,7 @@ struct {{name}}
             valid = valid & (u[{{i}}] <= V(1.0f)) & (u[{{i}}] >= V(-1.0f));
             {% endif %}{% endfor %}
             {% for i in range(n_q) %}
-            valid = valid & (y[{{i}}] >= V({{ at(lower, i) + joint_limit_margin}})) & (y[{{i}}] <= V({{ at(upper, i) - joint_limit_margin}}));
+            valid = valid & (y[{{i}}] >= V({{ at(lower, i) + at(joint_limit_margins, i)}})) & (y[{{i}}] <= V({{ at(upper, i) - at(joint_limit_margins, i)}}));
             {% endfor %}
 
             return {valid, y};

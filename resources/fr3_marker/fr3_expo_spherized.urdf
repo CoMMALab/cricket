@@ -480,13 +480,13 @@
 		</visual>
 		<collision>
 			<geometry>
-				<sphere radius="0.0010807309299707413"></sphere>
+				<sphere radius="0.0150807309299707413"></sphere>
 			</geometry>
 			<origin xyz="6.735312490491197e-05 3.753798591787927e-05 -0.00029216374969109893" rpy="0 0 0"></origin>
 		</collision>
 		<collision>
 			<geometry>
-				<sphere radius="0.0010744257597252727"></sphere>
+				<sphere radius="0.0150744257597252727"></sphere>
 			</geometry>
 			<origin xyz="2.1509351427084766e-05 -7.066665421007201e-05 0.00030517252162098885" rpy="0 0 0"></origin>
 		</collision>

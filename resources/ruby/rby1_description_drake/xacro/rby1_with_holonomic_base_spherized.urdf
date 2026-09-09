@@ -924,11 +924,20 @@
 				<mesh filename="ruby/rby1_description_drake/meshes/EE_FINGER.obj"></mesh>
 			</geometry>
 		</visual>
+		<!-- Re-fingered August 2026: printed TPU shank + 66 mm ball tip, replacing the
+		     stock 60.5 mm blade this single sphere was sized for. Two spheres now:
+		     the tip ball and a sphere circumscribing the shank. See notes/ball_fingers.md. -->
 		<collision>
 			<geometry>
-				<sphere radius="0.03427768871188164"></sphere>
+				<sphere radius="0.033"></sphere>
 			</geometry>
-			<origin xyz="0.0024527516216039658 -0.0016467842506244779 -0.0250600203871727" rpy="0 0 0"></origin>
+			<origin xyz="-0.005 0.0 -0.0774" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.044088462209517"></sphere>
+			</geometry>
+			<origin xyz="0.0025 0.0 -0.03795" rpy="0 0 0"></origin>
 		</collision>
 	</link>
 	<link name="left_ee_finger_2">
@@ -943,11 +952,20 @@
 				<mesh filename="ruby/rby1_description_drake/meshes/EE_FINGER.obj"></mesh>
 			</geometry>
 		</visual>
+		<!-- Re-fingered August 2026: printed TPU shank + 66 mm ball tip, replacing the
+		     stock 60.5 mm blade this single sphere was sized for. Two spheres now:
+		     the tip ball and a sphere circumscribing the shank. See notes/ball_fingers.md. -->
 		<collision>
 			<geometry>
-				<sphere radius="0.03427768871188164"></sphere>
+				<sphere radius="0.033"></sphere>
 			</geometry>
-			<origin xyz="0.0024527516216039658 -0.0016467842506244779 -0.0250600203871727" rpy="0 0 0"></origin>
+			<origin xyz="-0.005 0.0 -0.0774" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.044088462209517"></sphere>
+			</geometry>
+			<origin xyz="0.0025 0.0 -0.03795" rpy="0 0 0"></origin>
 		</collision>
 	</link>
 	<link name="right_ee_body">
@@ -987,11 +1005,20 @@
 				<mesh filename="ruby/rby1_description_drake/meshes/EE_FINGER.obj"></mesh>
 			</geometry>
 		</visual>
+		<!-- Re-fingered August 2026: printed TPU shank + 66 mm ball tip, replacing the
+		     stock 60.5 mm blade this single sphere was sized for. Two spheres now:
+		     the tip ball and a sphere circumscribing the shank. See notes/ball_fingers.md. -->
 		<collision>
 			<geometry>
-				<sphere radius="0.03427768871188164"></sphere>
+				<sphere radius="0.033"></sphere>
 			</geometry>
-			<origin xyz="0.0024527516216039658 -0.0016467842506244779 -0.0250600203871727" rpy="0 0 0"></origin>
+			<origin xyz="-0.005 0.0 -0.0774" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.044088462209517"></sphere>
+			</geometry>
+			<origin xyz="0.0025 0.0 -0.03795" rpy="0 0 0"></origin>
 		</collision>
 	</link>
 	<link name="right_ee_finger_2">
@@ -1006,11 +1033,20 @@
 				<mesh filename="ruby/rby1_description_drake/meshes/EE_FINGER.obj"></mesh>
 			</geometry>
 		</visual>
+		<!-- Re-fingered August 2026: printed TPU shank + 66 mm ball tip, replacing the
+		     stock 60.5 mm blade this single sphere was sized for. Two spheres now:
+		     the tip ball and a sphere circumscribing the shank. See notes/ball_fingers.md. -->
 		<collision>
 			<geometry>
-				<sphere radius="0.03427768871188164"></sphere>
+				<sphere radius="0.033"></sphere>
 			</geometry>
-			<origin xyz="0.0024527516216039658 -0.0016467842506244779 -0.0250600203871727" rpy="0 0 0"></origin>
+			<origin xyz="-0.005 0.0 -0.0774" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.044088462209517"></sphere>
+			</geometry>
+			<origin xyz="0.0025 0.0 -0.03795" rpy="0 0 0"></origin>
 		</collision>
 	</link>
 	<joint name="base_x" type="prismatic">
@@ -1073,7 +1109,10 @@
 		<child link="link_torso_1" />
 		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0" />
 		<axis xyz="0 1 0" />
-		<limit effort="1000.0" lower="-0.523598776" upper="1.52173048" velocity="3.14159265"
+		<!-- Upper bound tightened from vendor 1.52173048 to 1.146 rad: 16.9 mm clearance
+		     to the base-mounted mid360 LIDAR at torso_0 = 0, ~10 mm worst case. See
+		     notes/hardware_incident_20260828.md. -->
+		<limit effort="1000.0" lower="-0.523598776" upper="1.146" velocity="3.14159265"
 		drake:acceleration="1.5" />
 	</joint>
 
@@ -1082,7 +1121,12 @@
 		<child link="link_torso_2" />
 		<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.350" />
 		<axis xyz="0 1 0" />
-		<limit effort="1000.0" lower="-2.478367" upper="1.570796" velocity="3.14159265"
+		<!-- Range tightened from vendor [-2.478367, 1.570796] to [-2.38, 1.33]: link_torso_1
+		     and link_torso_2 physically interfere at 1.4744 rad (96 mrad inside the vendor
+		     upper bound; the robot was driven onto this stop on 2026-08-28). [-2.38, 1.33]
+		     keeps >=10 mm of metal-to-metal clearance at each bound (10.2 / 10.9 mm). See
+		     notes/hardware_incident_20260828.md and scripts/mesh_vs_limits.py. -->
+		<limit effort="1000.0" lower="-2.38" upper="1.33" velocity="3.14159265"
 		drake:acceleration="3.141592" />
 	</joint>
 

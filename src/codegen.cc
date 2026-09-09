@@ -220,6 +220,12 @@ namespace cricket
                 per_eef_spheres[k].emplace_back(local_offset, sphere.radius);
                 // we need a way of identifying the link the added sphere belongs to to print it
             }
+
+            // Only keep the last sphere for each end effector.
+            if (per_eef_spheres[k].size() > 1)
+            {
+                per_eef_spheres[k].erase(per_eef_spheres[k].begin(), per_eef_spheres[k].end() - 1);
+            }
         }
 
         ADVectorXs ad_pose(12 * num_end_effectors);
@@ -953,7 +959,19 @@ namespace cricket
 
         const std::string param_kind = data.value("param_kind", std::string("rby1_bimanual"));
         data["param_kind"] = param_kind;
-        data["joint_limit_margin"] = data.value("joint_limit_margin", 0.0);
+        const double joint_limit_margin = data.value("joint_limit_margin", 0.0);
+        data["joint_limit_margin"] = joint_limit_margin;
+
+        // Per-dof margin: only real revolute/prismatic joint-limit dofs (joint_revolute_mask,
+        // from RobotInfo::json) get the margin -- see its comment for why SO2/SO3/SE3/SE2 dofs
+        // must not.
+        const auto revolute_mask = data["joint_revolute_mask"].get<std::vector<int>>();
+        std::vector<double> joint_limit_margins(revolute_mask.size(), 0.0);
+        for (std::size_t i = 0; i < revolute_mask.size(); ++i)
+        {
+            joint_limit_margins[i] = revolute_mask[i] ? joint_limit_margin : 0.0;
+        }
+        data["joint_limit_margins"] = joint_limit_margins;
 
         if (param_kind == "iiwa_se3")
         {

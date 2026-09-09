@@ -723,6 +723,27 @@ namespace cricket
         json["lower"] = std::vector<float>(lower_bound.data(), lower_bound.data() + model.nq);
         json["upper"] = std::vector<float>(upper_bound.data(), upper_bound.data() + model.nq);
 
+        // Only JointType::Bounded dofs (classic single-dof revolute/prismatic joints with real
+        // mechanical limits) should ever get a joint_limit_margin applied -- SO2/SO3/SE3/SE2
+        // dofs are manifold coordinates (e.g. a continuous joint's cos/sin pair, or a
+        // quaternion component) whose "bounds" aren't real joint limits, so shrinking them by a
+        // margin corrupts those values instead of adding clearance.
+        {
+            std::vector<int> revolute_mask(model.nq, 0);
+            const auto [_, joint_mappings] = classify_joints(model);
+            for (const auto &jm : joint_mappings)
+            {
+                if (jm.type == JointType::Bounded)
+                {
+                    for (std::size_t i = 0; i < jm.nq; ++i)
+                    {
+                        revolute_mask[jm.idx_q + i] = 1;
+                    }
+                }
+            }
+            json["joint_revolute_mask"] = revolute_mask;
+        }
+
         const Eigen::VectorXd velocity_limit = model.velocityLimit;
         const Eigen::VectorXd effort_limit = model.effortLimit;
         json["velocity_limits"] =

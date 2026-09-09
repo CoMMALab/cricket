@@ -8,6 +8,10 @@
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
     "output": "rby1_fk.hh",
     "use_parameterized": true,
+    "constraints": true,
+    "com": {
+        "reference_frames": ["base"]
+    },
     "bounds": {
         "upper": [2, 2, 2],
         "lower": [-2, -2, -2]
