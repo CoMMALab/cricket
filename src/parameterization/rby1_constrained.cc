@@ -33,4 +33,9 @@ namespace cricket
         return RainbowEefWorldPosesFromMidCG(language);
     }
 
+    auto trace_rby1_classify_gcp(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        return RainbowClassifyGcpCG<ADCG>(info, language);
+    }
+
 }  // namespace cricket

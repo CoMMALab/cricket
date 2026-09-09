@@ -1434,4 +1434,213 @@ auto trace_rby1_constrained_interpolate_block(const std::string &language) -> Tr
         {{"a", n_per_side, true, ".broadcast(", ")"}, {"b", n_per_side, true, ".broadcast(", ")"}, {"t", 1, false}},
         {{"out", n_per_side, true}});
 }
+
+// =====================================================================
+// GCP classification (the inverse of RainbowIkCG/RainbowConstrainedBimanualIkCG): given an
+// *already-resolved* whole-body ambient configuration -- e.g. one a ConstrainedLocalPlanner-
+// based planner produced by projecting/sampling directly in ambient space, which never goes
+// through resolve_block or a GCP selector at all (see
+// vamp::planning::constraint::ConstraintSettings::fix_single_smm and
+// RBY1::ParameterizedSpace::classify_smm_block on the vamp side) -- recover which GCP branch
+// (elbow_sel, shoulder_sel, wrist_sel) each arm is actually on. See
+// RainbowLeftArmClassifyGcp/RainbowRightArmClassifyGcp (rainbow_arm_parameterization.hh) for
+// the actual per-arm math; this function is the RainbowIkCG-style plumbing around it: run
+// full-body forward kinematics on the given ambient configuration (unlike
+// RainbowConstrainedBimanualIkCG, which only runs it on base+torso, since here the arm
+// joints are already known tape inputs, not something to solve for), express each hand's
+// achieved pose relative to link_torso_5 (the arm solvers' own frame -- see
+// RainbowIkCG's header comment for why that composition is valid), and hand that plus the
+// arm's own already-known joint angles straight to the classify functions.
+//
+// Tape input layout (size 24) -- identical to RainbowIkCG's/
+// RainbowConstrainedBimanualIkCG's own "q" *output* layout, i.e. AmbientConfigurationBlock's
+// layout, so a caller already holding one of those doesn't need to repack it:
+//   [0:4)   -- wheeled base (x, y, base_rz_cos, base_rz_sin)
+//   [4:10)  -- torso_0 .. torso_5
+//   [10:17) -- left arm q (7): [j13, j14, j15, j16, j17, j18, j19]
+//   [17:24) -- right arm q (7): [j22, j23, j24, j25, j26, j27, j28]
+//
+// Output layout (6): left (elbow_sel, shoulder_sel, wrist_sel), then right, same order/shape
+// as left_gcp/right_gcp elsewhere.
+template <typename T>
+auto RainbowClassifyGcpCG(
+    const RobotInfo &info,
+    const std::string &language
+)
+{
+    using ModelT = pinocchio::ModelTpl<T>;
+    using DataT = pinocchio::DataTpl<T>;
+
+    std::cout << "Generating GCP classification code for the rainbow arms..." << std::endl;
+
+    const size_t n_base = 4;
+    const size_t n_torso = 6;
+    const size_t n_arm_q = 7;
+    const size_t num_inp = n_base + n_torso + n_arm_q + n_arm_q;  // == 24
+    ADVectorXs ad_inp(num_inp);
+    for (auto i = 0U; i < num_inp; ++i)
+    {
+        ad_inp[i] = (T)(0.0001);
+    }
+    Independent(ad_inp);
+
+    const T base_x = ad_inp[0];
+    const T base_y = ad_inp[1];
+    const T base_rz_cos = ad_inp[2];
+    const T base_rz_sin = ad_inp[3];
+
+    const T torso_0 = ad_inp[4];
+    const T torso_1 = ad_inp[5];
+    const T torso_2 = ad_inp[6];
+    const T torso_3 = ad_inp[7];
+    const T torso_4 = ad_inp[8];
+    const T torso_5 = ad_inp[9];
+
+    // left arm q: [j13, j14, j15, j16, j17, j18, j19] -- offsets 0/2/3/5 (j13/j15/j16/j18)
+    // are what RainbowLeftArmClassifyGcp needs; j14/j17/j19 aren't independently branch-
+    // selected (see that function's header comment) and are unused here.
+    const T left_j13 = ad_inp[10];
+    const T left_j15 = ad_inp[12];
+    const T left_j16 = ad_inp[13];
+    const T left_j18 = ad_inp[15];
+
+    // right arm q: [j22, j23, j24, j25, j26, j27, j28] -- same offsets (0/2/3/5).
+    const T right_j22 = ad_inp[17];
+    const T right_j24 = ad_inp[19];
+    const T right_j25 = ad_inp[20];
+    const T right_j27 = ad_inp[22];
+
+    ModelT ad_model = info.model.cast<T>();
+    DataT ad_data(ad_model);
+
+    Eigen::VectorX<T> q_full = Eigen::VectorX<T>::Zero(ad_model.nq);
+
+    // Same lambda as RainbowIkCG's -- writes `value` into q_full at the named scalar
+    // (nq() == 1) joint's configuration slot.
+    auto set_scalar_joint = [&](const std::string &name, const T &value) {
+        if (not info.model.existJointName(name))
+        {
+            throw std::runtime_error(fmt::format("RainbowClassifyGcpCG: model has no joint named `{}`", name));
+        }
+        const auto &joint = info.model.joints[info.model.getJointId(name)];
+        if (joint.nq() != 1)
+        {
+            throw std::runtime_error(
+                fmt::format("RainbowClassifyGcpCG: joint `{}` has nq() == {}, expected 1", name, joint.nq()));
+        }
+        q_full[joint.idx_q()] = value;
+    };
+
+    set_scalar_joint("base_x", base_x);
+    set_scalar_joint("base_y", base_y);
+
+    if (not info.model.existJointName("base_rz"))
+    {
+        throw std::runtime_error("RainbowClassifyGcpCG: model has no joint named `base_rz`");
+    }
+    {
+        const auto &base_rz_joint = info.model.joints[info.model.getJointId("base_rz")];
+        if (base_rz_joint.nq() != 2)
+        {
+            throw std::runtime_error(fmt::format(
+                "RainbowClassifyGcpCG: joint `base_rz` has nq() == {}, expected 2 (continuous)",
+                base_rz_joint.nq()));
+        }
+        q_full[base_rz_joint.idx_q() + 0] = base_rz_cos;
+        q_full[base_rz_joint.idx_q() + 1] = base_rz_sin;
+    }
+
+    set_scalar_joint("torso_0", torso_0);
+    set_scalar_joint("torso_1", torso_1);
+    set_scalar_joint("torso_2", torso_2);
+    set_scalar_joint("torso_3", torso_3);
+    set_scalar_joint("torso_4", torso_4);
+    set_scalar_joint("torso_5", torso_5);
+
+    // Unlike RainbowConstrainedBimanualIkCG (which only commands base+torso, since the arm
+    // joints are what it's solving for), every arm joint is already a known tape input
+    // here, so it's set too -- forwardKinematics below needs the FULL configuration to
+    // report the hands' actually-achieved poses, not just link_torso_5's.
+    set_scalar_joint("left_arm_0", left_j13);
+    set_scalar_joint("left_arm_1", ad_inp[11]);
+    set_scalar_joint("left_arm_2", left_j15);
+    set_scalar_joint("left_arm_3", left_j16);
+    set_scalar_joint("left_arm_4", ad_inp[14]);
+    set_scalar_joint("left_arm_5", left_j18);
+    set_scalar_joint("left_arm_6", ad_inp[16]);
+
+    set_scalar_joint("right_arm_0", right_j22);
+    set_scalar_joint("right_arm_1", ad_inp[18]);
+    set_scalar_joint("right_arm_2", right_j24);
+    set_scalar_joint("right_arm_3", right_j25);
+    set_scalar_joint("right_arm_4", ad_inp[21]);
+    set_scalar_joint("right_arm_5", right_j27);
+    set_scalar_joint("right_arm_6", ad_inp[23]);
+
+    forwardKinematics(ad_model, ad_data, q_full);
+    updateFramePlacements(ad_model, ad_data);
+
+    if (not info.model.existFrame("link_torso_5"))
+    {
+        throw std::runtime_error("RainbowClassifyGcpCG: model has no frame named `link_torso_5`");
+    }
+    if (not info.model.existFrame("ee_left"))
+    {
+        throw std::runtime_error("RainbowClassifyGcpCG: model has no frame named `ee_left`");
+    }
+    if (not info.model.existFrame("ee_right"))
+    {
+        throw std::runtime_error("RainbowClassifyGcpCG: model has no frame named `ee_right`");
+    }
+
+    const auto torso_frame_id = info.model.getFrameId("link_torso_5");
+    const auto &torso_world = ad_data.oMf[torso_frame_id];
+    const auto &left_ee_world = ad_data.oMf[info.model.getFrameId("ee_left")];
+    const auto &right_ee_world = ad_data.oMf[info.model.getFrameId("ee_right")];
+
+    // Same "world -> link_torso_5-relative" composition as RainbowIkCG/
+    // RainbowConstrainedBimanualIkCG use for the goal pose, applied here to the *achieved*
+    // hand pose instead -- see this function's header comment.
+    pinocchio::SE3Tpl<T> left_goal_local = torso_world.inverse() * left_ee_world;
+    pinocchio::SE3Tpl<T> right_goal_local = torso_world.inverse() * right_ee_world;
+
+    Eigen::Vector3<T> left_gcp =
+        RainbowLeftArmClassifyGcp<T>(left_goal_local.translation(), left_goal_local.rotation(),
+            left_j13, left_j15, left_j16, left_j18);
+    Eigen::Vector3<T> right_gcp =
+        RainbowRightArmClassifyGcp<T>(right_goal_local.translation(), right_goal_local.rotation(),
+            right_j22, right_j24, right_j25, right_j27);
+
+    ADVectorXs data(6);
+    data[0] = left_gcp(0);
+    data[1] = left_gcp(1);
+    data[2] = left_gcp(2);
+    data[3] = right_gcp(0);
+    data[4] = right_gcp(1);
+    data[5] = right_gcp(2);
+
+    ADFun<CGD> classify_gcp_func(ad_inp, data);
+    std::cout << "Created the AD function." << std::endl;
+    CodeHandler<double> handler;
+    CppAD::vector<CGD> ind_vars(num_inp);
+
+    handler.makeVariables(ind_vars);
+
+    CppAD::vector<CGD> result = classify_gcp_func.Forward(0, ind_vars);
+    std::cout << "Ran the AD function." << std::endl;
+
+    // Codegen needs the block-oriented language for fk_template.hh-style FloatVector-based
+    // classify_smm_block, same remap RainbowIkCG uses for resolve_block.
+    const std::string lang = (language == "c++") ? "c++_block" : language;
+
+    SegmentedVariableNameGenerator<double> nameGen(
+        {{"q", num_inp, true}},
+        {{"left_gcp_out", 3, true}, {"right_gcp_out", 3, true}});
+
+    std::cout << "Generated the GCP classification code." << std::endl;
+    return Traced{
+        generate_code(handler, result, lang, nameGen),
+        handler.getTemporaryVariableCount(),
+        result.size()};
+}
 }  // namespace cricket

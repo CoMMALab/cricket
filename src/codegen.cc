@@ -751,6 +751,14 @@ namespace cricket
         data["param_eef_world_poses_code_vars"] = param_eef_world_poses.temp_variables;
         data["param_eef_world_poses_code_output"] = param_eef_world_poses.outputs;
 
+        // GCP classification (see trace_rby1_classify_gcp/RainbowClassifyGcpCG): recovers
+        // (elbow_sel, shoulder_sel, wrist_sel) per arm from an already-resolved ambient
+        // configuration alone, for ConstraintSettings::fix_single_smm.
+        auto param_classify_gcp = trace_rby1_classify_gcp(robot, language);
+        data["param_classify_gcp_code"] = param_classify_gcp.code;
+        data["param_classify_gcp_code_vars"] = param_classify_gcp.temp_variables;
+        data["param_classify_gcp_code_output"] = param_classify_gcp.outputs;
+
         // Per-end-effector local spheres (gripper/finger geometry) for eefs_in_collision's
         // no-attachment case -- see trace_eef_local_spheres above. Generic
         // over robot.end_effector_names, but eefs_in_collision itself is currently only

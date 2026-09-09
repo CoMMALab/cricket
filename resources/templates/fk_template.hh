@@ -775,6 +775,29 @@ struct {{name}}
         // overwrite directly or via compute_mid_pose() below.
         inline static thread_local std::array<float, 7> t_mid_left = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
         inline static thread_local std::array<float, 7> t_mid_right = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+
+        // Target GCP branch for ConstrainedLocalPlanner's optional single-SMM restriction
+        // (see vamp::planning::constraint::ConstraintSettings::fix_single_smm): the
+        // (elbow_sel, shoulder_sel, wrist_sel) every candidate configuration must classify
+        // to, per arm, while that setting is on. Not read by resolve_block (that's what
+        // left_gcp/right_gcp above are for) -- only by classify_smm_block/smm_mask_block
+        // below, which ConstrainedLocalPlanner calls instead when it never goes through
+        // resolve_block at all (e.g. RBY1's projection-based mcvamp planner, which samples/
+        // projects directly in ambient space).
+        inline static thread_local std::array<float, 3> target_smm_left = {0.0f, 0.0f, 1.0f};
+        inline static thread_local std::array<float, 3> target_smm_right = {0.0f, 0.0f, 1.0f};
+
+        // Set the target GCP branch (elbow_sel, shoulder_sel, wrist_sel) both arms must
+        // classify to while ConstraintSettings::fix_single_smm is on. Typically set once per
+        // planning problem from classify_smm_block() applied to that problem's own start
+        // configuration (i.e. "stay on whatever branch the start is already on"), the same
+        // way left_gcp/right_gcp get fixed for a whole RRTC run via set_gcp.
+        static inline void set_target_smm(
+            const std::array<float, 3> &left, const std::array<float, 3> &right) noexcept
+        {
+            target_smm_left = left;
+            target_smm_right = right;
+        }
         {% else if param_kind == "iiwa_bimanual" %}
         // Per-arm GC2/GC4/GC6 (shoulder/elbow/wrist) self-motion-manifold branch selectors --
         // see IiwaSE3Parameterization in iiwa_parameterization.hh, called once per arm by
@@ -986,6 +1009,54 @@ struct {{name}}
             {{param_com_code}}
 
             return y;
+        }
+        {% endif %}
+
+        {% if param_kind == "rby1_bimanual" %}
+        // Recovers (elbow_sel, shoulder_sel, wrist_sel) per arm from an already-resolved
+        // ambient configuration alone -- the inverse of what resolve_block does starting
+        // from a target task-space pose plus a chosen left_gcp/right_gcp. Needed because
+        // ConstrainedLocalPlanner (the generic projection-based local planner -- see
+        // rby1_mcvamp_planner.cc) never goes through resolve_block or ParameterizedSpace at
+        // all: it samples/projects directly in Ambient's own configuration space, so there
+        // is no left_gcp/right_gcp already lying around to compare a candidate against; it
+        // has to be read back out of the candidate's own joint values. See
+        // RainbowClassifyGcpCG/RainbowLeftArmClassifyGcp/RainbowRightArmClassifyGcp
+        // (cricket's src/parameterization/rainbow_ik_cg.hh /
+        // rainbow_arm_parameterization.hh) for the actual math this generates.
+        template <std::size_t rake>
+        static inline auto classify_smm_block(const Ambient::ConfigurationBlock<rake> &q) noexcept
+            -> std::array<std::array<FloatVector<rake, 1>, 3>, 2>
+        {
+            using V = FloatVector<rake, 1>;
+            {% if param_classify_gcp_code_vars > 0 %}std::array<V, {{param_classify_gcp_code_vars}}> v;{% endif %}
+            std::array<V, 3> left_gcp_out;
+            std::array<V, 3> right_gcp_out;
+
+            {{param_classify_gcp_code}}
+
+            return {left_gcp_out, right_gcp_out};
+        }
+
+        // Per-lane 1.0/0.0 mask: whether that lane's (elbow_sel, shoulder_sel, wrist_sel) --
+        // both arms -- matches target_smm_left/target_smm_right exactly (discrete branch
+        // labels, not continuous values, so exact equality is the right test, unlike e.g.
+        // fkcc's tolerance-based checks). Intended to be combined with a block's fkcc mask
+        // the same way ConstrainedLocalPlanner's fkcc_block gate already works: reject the
+        // whole block ("not all points in the same SMM") unless every lane matches.
+        template <std::size_t rake>
+        static inline auto smm_mask_block(const Ambient::ConfigurationBlock<rake> &q) noexcept
+            -> FloatVector<rake, 1>
+        {
+            using V = FloatVector<rake, 1>;
+            const auto classified = classify_smm_block<rake>(q);
+
+            return (classified[0][0] == V(target_smm_left[0])) &
+                   (classified[0][1] == V(target_smm_left[1])) &
+                   (classified[0][2] == V(target_smm_left[2])) &
+                   (classified[1][0] == V(target_smm_right[0])) &
+                   (classified[1][1] == V(target_smm_right[1])) &
+                   (classified[1][2] == V(target_smm_right[2]));
         }
         {% endif %}
 

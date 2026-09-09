@@ -841,3 +841,145 @@ auto RainbowRightArmParameterizationFromPose(
 
     return RainbowArmParamResult<T>{q, unclipped, reach_violation, loss};
 }
+
+// --- GCP classification: the inverse problem -----------------------------
+//
+// RainbowLeftArmParameterizationFromPose / RainbowRightArmParameterizationFromPose go
+// (target pose, free joint angle, GCP selectors) -> ambient joint angles q, CondExpEq-
+// selecting one of two closed-form candidates for the elbow/shoulder joints per the caller-
+// supplied elbow_sel/shoulder_sel (wrist_sel is a plain sign multiplier, no selection
+// needed). RainbowLeftArmClassifyGcp / RainbowRightArmClassifyGcp below solve the inverse:
+// given an *already-resolved* arm (its own achieved joint angles, from wherever -- a real
+// resolve_block call, or e.g. RRTC sampling/projection in ambient space that never touched
+// resolve_block or a GCP selector at all), recover which GCP branch it's actually on.
+//
+// The method: recompute the SAME two closed-form candidates the forward function would
+// have chosen between (from the achieved end-effector pose alone -- no elbow_sel/
+// shoulder_sel input), then classify by whichever candidate the arm's own actual joint
+// value is angularly closer to. "Closer" is compared via cos() of the difference rather
+// than the raw angular difference, so it's automatically wraparound-safe (no RainbowWrap
+// needed on the candidates) and remains well-defined even for a configuration that didn't
+// come from resolve_block at all (e.g. one RRTC/projection nudged slightly off the exact
+// closed-form solution) -- it always picks whichever candidate is nearest, rather than
+// requiring an exact match.
+//
+// wrist_sel needs no candidate evaluation at all: j18/j27 = wrist_sel * (a nonnegative
+// magnitude) by construction (see the `j18 = wrist_sel * j18_pos` / `j27 = wrist_sel *
+// j27_pos` assignments above), so its sign IS wrist_sel directly.
+//
+// Returns (elbow_sel, shoulder_sel, wrist_sel) as a Vector3, matching the 3-tuple shape
+// left_gcp/right_gcp/set_gcp already use elsewhere (elbow_sel/shoulder_sel come back as
+// exactly 0.0 or 1.0, wrist_sel as exactly +-1.0, matching what a caller would have passed
+// to CondExpEq/multiplied by, respectively, on the forward path).
+
+// Left arm: `actual_j13`/`actual_j15`/`actual_j16`/`actual_j18` are that arm's own already-
+// resolved joint angles (shoulder, free/self-motion, elbow, wrist -- ambient offsets 0, 2,
+// 3, 5 within the arm's own 7-joint block, i.e. left_arm_0/left_arm_2/left_arm_3/
+// left_arm_5), `eetrans`/`eerot` its achieved end-effector pose in the same solver frame
+// RainbowTransformToSolverFrame expects (i.e. relative to link_torso_5 -- see
+// RainbowIkCG/RainbowConstrainedBimanualIkCG's header comments for that composition).
+template <typename T>
+auto RainbowLeftArmClassifyGcp(
+    const Eigen::Matrix<T, 3, 1> &eetrans,
+    const Eigen::Matrix3<T> &eerot,
+    const T &actual_j13,
+    const T &actual_j15,
+    const T &actual_j16,
+    const T &actual_j18
+) -> Eigen::Vector3<T>
+{
+    T px, py, pz;
+    T r00, r01, r02, r10, r11, r12, r20, r21, r22;
+    RainbowTransformToSolverFrame<T>(eetrans, eerot, px, py, pz, r00, r01, r02, r10, r11, r12, r20, r21, r22);
+
+    const T cj15 = cos(actual_j15), sj15 = sin(actual_j15);
+    const T cj16 = cos(actual_j16), sj16 = sin(actual_j16);
+    const T pp = (px * px) + (py * py) + (pz * pz);
+    (void) sj15;
+
+    // elbow_sel: same asin16_arg/x121 the forward j16 formula uses (see
+    // RainbowLeftArmParameterizationFromPose above).
+    T asin16_arg = (static_cast<T>(-1.00275505726673) + (static_cast<T>(6.98132097739206) * pp));
+    T x121 = RainbowAsin(asin16_arg);
+    T j16_branch0 = static_cast<T>(-1.80315340003661) + x121;
+    T j16_branch1 = static_cast<T>(1.33843925355319) - x121;
+    T elbow_sel = CondExpGe(
+        cos(actual_j16 - j16_branch0), cos(actual_j16 - j16_branch1),
+        static_cast<T>(0.0), static_cast<T>(1.0));
+
+    // shoulder_sel: same asin13_arg/x1158/x1159 the forward j13 formula uses, evaluated
+    // with the arm's own actual j15/j16 (its real achieved state, not a hypothetical
+    // branch -- classification always reasons from what the arm actually did).
+    T x1157 = static_cast<T>(0.031) * cj15;
+    T x1158 = atan2(-px, -py);
+    T x1161 = RainbowSafeRecip(RainbowSqrt((px * px) + (py * py)));
+    T asin13_arg =
+        x1161 * (x1157 + ((static_cast<T>(-1.0) * cj16 * x1157)) + (static_cast<T>(-0.256) * cj15 * sj16));
+    T x1159 = RainbowAsin(asin13_arg);
+    T j13_branch0 = (static_cast<T>(-1.0) * x1158) + (static_cast<T>(-1.0) * x1159);
+    T j13_branch1 = static_cast<T>(3.14159265358979) + x1159 + (static_cast<T>(-1.0) * x1158);
+    T shoulder_sel = CondExpGe(
+        cos(actual_j13 - j13_branch0), cos(actual_j13 - j13_branch1),
+        static_cast<T>(0.0), static_cast<T>(1.0));
+
+    T wrist_sel = CondExpGe(actual_j18, static_cast<T>(0.0), static_cast<T>(1.0), static_cast<T>(-1.0));
+
+    Eigen::Vector3<T> result;
+    result << elbow_sel, shoulder_sel, wrist_sel;
+    return result;
+}
+
+// Right arm counterpart -- same method as RainbowLeftArmClassifyGcp, mirrored per
+// RainbowRightArmParameterizationFromPose's own constants/formula shape.
+// `actual_j22`/`actual_j24`/`actual_j25`/`actual_j27` are the right arm's own already-
+// resolved joint angles (shoulder, free/self-motion, elbow, wrist -- ambient offsets 0, 2,
+// 3, 5 within the arm's own 7-joint block, i.e. right_arm_0/right_arm_2/right_arm_3/
+// right_arm_5).
+template <typename T>
+auto RainbowRightArmClassifyGcp(
+    const Eigen::Matrix<T, 3, 1> &eetrans,
+    const Eigen::Matrix3<T> &eerot,
+    const T &actual_j22,
+    const T &actual_j24,
+    const T &actual_j25,
+    const T &actual_j27
+) -> Eigen::Vector3<T>
+{
+    T px, py, pz;
+    T r00, r01, r02, r10, r11, r12, r20, r21, r22;
+    RainbowRightTransformToSolverFrame<T>(eetrans, eerot, px, py, pz, r00, r01, r02, r10, r11, r12, r20, r21, r22);
+
+    const T cj24 = cos(actual_j24), sj24 = sin(actual_j24);
+    const T cj25 = cos(actual_j25), sj25 = sin(actual_j25);
+    const T pp = (px * px) + (py * py) + (pz * pz);
+    (void) sj24;
+
+    // elbow_sel: same asin25_arg/x124 the forward j25 formula uses.
+    T asin25_arg = (static_cast<T>(-1.00275505726673) + (static_cast<T>(6.98132097739206) * pp));
+    T x124 = RainbowAsin(asin25_arg);
+    T j25_branch0 = static_cast<T>(-1.80315340003661) + x124;
+    T j25_branch1 = static_cast<T>(1.33843925355319) - x124;
+    T elbow_sel = CondExpGe(
+        cos(actual_j25 - j25_branch0), cos(actual_j25 - j25_branch1),
+        static_cast<T>(0.0), static_cast<T>(1.0));
+
+    // shoulder_sel: same asin22_arg/x1109/x1110 the forward j22 formula uses, evaluated
+    // with the arm's own actual j24/j25.
+    T x1108 = static_cast<T>(0.031) * cj24;
+    T x1109 = atan2(-px, -py);
+    T x1112 = RainbowSafeRecip(RainbowSqrt((px * px) + (py * py)));
+    T asin22_arg =
+        x1112 * ((static_cast<T>(-0.256) * cj24 * sj25) + x1108 + (static_cast<T>(-1.0) * cj25 * x1108));
+    T x1110 = RainbowAsin(asin22_arg);
+    T j22_branch0 = (static_cast<T>(-1.0) * x1110) + (static_cast<T>(-1.0) * x1109);
+    T j22_branch1 = static_cast<T>(3.14159265358979) + x1110 + (static_cast<T>(-1.0) * x1109);
+    T shoulder_sel = CondExpGe(
+        cos(actual_j22 - j22_branch0), cos(actual_j22 - j22_branch1),
+        static_cast<T>(0.0), static_cast<T>(1.0));
+
+    T wrist_sel = CondExpGe(actual_j27, static_cast<T>(0.0), static_cast<T>(1.0), static_cast<T>(-1.0));
+
+    Eigen::Vector3<T> result;
+    result << elbow_sel, shoulder_sel, wrist_sel;
+    return result;
+}

@@ -198,6 +198,15 @@ namespace cricket
     // arm IK that follows (see RainbowEefWorldPosesFromMidCG in rainbow_ik_cg.hh).
     auto trace_rby1_eef_world_poses_from_mid(const std::string &language) -> Traced;
 
+    // GCP classification (the inverse of trace_rby1_constrained_ik): given an already-
+    // resolved whole-body ambient configuration, recover which GCP branch (elbow_sel,
+    // shoulder_sel, wrist_sel per arm) it's actually on -- for a ConstrainedLocalPlanner-
+    // based planner, which never goes through resolve_block/a GCP selector at all (see
+    // RainbowClassifyGcpCG in rainbow_ik_cg.hh, and
+    // vamp::planning::constraint::ConstraintSettings::fix_single_smm /
+    // RBY1::ParameterizedSpace::classify_smm_block on the vamp side).
+    auto trace_rby1_classify_gcp(const RobotInfo &info, const std::string &language) -> Traced;
+
     // Per-end-effector collision spheres rigidly attached to each of `info.end_effector_names`
     // (in that order), expressed as a function of a candidate world-frame pose for that end
     // effector (translation + rotation matrix, vamp::to_isometry's 12-float layout) rather
