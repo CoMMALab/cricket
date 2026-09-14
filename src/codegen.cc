@@ -181,6 +181,11 @@ namespace cricket
         data["eefk_code_vars"] = eefk.temp_variables;
         data["eefk_code_output"] = eefk.outputs;
 
+        auto eejac = trace_ee_fk_jacobian(robot, opts.language);
+        data["eejac_code"] = eejac.code;
+        data["eejac_code_vars"] = eejac.temp_variables;
+        data["eejac_code_output"] = eejac.outputs;
+
         auto spherefk = trace_sphere_cc_fk(robot, opts.language, true, false, false);
         data["spherefk_code"] = spherefk.code;
         data["spherefk_code_vars"] = spherefk.temp_variables;

@@ -29,6 +29,16 @@ namespace cricket
         bool bounding_spheres = true,
         bool fk = true) -> Traced;
 
+    /// Traces the end-effector pose together with its Jacobian.
+    ///
+    /// Emits `12 + 6 * nv` outputs: three translation components, then the rotation matrix in
+    /// column-major order, then the 6 x nv Jacobian in row-major order.
+    /// The first three Jacobian rows map joint velocity to the linear velocity of the end-effector
+    /// origin, and the last three map it to angular velocity.
+    /// Both are resolved in world axes, not end-effector axes, so the twist the Jacobian acts on is
+    /// built from a world-frame position difference and a world-frame rotation difference.
+    auto trace_ee_fk_jacobian(const RobotInfo &info, const std::string &language) -> Traced;
+
     auto trace_map_to_configuration(
         const pinocchio::Model &model,
         const std::string &language,

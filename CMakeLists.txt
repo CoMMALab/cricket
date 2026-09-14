@@ -110,6 +110,7 @@ add_library(cricket
     src/tracing/mapping.cc
     src/tracing/interpolate.cc
     src/tracing/distance.cc
+    src/tracing/frame_jacobian.cc
     src/tracing/forward_dynamics.cc
     src/tracing/integrate_configuration.cc
 )

@@ -32,7 +32,7 @@ impl {{name}} {
 
     pub const STEP_SIZE: f32 = 1.0 / {{resolution}}f32;
 
-    pub const JOINT_NAMES: [&str; DIM] = ["{{join(joint_names, "\", \"")}}"]; 
+    pub const JOINT_NAMES: [&str; DIM] = ["{{join(joint_names, "\", \"")}}"];
     pub const END_EFFECTOR_NAME: &str = "{{end_effector}}";
 {% if forward_dynamics %}
     pub const EFFORT_BOUNDS: [[f32; {{n_v}}]; 2] = [
@@ -112,6 +112,23 @@ impl Attach<DIM, f32> for {{name}}
 {
     fn eefk<const L: usize>(&self, cfgs: &Block<DIM, L, f32>) -> Isometry<Simd<f32, L>, 3> {
         eefk(&cfgs.0)
+    }
+}
+
+impl {{name}}
+{
+    /// Position and orientation of the end effector, together with its Jacobian.
+    ///
+    /// The Jacobian is row-major with six rows of {{n_v}} columns.
+    /// The first three rows map joint velocity to the linear velocity of the end-effector origin,
+    /// and the last three to its angular velocity.
+    /// Both are expressed in world axes, so the Jacobian pairs with an error twist built from a
+    /// world-frame position difference and a world-frame rotation difference.
+    pub fn eefk_jacobian<const L: usize>(
+        &self,
+        cfgs: &Block<DIM, L, f32>,
+    ) -> (Isometry<Simd<f32, L>, 3>, [Simd<f32, L>; {{6 * n_v}}]) {
+        eefk_jacobian(&cfgs.0)
     }
 }
 
@@ -246,6 +263,21 @@ fn eefk<const L: usize>(x: &ConfigurationBlock<L>) -> Isometry<Simd<f32, L>, 3>
     {{eefk_code}}
 
     Isometry::from_carom_buf(y)
+}
+
+fn eefk_jacobian<const L: usize>(
+    x: &ConfigurationBlock<L>,
+) -> (Isometry<Simd<f32, L>, 3>, [Simd<f32, L>; {{6 * n_v}}])
+{
+    let mut v = [Simd::splat(0.0); {{eejac_code_vars}}];
+    let mut y = [Simd::splat(0.0); {{eejac_code_output}}];
+
+    {{eejac_code}}
+
+    (
+        Isometry::from_carom_buf(*y[..12].as_array().unwrap()),
+        *y[12..].as_array().unwrap(),
+    )
 }
 
 {% if forward_dynamics %}

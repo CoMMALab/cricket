@@ -35,5 +35,17 @@ int main()
     assert(not integration.code.empty());
     assert(integration.code.find("x[0] + x[6]") != std::string::npos);
 
+    const auto spherized = std::filesystem::path(CRICKET_SOURCE_DIR) / "resources/ur5/ur5_spherized_no_offset.urdf";
+    const auto srdf = std::filesystem::path(CRICKET_SOURCE_DIR) / "resources/ur5/ur5.srdf";
+    cricket::RobotInfo info(spherized, srdf, std::string("robotiq_85_base_link"));
+
+    const auto eejac = cricket::trace_ee_fk_jacobian(info, "rust");
+    assert(eejac.outputs == static_cast<std::size_t>(12 + 6 * info.model.nv));
+    assert(eejac.temp_variables > 0);
+    assert(eejac.code.find("sin(") != std::string::npos);
+    assert(eejac.code.find("cos(") != std::string::npos);
+    // The Rust backend cannot emit conditionals, so a trace containing one would be silently wrong.
+    assert(eejac.code.find(" ? ") == std::string::npos);
+
     return 0;
 }
