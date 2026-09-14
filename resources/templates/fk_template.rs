@@ -11,8 +11,8 @@
 use core::simd::Simd;
 
 use carom_core::{
-    Attach, AttachValidate, Ball, Block, BlockValidate, Collide3, PosedAttachment, Robot, SimdArithmetic, cos, sin,
-    sphere_environment_in_collision, sphere_sphere_self_collision, Isometry,
+    Attach, AttachValidate, Ball, Block, BlockValidate, Collide3, IkKernel, Integrate, PosedAttachment, Robot,
+    SimdArithmetic, cos, sin, sphere_environment_in_collision, sphere_sphere_self_collision, Isometry,
     {% if forward_dynamics %}DynamicsKernel,{% endif %}
 };
 
@@ -115,20 +115,24 @@ impl Attach<DIM, f32> for {{name}}
     }
 }
 
-impl {{name}}
+impl IkKernel<DIM, {{n_v}}, f32> for {{name}}
 {
-    /// Position and orientation of the end effector, together with its Jacobian.
-    ///
-    /// The Jacobian is row-major with six rows of {{n_v}} columns.
-    /// The first three rows map joint velocity to the linear velocity of the end-effector origin,
-    /// and the last three to its angular velocity.
-    /// Both are expressed in world axes, so the Jacobian pairs with an error twist built from a
-    /// world-frame position difference and a world-frame rotation difference.
-    pub fn eefk_jacobian<const L: usize>(
+    fn eefk_jacobian<const L: usize>(
         &self,
         cfgs: &Block<DIM, L, f32>,
-    ) -> (Isometry<Simd<f32, L>, 3>, [Simd<f32, L>; {{6 * n_v}}]) {
+    ) -> (Isometry<Simd<f32, L>, 3>, [[Simd<f32, L>; {{n_v}}]; 6]) {
         eefk_jacobian(&cfgs.0)
+    }
+}
+
+impl Integrate<DIM, {{n_v}}, f32> for {{name}}
+{
+    fn integrate_configuration<const L: usize>(
+        &self,
+        q: &[Simd<f32, L>; DIM],
+        dq: &[Simd<f32, L>; {{n_v}}],
+    ) -> [Simd<f32, L>; DIM] {
+        integrate_configuration(q, dq)
     }
 }
 
@@ -160,14 +164,6 @@ impl DynamicsKernel<{DIM}, {{n_v}}, f32> for {{name}} {
         tau: &[Simd<f32, L>; {{n_v}}],
     ) -> [Simd<f32, L>; {{n_v}}] {
         forward_dynamics(q, v, tau)
-    }
-
-    fn integrate_configuration<const L: usize>(
-        &self,
-        q: &[Simd<f32, L>; DIM],
-        dq: &[Simd<f32, L>; {{n_v}}],
-    ) -> [Simd<f32, L>; DIM] {
-        integrate_configuration(q, dq)
     }
 }
 {% endif %}
@@ -267,7 +263,7 @@ fn eefk<const L: usize>(x: &ConfigurationBlock<L>) -> Isometry<Simd<f32, L>, 3>
 
 fn eefk_jacobian<const L: usize>(
     x: &ConfigurationBlock<L>,
-) -> (Isometry<Simd<f32, L>, 3>, [Simd<f32, L>; {{6 * n_v}}])
+) -> (Isometry<Simd<f32, L>, 3>, [[Simd<f32, L>; {{n_v}}]; 6])
 {
     let mut v = [Simd::splat(0.0); {{eejac_code_vars}}];
     let mut y = [Simd::splat(0.0); {{eejac_code_output}}];
@@ -276,7 +272,7 @@ fn eefk_jacobian<const L: usize>(
 
     (
         Isometry::from_carom_buf(*y[..12].as_array().unwrap()),
-        *y[12..].as_array().unwrap(),
+        core::array::from_fn(|r| *y[12 + r * {{n_v}}..12 + (r + 1) * {{n_v}}].as_array().unwrap()),
     )
 }
 
@@ -301,6 +297,7 @@ fn forward_dynamics<const L: usize>(
 
     y
 }
+{% endif %}
 
 fn integrate_configuration<const L: usize>(
     q: &[Simd<f32, L>; {{n_q}}],
@@ -320,4 +317,3 @@ fn integrate_configuration<const L: usize>(
 
     y
 }
-{% endif %}
