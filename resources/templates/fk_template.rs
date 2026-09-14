@@ -11,7 +11,7 @@
 use core::simd::Simd;
 
 use carom_core::{
-    Attach, AttachValidate, Ball, Block, BlockValidate, Collide3, IkKernel, Integrate, PosedAttachment, Robot,
+    Attach, AttachValidate, Ball, Block, BlockValidate, Collide3, Integrate, Jacobian, PosedAttachment, Robot,
     SimdArithmetic, cos, sin, sphere_environment_in_collision, sphere_sphere_self_collision, Isometry,
     {% if forward_dynamics %}DynamicsKernel,{% endif %}
 };
@@ -115,7 +115,7 @@ impl Attach<DIM, f32> for {{name}}
     }
 }
 
-impl IkKernel<DIM, {{n_v}}, f32> for {{name}}
+impl Jacobian<DIM, {{n_v}}, f32> for {{name}}
 {
     fn eefk_jacobian<const L: usize>(
         &self,
