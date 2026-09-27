@@ -207,6 +207,47 @@ namespace cricket
     // RBY1::ParameterizedSpace::classify_smm_block on the vamp side).
     auto trace_rby1_classify_gcp(const RobotInfo &info, const std::string &language) -> Traced;
 
+    // Torso/free-joint feasibility search: given a goal T_mid (base frame) and a fixed GCP
+    // branch per arm, differentiates trace_rby1_constrained_ik's closed-form feasibility loss
+    // (loss_left, loss_right -- see rainbow_arm_parameterization.hh's HingeSqPenalty) back
+    // through the real base->torso forward kinematics, with respect to
+    // [torso_0..5, psi_left, psi_right]. Pairs with trace_rby1_torso_free_solve_* below to do
+    // gradient-based search over those 8 variables until the requested mid-pose falls inside
+    // both arms' analytic reachable domain (loss == 0), at which point the closed-form arm
+    // solve is an exact IK solution -- no further Cartesian refinement needed. See
+    // RainbowConstrainedBimanualIkCG's `compute_gradient` mode in rainbow_ik_cg.hh.
+    // Input layout: identical to trace_rby1_constrained_ik's own tape input (39, see that
+    // function's header). Output: identical to trace_rby1_constrained_ik's own output, plus
+    // "jac_left" and "jac_right" (8 each): d(loss_left)/d(.), d(loss_right)/d(.) w.r.t.
+    // [torso_0..5, psi_left, psi_right].
+    auto trace_rby1_torso_free_loss_and_jacobian(const RobotInfo &info, const std::string &language) -> Traced;
+
+    // Least-squares step from trace_rby1_torso_free_loss_and_jacobian's jac_left/jac_right +
+    // loss_left/loss_right, searching over [torso_0..5, psi_left, psi_right] (8). See
+    // trace_rby1_torso_free_solve in rainbow_ik_cg.hh for why this doesn't just call
+    // trace_solve_jacobian (that function always sizes its Jacobian's width off
+    // `info.model.nq`, the whole ambient model, not the 8 variables searched over here).
+    // Input: J (2 x 8, row-major -- jac_left then jac_right), then err (2 -- loss_left,
+    // loss_right). Output: the step direction (8).
+    auto trace_rby1_torso_free_solve_gradient_descent(const std::string &language) -> Traced;
+    auto trace_rby1_torso_free_solve_lm_inner(const std::string &language) -> Traced;
+
+    // Independent (unconstrained) counterpart of trace_rby1_torso_free_loss_and_jacobian:
+    // both hand targets are ordinary, independent inputs (RainbowIkCG) instead of derived
+    // from a shared mid-pose plus fixed per-arm offsets, so a caller doesn't need any
+    // t_mid_left/t_mid_right bookkeeping (or a compute_mid_pose() call) to use it -- just
+    // pass each hand's own goal pose directly. Same "search [torso_0..5, left_j15_free,
+    // right_j24_free] to drive loss_left/loss_right to zero" idea as the mid-pose mode; see
+    // RainbowIkCG's `compute_gradient` mode in rainbow_ik_cg.hh for the math, and note the
+    // step-solve is shared verbatim with the mid-pose mode (trace_rby1_torso_free_solve_*
+    // above) since both reduce to the same "2 losses + their 8-wide Jacobians -> 8-wide
+    // step" shape.
+    // Input layout: identical to RainbowIkCG's own tape input (32, see that function's
+    // header). Output: identical to RainbowIkCG's own output, plus "jac_left" and
+    // "jac_right" (8 each): d(loss_left)/d(.), d(loss_right)/d(.) w.r.t.
+    // [torso_0..5, left_j15_free, right_j24_free].
+    auto trace_rby1_independent_loss_and_jacobian(const RobotInfo &info, const std::string &language) -> Traced;
+
     // Per-end-effector collision spheres rigidly attached to each of `info.end_effector_names`
     // (in that order), expressed as a function of a candidate world-frame pose for that end
     // effector (translation + rotation matrix, vamp::to_isometry's 12-float layout) rather

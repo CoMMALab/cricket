@@ -38,4 +38,30 @@ namespace cricket
         return RainbowClassifyGcpCG<ADCG>(info, language);
     }
 
+    auto trace_rby1_torso_free_loss_and_jacobian(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        return RainbowConstrainedBimanualIkCG<ADCG>(info, language, /*compute_gradient=*/true);
+    }
+
+    auto trace_rby1_torso_free_solve_gradient_descent(const std::string &language) -> Traced
+    {
+        return trace_rby1_torso_free_solve(language, ProjMethod::GradDesc);
+    }
+
+    auto trace_rby1_torso_free_solve_lm_inner(const std::string &language) -> Traced
+    {
+        return trace_rby1_torso_free_solve(language, ProjMethod::InnerLM);
+    }
+
+    // Independent (unconstrained) bimanual variant: the two hand targets are ordinary,
+    // independent tape inputs (RainbowIkCG) rather than derived from a shared mid-pose plus
+    // fixed offsets (RainbowConstrainedBimanualIkCG). The step-solve math is unchanged --
+    // trace_rby1_torso_free_solve_gradient_descent/_lm_inner above are already generic over
+    // any 8-in/8-out "2 losses + their 8-wide Jacobians -> 8-wide step" problem, so this mode
+    // reuses those directly and only needs its own loss+Jacobian trace.
+    auto trace_rby1_independent_loss_and_jacobian(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        return RainbowIkCG<ADCG>(info, language, /*compute_gradient=*/true);
+    }
+
 }  // namespace cricket

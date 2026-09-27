@@ -3,6 +3,7 @@
 #include <cricket/codegen.hh>
 #include <cricket/robot_info.hh>
 
+#include "../tracing/cholesky.hh"
 #include "../tracing/internal.hh"
 #include "rainbow_arm_parameterization.hh"
 #include "se3_tracer.hh"
@@ -12,8 +13,10 @@
 
 #include <Eigen/Dense>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iostream>
+#include <iterator>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -82,12 +85,22 @@ namespace cricket
 //       each means. Both arms' q already live in the single "q" segment
 //       above, not repeated here.
 //
-// No gradient/Jacobian output here (unlike IiwaSE3ParameterizationCG's
-// `compute_gradient` option) -- out of scope for now.
+// If `compute_gradient` is set, two more outputs are appended: "jac_left" and "jac_right"
+// (8 each), d(loss_left)/d(.) and d(loss_right)/d(.) with respect to
+// [torso_0..5, left_j15_free, right_j24_free] -- the variables a caller would search over to
+// make BOTH independently-specified hand targets simultaneously reachable on the fixed GCP
+// branch (see rainbow_ik_torso_free_solve.hh and RainbowConstrainedBimanualIkCG's
+// `compute_gradient` mode, which this mirrors). Unlike that mode, there is no mid-pose to
+// couple the two hands through -- left_pose/right_pose are independent tape inputs already,
+// so d(loss_left)/d(right_j24_free) and d(loss_right)/d(left_j15_free) come out analytically
+// zero with no special-casing; base/left_pose/right_pose/gcp are still tape inputs (needed to
+// compute the loss and its gradient at all) but aren't searched over here, so no gradient
+// columns are emitted for them.
 template <typename T>
 auto RainbowIkCG(
     const RobotInfo &info,
-    const std::string &language
+    const std::string &language,
+    bool compute_gradient = false
 )
 {
     using ModelT = pinocchio::ModelTpl<T>;
@@ -292,6 +305,45 @@ auto RainbowIkCG(
     // FloatVector-based parameterized_ik, same remap used elsewhere.
     const std::string lang = (language == "c++") ? "c++_block" : language;
 
+    std::vector<VarSegment> output_segments{
+        {"q", n_q_combined, true},
+        {"u_left", n_unclipped, true},
+        {"reach_violation_left", n_reach_violation, true},
+        {"loss_left", n_loss, true},
+        {"u_right", n_unclipped, true},
+        {"reach_violation_right", n_reach_violation, true},
+        {"loss_right", n_loss, true}};
+
+    if (compute_gradient)
+    {
+        // Gradient of every output w.r.t. every input.
+        CppAD::vector<CGD> jac_e_q = rainbow_ik_func.Jacobian(ind_vars);
+
+        // loss_left/loss_right's own row indices into that flattened (n_out x num_inp)
+        // Jacobian -- identical offsets to RainbowConstrainedBimanualIkCG's, since both
+        // share the same n_q_combined/n_unclipped/n_reach_violation/n_loss shape: data[28]
+        // is loss_left, data[33] is loss_right.
+        const std::size_t loss_left_row = n_q_combined + n_unclipped + n_reach_violation;  // == 28
+        const std::size_t loss_right_row = loss_left_row + n_out_per_arm_extra;            // == 33
+
+        // Columns searched over: torso_0..5 (input indices [4:10)), then left_j15_free
+        // (17), right_j24_free (25) -- see this function's header comment.
+        const std::array<std::size_t, 8> grad_cols = {4, 5, 6, 7, 8, 9, 17, 25};
+
+        CppAD::vector<CGD> jac_left(grad_cols.size());
+        CppAD::vector<CGD> jac_right(grad_cols.size());
+        for (std::size_t i = 0; i < grad_cols.size(); ++i)
+        {
+            jac_left[i] = jac_e_q[loss_left_row * num_inp + grad_cols[i]];
+            jac_right[i] = jac_e_q[loss_right_row * num_inp + grad_cols[i]];
+        }
+        std::move(jac_left.begin(), jac_left.end(), std::back_inserter(result));
+        std::move(jac_right.begin(), jac_right.end(), std::back_inserter(result));
+
+        output_segments.push_back({"jac_left", grad_cols.size(), true});
+        output_segments.push_back({"jac_right", grad_cols.size(), true});
+    }
+
     SegmentedVariableNameGenerator<double> nameGen(
         {{"base", 4, true},
          {"torso", 6, true},
@@ -301,13 +353,7 @@ auto RainbowIkCG(
          {"right_j24", 1, false},
          {"left_gcp", 3, true},
          {"right_gcp", 3, true}},
-        {{"q", n_q_combined, true},
-         {"u_left", n_unclipped, true},
-         {"reach_violation_left", n_reach_violation, true},
-         {"loss_left", n_loss, true},
-         {"u_right", n_unclipped, true},
-         {"reach_violation_right", n_reach_violation, true},
-         {"loss_right", n_loss, true}});
+        output_segments);
 
     std::cout << "Generated the whole-body-relative parameterized IK code." << std::endl;
     return Traced{
@@ -902,10 +948,24 @@ inline auto RainbowEefWorldPosesFromMidCG(const std::string &language) -> Traced
 // then right), "u"(3), "reach_violation"(1), "loss"(1). See
 // RainbowArmParamResult in rainbow_arm_parameterization.hh for what
 // each of those means.
+//
+// If `compute_gradient` is set, two more outputs are appended: "jac_left"
+// and "jac_right" (8 each), d(loss_left)/d(.) and d(loss_right)/d(.) with
+// respect to [torso_0..5, psi_left, psi_right] -- exactly the variables a
+// caller would search over to make the requested T_mid reachable on the
+// fixed GCP branch (see rainbow_ik_torso_free_solve.hh), the same "slice
+// the full Jacobian down to the columns callers actually search over"
+// move rainbow_arm_parameterization_gen.hh already makes for jac_j15/
+// jac_j24, just widened from 1 column to 8 and taken at the whole-body
+// level (loss_left/loss_right's rows) instead of per-arm. base/t_mid/
+// t_mid_left/t_mid_right/gcp are still tape inputs (needed to compute the
+// loss and its gradient at all) but aren't searched over here, so no
+// gradient columns are emitted for them.
 template <typename T>
 auto RainbowConstrainedBimanualIkCG(
     const RobotInfo &info,
-    const std::string &language
+    const std::string &language,
+    bool compute_gradient = false
 )
 {
     using ModelT = pinocchio::ModelTpl<T>;
@@ -1121,6 +1181,45 @@ auto RainbowConstrainedBimanualIkCG(
 
     const std::string lang = (language == "c++") ? "c++_block" : language;
 
+    std::vector<VarSegment> output_segments{
+        {"q", n_q_combined, true},
+        {"u_left", n_unclipped, true},
+        {"reach_violation_left", n_reach_violation, true},
+        {"loss_left", n_loss, true},
+        {"u_right", n_unclipped, true},
+        {"reach_violation_right", n_reach_violation, true},
+        {"loss_right", n_loss, true}};
+
+    if (compute_gradient)
+    {
+        // Gradient of every output w.r.t. every input.
+        CppAD::vector<CGD> jac_e_q = constrained_ik_func.Jacobian(ind_vars);
+
+        // loss_left/loss_right's own row indices into that flattened
+        // (n_out x num_inp) Jacobian -- see the offset bookkeeping above:
+        // data[28] is loss_left, data[33] is loss_right.
+        const std::size_t loss_left_row = n_q_combined + n_unclipped + n_reach_violation;  // == 28
+        const std::size_t loss_right_row = loss_left_row + n_out_per_arm_extra;            // == 33
+
+        // Columns searched over: torso_0..5 (input indices [4:10)), then
+        // psi_left (17), psi_right (18) -- see this function's header
+        // comment.
+        const std::array<std::size_t, 8> grad_cols = {4, 5, 6, 7, 8, 9, 17, 18};
+
+        CppAD::vector<CGD> jac_left(grad_cols.size());
+        CppAD::vector<CGD> jac_right(grad_cols.size());
+        for (std::size_t i = 0; i < grad_cols.size(); ++i)
+        {
+            jac_left[i] = jac_e_q[loss_left_row * num_inp + grad_cols[i]];
+            jac_right[i] = jac_e_q[loss_right_row * num_inp + grad_cols[i]];
+        }
+        std::move(jac_left.begin(), jac_left.end(), std::back_inserter(result));
+        std::move(jac_right.begin(), jac_right.end(), std::back_inserter(result));
+
+        output_segments.push_back({"jac_left", grad_cols.size(), true});
+        output_segments.push_back({"jac_right", grad_cols.size(), true});
+    }
+
     SegmentedVariableNameGenerator<double> nameGen(
         {{"base", 4, true},
          {"torso", 6, true},
@@ -1131,17 +1230,95 @@ auto RainbowConstrainedBimanualIkCG(
          {"t_mid_right", 7, true},
          {"left_gcp", 3, true},
          {"right_gcp", 3, true}},
-        {{"q", n_q_combined, true},
-         {"u_left", n_unclipped, true},
-         {"reach_violation_left", n_reach_violation, true},
-         {"loss_left", n_loss, true},
-         {"u_right", n_unclipped, true},
-         {"reach_violation_right", n_reach_violation, true},
-         {"loss_right", n_loss, true}});
+        output_segments);
 
     std::cout << "Generated the constrained-bimanual parameterized IK code." << std::endl;
     return Traced{
         generate_code(handler, result, lang, nameGen),
+        handler.getTemporaryVariableCount(),
+        result.size()};
+}
+
+// Least-squares step from RainbowConstrainedBimanualIkCG<T>(..., /*compute_gradient=*/true)'s
+// jac_left/jac_right + loss_left/loss_right, searching over exactly the 8 variables those
+// Jacobians are taken against: [torso_0..5, psi_left, psi_right]. Same math as
+// trace_solve_jacobian (tracing/constraints.cc) -- InnerLM/OuterLM/GradDesc over a stacked
+// err_size x n error/Jacobian -- but that function always sizes its Jacobian's column count
+// off `info.model.nq` (the whole ambient model), which is wrong here: jac_left/jac_right are
+// only 8 wide (torso + the two free joints), not the full ambient configuration, so this is a
+// dedicated small tape instead of a call to trace_solve_jacobian with some `info`.
+//
+// Input layout (18): J (2 x 8, row-major -- jac_left's 8 columns then jac_right's 8, matching
+// how a caller lays the two RainbowConstrainedBimanualIkCG jac_left/jac_right outputs out
+// contiguously), then err (2 -- loss_left, loss_right).
+// Output layout (8): the step direction over [torso_0..5, psi_left, psi_right].
+inline auto trace_rby1_torso_free_solve(const std::string &language, ProjMethod method) -> Traced
+{
+    constexpr double damp = 1e-6;
+    constexpr std::size_t n = 8;          // torso_0..5, psi_left, psi_right
+    constexpr std::size_t err_size = 2;   // loss_left, loss_right
+
+    using ADMatrixXs = Eigen::Matrix<ADCG, Eigen::Dynamic, Eigen::Dynamic>;
+
+    const std::size_t num_inp = err_size * n + err_size;
+
+    ADVectorXs ad_inp(num_inp);
+    for (auto i = 0U; i < num_inp; ++i)
+    {
+        ad_inp[i] = ADCG(0.0);
+    }
+
+    Independent(ad_inp);
+
+    ADMatrixXs J(err_size, n);
+    for (auto i = 0U; i < err_size; ++i)
+    {
+        for (auto j = 0U; j < n; ++j)
+        {
+            J(i, j) = ad_inp[i * n + j];
+        }
+    }
+
+    ADVectorXs err(err_size);
+    for (auto i = 0U; i < err_size; ++i)
+    {
+        err[i] = ad_inp[err_size * n + i];
+    }
+
+    ADVectorXs grad(n);
+    switch (method)
+    {
+        case ProjMethod::InnerLM:
+        {
+            ADMatrixXs identity = ADMatrixXs::Identity(err_size, err_size);
+            const auto factor = cholesky_factor<ADMatrixXs, ADCG>(J * J.transpose() + identity * damp);
+            grad = J.transpose() * cholesky_solve<ADMatrixXs, ADVectorXs, ADCG>(factor, err);
+            break;
+        }
+        case ProjMethod::OuterLM:
+        {
+            ADMatrixXs identity = ADMatrixXs::Identity(n, n);
+            const auto factor = cholesky_factor<ADMatrixXs, ADCG>(J.transpose() * J + identity * damp);
+            grad = cholesky_solve<ADMatrixXs, ADVectorXs, ADCG>(factor, J.transpose() * err);
+            break;
+        }
+        case ProjMethod::GradDesc:
+        {
+            grad = J.transpose() * err;
+            break;
+        }
+    }
+
+    ADFun<CGD> solve_func(ad_inp, grad);
+
+    CodeHandler<double> handler;
+    CppAD::vector<CGD> ind_vars(num_inp);
+    handler.makeVariables(ind_vars);
+
+    CppAD::vector<CGD> result = solve_func.Forward(0, ind_vars);
+
+    return Traced{
+        generate_code(handler, result, language),
         handler.getTemporaryVariableCount(),
         result.size()};
 }

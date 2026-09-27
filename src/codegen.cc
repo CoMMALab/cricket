@@ -759,6 +759,48 @@ namespace cricket
         data["param_classify_gcp_code_vars"] = param_classify_gcp.temp_variables;
         data["param_classify_gcp_code_output"] = param_classify_gcp.outputs;
 
+        // Torso/free-joint feasibility search (see trace_rby1_torso_free_loss_and_jacobian /
+        // trace_rby1_torso_free_solve_* in rainbow_ik_cg.hh): differentiates the closed-form
+        // arm IK's feasibility loss back through torso, for gradient-based search over
+        // [torso_0..5, psi_left, psi_right] given a fixed goal T_mid and GCP branch.
+        auto param_torso_free_jac = trace_rby1_torso_free_loss_and_jacobian(robot, language);
+        data["param_torso_free_jac_code"] = param_torso_free_jac.code;
+        data["param_torso_free_jac_code_vars"] = param_torso_free_jac.temp_variables;
+        data["param_torso_free_jac_code_output"] = param_torso_free_jac.outputs;
+
+        auto param_torso_free_solve_gradient_descent = trace_rby1_torso_free_solve_gradient_descent(language);
+        data["param_torso_free_solve_gradient_descent_code"] = param_torso_free_solve_gradient_descent.code;
+        data["param_torso_free_solve_gradient_descent_code_vars"] =
+            param_torso_free_solve_gradient_descent.temp_variables;
+
+        auto param_torso_free_solve_lm_inner = trace_rby1_torso_free_solve_lm_inner(language);
+        data["param_torso_free_solve_lm_inner_code"] = param_torso_free_solve_lm_inner.code;
+        data["param_torso_free_solve_lm_inner_code_vars"] = param_torso_free_solve_lm_inner.temp_variables;
+
+        // Independent (unconstrained) bimanual feasibility search: same idea as
+        // param_torso_free_jac above, except the two hand targets are ordinary independent
+        // poses (RainbowIkCG) instead of derived from a shared T_mid -- see
+        // trace_rby1_independent_loss_and_jacobian's header comment. Reuses
+        // param_torso_free_solve_gradient_descent/_lm_inner's already-generated step code
+        // unchanged (see that function's own comment for why).
+        auto param_independent_jac = trace_rby1_independent_loss_and_jacobian(robot, language);
+        data["param_independent_jac_code"] = param_independent_jac.code;
+        data["param_independent_jac_code_vars"] = param_independent_jac.temp_variables;
+        data["param_independent_jac_code_output"] = param_independent_jac.outputs;
+
+        // torso_0..5's own joint-limit slice out of the ambient "lower"/"upper"/
+        // "joint_limit_margins" arrays (indices [4:10) -- see RainbowConstrainedBimanualIkCG's
+        // ambient q layout: base(4) + torso(6) + left arm(7) + right arm(7)), precomputed here
+        // so solve_torso_for_mid_pose's runtime clipping can index a 6-long array by plain `i`
+        // (`{{ at(rby1_torso_lower, i) }}`) instead of needing `4 + i` arithmetic inside an
+        // inja function call.
+        const auto q_lower = data["lower"].get<std::vector<double>>();
+        const auto q_upper = data["upper"].get<std::vector<double>>();
+        const auto q_margins = data["joint_limit_margins"].get<std::vector<double>>();
+        data["rby1_torso_lower"] = std::vector<double>(q_lower.begin() + 4, q_lower.begin() + 10);
+        data["rby1_torso_upper"] = std::vector<double>(q_upper.begin() + 4, q_upper.begin() + 10);
+        data["rby1_torso_margins"] = std::vector<double>(q_margins.begin() + 4, q_margins.begin() + 10);
+
         // Per-end-effector local spheres (gripper/finger geometry) for eefs_in_collision's
         // no-attachment case -- see trace_eef_local_spheres above. Generic
         // over robot.end_effector_names, but eefs_in_collision itself is currently only

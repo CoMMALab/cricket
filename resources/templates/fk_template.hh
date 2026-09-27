@@ -8,10 +8,10 @@
 
 #include <Eigen/Geometry>
 
-#include <optional>
-{% if has_flask %}
 #include <algorithm>
 #include <cmath>
+#include <optional>
+{% if has_flask %}
 #include <limits>
 {% endif %}
 
@@ -1057,6 +1057,858 @@ struct {{name}}
                    (classified[1][0] == V(target_smm_right[0])) &
                    (classified[1][1] == V(target_smm_right[1])) &
                    (classified[1][2] == V(target_smm_right[2]));
+        }
+        {% endif %}
+
+        {% if param_kind == "rby1_bimanual" %}
+        // -----------------------------------------------------------------------------
+        // Torso/free-joint feasibility search: differentiates the closed-form arm IK's
+        // feasibility loss (loss_left, loss_right -- see rainbow_arm_parameterization.hh's
+        // HingeSqPenalty) back through the real base->torso forward kinematics, and does
+        // gradient-based search over [torso_0..5, psi_left, psi_right] to drive it to zero
+        // for a fixed goal T_mid (base frame) and the current left_gcp/right_gcp branch --
+        // see RainbowConstrainedBimanualIkCG's `compute_gradient` mode and
+        // trace_rby1_torso_free_solve (rainbow_ik_cg.hh) for the math. Once loss reaches
+        // zero the closed-form arm solve is an *exact* IK solution, not an approximation --
+        // no further Cartesian refinement is needed on convergence.
+        //
+        // Scalar (non-rake) utilities -- called once (or a handful of times) per planning
+        // problem, not a hot per-candidate loop -- but torso_free_loss_jacobian internally
+        // broadcasts to FloatVector<vamp::FloatVectorWidth, 1> because param_torso_free_jac_code
+        // reads left_gcp/right_gcp/t_mid_left/t_mid_right directly by name at that fixed
+        // width, same as resolve_block above; every lane carries the same input and only
+        // lane 0 of the result is used, extracted via the {row, col} scalar-indexing
+        // overload of FloatVector's operator[].
+        //
+        // The wheeled base is held fixed at the origin (x = y = 0, base_rz = 0, i.e.
+        // (base_rz_cos, base_rz_sin) = (1, 0)) for this search -- it is never one of the
+        // variables searched over (jac_left/jac_right only carry columns for
+        // [torso_0..5, psi_left, psi_right], see RainbowConstrainedBimanualIkCG's
+        // `compute_gradient` mode), so torso_free_loss_jacobian doesn't take a base pose
+        // as input at all.
+        // -----------------------------------------------------------------------------
+
+        struct TorsoFreeLossJacobian
+        {
+            // reach_violation_left == reach_violation_right == 0: q is an exact IK solution
+            // on the current GCP branch -- distinct from loss == 0, its smooth surrogate
+            // that solve_torso_for_mid_pose actually drives to zero.
+            bool feasible;
+            Ambient::ConfigurationArray q;
+            float loss_left;
+            float loss_right;
+            std::array<float, 8> jac_left;   // d(loss_left)/d([torso_0..5, psi_left, psi_right])
+            std::array<float, 8> jac_right;  // d(loss_right)/d([torso_0..5, psi_left, psi_right])
+        };
+
+        static inline auto torso_free_loss_jacobian(
+            const std::array<float, 6> &torso_in,
+            const std::array<float, 7> &t_mid_pose_in,
+            float psi_left_in,
+            float psi_right_in) noexcept -> TorsoFreeLossJacobian
+        {
+            constexpr std::size_t rake = vamp::FloatVectorWidth;
+            using V = FloatVector<rake, 1>;
+
+            // Base fixed at the origin -- see this section's header comment.
+            std::array<V, 4> base{V(0.0f), V(0.0f), V(1.0f), V(0.0f)};
+            std::array<V, 6> torso{
+                V(torso_in[0]), V(torso_in[1]), V(torso_in[2]),
+                V(torso_in[3]), V(torso_in[4]), V(torso_in[5])};
+            std::array<V, 7> t_mid_pose{
+                V(t_mid_pose_in[0]), V(t_mid_pose_in[1]), V(t_mid_pose_in[2]),
+                V(t_mid_pose_in[3]), V(t_mid_pose_in[4]), V(t_mid_pose_in[5]), V(t_mid_pose_in[6])};
+            const V psi_left(psi_left_in);
+            const V psi_right(psi_right_in);
+
+            FloatVector<rake, {{param_torso_free_jac_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> q;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_left;
+            FloatVector<rake, 1> reach_violation_left;
+            FloatVector<rake, 1> loss_left;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_right;
+            FloatVector<rake, 1> reach_violation_right;
+            FloatVector<rake, 1> loss_right;
+            FloatVector<rake, 8> jac_left;
+            FloatVector<rake, 8> jac_right;
+
+            {{param_torso_free_jac_code}}
+
+            TorsoFreeLossJacobian out;
+            out.feasible = (reach_violation_left[{0, 0}] <= 0.0f) and (reach_violation_right[{0, 0}] <= 0.0f);
+            out.loss_left = loss_left[{0, 0}];
+            out.loss_right = loss_right[{0, 0}];
+            for (std::size_t i = 0; i < Ambient::dimension; ++i)
+            {
+                out.q[i] = q[{i, 0}];
+            }
+            for (std::size_t i = 0; i < 8; ++i)
+            {
+                out.jac_left[i] = jac_left[{i, 0}];
+                out.jac_right[i] = jac_right[{i, 0}];
+            }
+            return out;
+        }
+
+        // Least-squares step from torso_free_loss_jacobian's jac_left/jac_right +
+        // loss_left/loss_right, searching over [torso_0..5, psi_left, psi_right] (8). Plain
+        // scalar generated code (unlike torso_free_loss_jacobian above) -- see
+        // trace_rby1_torso_free_solve's header comment for why it isn't just a call to the
+        // generic trace_solve_jacobian used by the TSR/CoM/closed-loop/lead-screw solvers
+        // further up this file.
+        static inline auto solve_torso_free_gradient_descent(
+            const std::array<float, 8> &jac_left,
+            const std::array<float, 8> &jac_right,
+            float loss_left,
+            float loss_right) noexcept -> std::array<float, 8>
+        {
+            {% if param_torso_free_solve_gradient_descent_code_vars > 0 %}std::array<float, {{param_torso_free_solve_gradient_descent_code_vars}}> v;{% endif %}
+            std::array<float, 18> x{
+                jac_left[0], jac_left[1], jac_left[2], jac_left[3],
+                jac_left[4], jac_left[5], jac_left[6], jac_left[7],
+                jac_right[0], jac_right[1], jac_right[2], jac_right[3],
+                jac_right[4], jac_right[5], jac_right[6], jac_right[7],
+                loss_left, loss_right};
+            std::array<float, 8> y{};
+
+            {{param_torso_free_solve_gradient_descent_code}}
+
+            return y;
+        }
+
+        static inline auto solve_torso_free_lm_inner(
+            const std::array<float, 8> &jac_left,
+            const std::array<float, 8> &jac_right,
+            float loss_left,
+            float loss_right) noexcept -> std::array<float, 8>
+        {
+            {% if param_torso_free_solve_lm_inner_code_vars > 0 %}std::array<float, {{param_torso_free_solve_lm_inner_code_vars}}> v;{% endif %}
+            std::array<float, 18> x{
+                jac_left[0], jac_left[1], jac_left[2], jac_left[3],
+                jac_left[4], jac_left[5], jac_left[6], jac_left[7],
+                jac_right[0], jac_right[1], jac_right[2], jac_right[3],
+                jac_right[4], jac_right[5], jac_right[6], jac_right[7],
+                loss_left, loss_right};
+            std::array<float, 8> y{};
+
+            {{param_torso_free_solve_lm_inner_code}}
+
+            return y;
+        }
+
+        // Iteratively searches for [torso_0..5, psi_left, psi_right] that drive
+        // loss_left/loss_right to (near) zero for a fixed goal T_mid (base frame), starting
+        // from `torso_init`/`psi_*_init` (e.g. the current/nominal torso configuration).
+        // `step` is solve_torso_free_gradient_descent or solve_torso_free_lm_inner. Clips
+        // torso to its own joint limits and wraps psi to [0, 2*pi) after every step -- the
+        // closed-form arm solver's own domain (torso occupies Ambient q indices [4:10), the
+        // same limits resolve_block checks against). `converged` means loss_left/loss_right
+        // both fell under `tol`, at which point `q` is an *exact* closed-form IK solution for
+        // T_mid on the current left_gcp/right_gcp branch; on `!converged` (iteration budget
+        // exhausted) the last iterate is still returned so a caller can inspect how close it
+        // got.
+        struct TorsoFreeSolveResult
+        {
+            bool converged;
+            Ambient::ConfigurationArray q;
+            std::array<float, 6> torso;
+            float psi_left;
+            float psi_right;
+            float loss_left;
+            float loss_right;
+            std::size_t iterations;
+        };
+
+        template <typename StepFn>
+        static inline auto solve_torso_for_mid_pose_impl(
+            const std::array<float, 6> &torso_init,
+            const std::array<float, 7> &t_mid_pose,
+            float psi_left_init,
+            float psi_right_init,
+            StepFn &&step,
+            std::size_t max_iters,
+            float step_size,
+            float tol) noexcept -> TorsoFreeSolveResult
+        {
+            std::array<float, 6> torso = torso_init;
+            float psi_left = psi_left_init;
+            float psi_right = psi_right_init;
+            constexpr float two_pi = 2.0f * static_cast<float>(M_PI);
+
+            for (std::size_t iter = 0; iter < max_iters; ++iter)
+            {
+                auto eval = torso_free_loss_jacobian(torso, t_mid_pose, psi_left, psi_right);
+
+                if (eval.loss_left <= tol and eval.loss_right <= tol)
+                {
+                    return {true, eval.q, torso, psi_left, psi_right, eval.loss_left, eval.loss_right, iter};
+                }
+
+                const auto delta = step(eval.jac_left, eval.jac_right, eval.loss_left, eval.loss_right);
+
+                {% for i in range(6) %}
+                torso[{{i}}] = std::clamp(
+                    torso[{{i}}] - step_size * delta[{{i}}],
+                    static_cast<float>({{ at(rby1_torso_lower, i) }} + {{ at(rby1_torso_margins, i) }}),
+                    static_cast<float>({{ at(rby1_torso_upper, i) }} - {{ at(rby1_torso_margins, i) }}));
+                {% endfor %}
+
+                psi_left = std::fmod(std::fmod(psi_left - step_size * delta[6], two_pi) + two_pi, two_pi);
+                psi_right = std::fmod(std::fmod(psi_right - step_size * delta[7], two_pi) + two_pi, two_pi);
+            }
+
+            auto eval = torso_free_loss_jacobian(torso, t_mid_pose, psi_left, psi_right);
+            return {false, eval.q, torso, psi_left, psi_right, eval.loss_left, eval.loss_right, max_iters};
+        }
+
+        static inline auto solve_torso_for_mid_pose_gradient_descent(
+            const std::array<float, 6> &torso_init,
+            const std::array<float, 7> &t_mid_pose,
+            float psi_left_init,
+            float psi_right_init,
+            std::size_t max_iters = 100,
+            float step_size = 0.1f,
+            float tol = 1e-6f) noexcept -> TorsoFreeSolveResult
+        {
+            return solve_torso_for_mid_pose_impl(
+                torso_init, t_mid_pose, psi_left_init, psi_right_init,
+                [](const std::array<float, 8> &jl, const std::array<float, 8> &jr, float ll, float lr) {
+                    return solve_torso_free_gradient_descent(jl, jr, ll, lr);
+                },
+                max_iters, step_size, tol);
+        }
+
+        static inline auto solve_torso_for_mid_pose_lm_inner(
+            const std::array<float, 6> &torso_init,
+            const std::array<float, 7> &t_mid_pose,
+            float psi_left_init,
+            float psi_right_init,
+            std::size_t max_iters = 50,
+            float step_size = 1.0f,
+            float tol = 1e-6f) noexcept -> TorsoFreeSolveResult
+        {
+            return solve_torso_for_mid_pose_impl(
+                torso_init, t_mid_pose, psi_left_init, psi_right_init,
+                [](const std::array<float, 8> &jl, const std::array<float, 8> &jr, float ll, float lr) {
+                    return solve_torso_free_lm_inner(jl, jr, ll, lr);
+                },
+                max_iters, step_size, tol);
+        }
+
+        // -----------------------------------------------------------------------------
+        // Block/FloatVector counterpart of the above: `rake` independent
+        // [torso_0..5, psi_left, psi_right] attempts for the SAME goal T_mid, evaluated
+        // together in one param_torso_free_jac_code call per iteration (genuinely different
+        // per-lane torso/psi values this time, not a broadcast of one candidate -- unlike
+        // torso_free_loss_jacobian above), stopping as soon as ANY lane converges instead of
+        // waiting for the whole batch. Useful because the scalar solve above is a purely
+        // local search: HingeSqPenalty's loss is EXACTLY zero (zero gradient, no pull at all)
+        // everywhere inside the feasible region, so a single bad starting guess that's
+        // already just inside -- or that a fixed step size overshoots past -- can converge to
+        // a degenerate/unintended solution or fail to move at all; multiple attempts from
+        // different starting points make that much less likely.
+        //
+        // This file does NOT do the random sampling itself (no <random> dependency here,
+        // matching every other batched utility in this header -- resolve_block_mask,
+        // classify_smm_block, set_gcp_lanes all take caller-prepared per-lane data too, same
+        // as rby1_gcp_branch_selector.cc's own external-RNG sweeps): callers supply
+        // `torso_inits`/`psi_left_inits`/`psi_right_inits`, one entry per lane. The intended
+        // convention -- not enforced here -- is lane 0 forced to {0,0,0,0,0,0}/0/0 (the same
+        // starting point solve_torso_for_mid_pose_* above uses) and the remaining lanes
+        // randomly sampled by the caller.
+        // -----------------------------------------------------------------------------
+
+        template <std::size_t rake>
+        struct TorsoFreeLossJacobianBlock
+        {
+            std::array<bool, rake> feasible;
+            std::array<Ambient::ConfigurationArray, rake> q;
+            std::array<float, rake> loss_left;
+            std::array<float, rake> loss_right;
+            std::array<std::array<float, 8>, rake> jac_left;
+            std::array<std::array<float, 8>, rake> jac_right;
+        };
+
+        // Per-lane counterpart of torso_free_loss_jacobian: `torso_lanes[lane]`/
+        // `psi_left_lanes[lane]`/`psi_right_lanes[lane]` are that lane's own candidate, while
+        // `t_mid_pose_in` (the goal) and the base (fixed at the origin) are shared by every
+        // lane -- same param_torso_free_jac_code macro as the scalar version, just fed
+        // genuinely varying-per-lane FloatVector<rake, 1> locals (built via its
+        // std::array<float, rake> packing constructor, the same one set_gcp_lanes above uses)
+        // instead of a uniform broadcast. Requires rake == vamp::FloatVectorWidth, same reason
+        // as resolve_block/torso_free_loss_jacobian.
+        template <std::size_t rake>
+        static inline auto torso_free_loss_jacobian_block(
+            const std::array<std::array<float, 6>, rake> &torso_lanes,
+            const std::array<float, 7> &t_mid_pose_in,
+            const std::array<float, rake> &psi_left_lanes,
+            const std::array<float, rake> &psi_right_lanes) noexcept -> TorsoFreeLossJacobianBlock<rake>
+        {
+            static_assert(
+                rake == vamp::FloatVectorWidth,
+                "torso_free_loss_jacobian_block requires rake == vamp::FloatVectorWidth -- "
+                "param_torso_free_jac_code reads left_gcp/right_gcp/t_mid_left/t_mid_right "
+                "directly by name at that fixed width, same as resolve_block.");
+
+            using V = FloatVector<rake, 1>;
+
+            std::array<V, 4> base{V(0.0f), V(0.0f), V(1.0f), V(0.0f)};
+
+            std::array<V, 6> torso;
+            for (std::size_t j = 0; j < 6; ++j)
+            {
+                std::array<float, rake> column{};
+                for (std::size_t lane = 0; lane < rake; ++lane)
+                {
+                    column[lane] = torso_lanes[lane][j];
+                }
+                torso[j] = V(column);
+            }
+
+            std::array<V, 7> t_mid_pose{
+                V(t_mid_pose_in[0]), V(t_mid_pose_in[1]), V(t_mid_pose_in[2]),
+                V(t_mid_pose_in[3]), V(t_mid_pose_in[4]), V(t_mid_pose_in[5]), V(t_mid_pose_in[6])};
+            const V psi_left(psi_left_lanes);
+            const V psi_right(psi_right_lanes);
+
+            FloatVector<rake, {{param_torso_free_jac_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> q;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_left;
+            FloatVector<rake, 1> reach_violation_left;
+            FloatVector<rake, 1> loss_left;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_right;
+            FloatVector<rake, 1> reach_violation_right;
+            FloatVector<rake, 1> loss_right;
+            FloatVector<rake, 8> jac_left;
+            FloatVector<rake, 8> jac_right;
+
+            {{param_torso_free_jac_code}}
+
+            TorsoFreeLossJacobianBlock<rake> out;
+            for (std::size_t lane = 0; lane < rake; ++lane)
+            {
+                out.feasible[lane] =
+                    (reach_violation_left[{0, lane}] <= 0.0f) and (reach_violation_right[{0, lane}] <= 0.0f);
+                out.loss_left[lane] = loss_left[{0, lane}];
+                out.loss_right[lane] = loss_right[{0, lane}];
+                for (std::size_t i = 0; i < Ambient::dimension; ++i)
+                {
+                    out.q[lane][i] = q[{i, lane}];
+                }
+                for (std::size_t i = 0; i < 8; ++i)
+                {
+                    out.jac_left[lane][i] = jac_left[{i, lane}];
+                    out.jac_right[lane][i] = jac_right[{i, lane}];
+                }
+            }
+            return out;
+        }
+
+        // Same fields as TorsoFreeSolveResult, plus `lane`: which of the `rake` attempts
+        // converged (or, if none did, whichever ended with the lowest loss_left + loss_right
+        // -- still a best-effort result, same "return the last iterate" contract as
+        // solve_torso_for_mid_pose_impl's own !converged case).
+        template <std::size_t rake>
+        struct TorsoFreeSolveBlockResult
+        {
+            bool converged;
+            std::size_t lane;
+            Ambient::ConfigurationArray q;
+            std::array<float, 6> torso;
+            float psi_left;
+            float psi_right;
+            float loss_left;
+            float loss_right;
+            std::size_t iterations;
+        };
+
+        // Batched counterpart of solve_torso_for_mid_pose_impl: advances all `rake` lanes'
+        // [torso, psi_left, psi_right] together each iteration (one torso_free_loss_jacobian_block
+        // call, then one scalar `step` call per lane -- the step itself, an 8x8-or-smaller
+        // Cholesky solve, is cheap enough that batching it isn't worth a dedicated block trace,
+        // unlike the FK-heavy loss/Jacobian evaluation above), but stops and returns as soon as
+        // ANY lane's loss falls under `tol` -- it does not wait for the other lanes to catch up.
+        template <std::size_t rake, typename StepFn>
+        static inline auto solve_torso_for_mid_pose_block_impl(
+            const std::array<std::array<float, 6>, rake> &torso_inits,
+            const std::array<float, 7> &t_mid_pose,
+            const std::array<float, rake> &psi_left_inits,
+            const std::array<float, rake> &psi_right_inits,
+            StepFn &&step,
+            std::size_t max_iters,
+            float step_size,
+            float tol) noexcept -> TorsoFreeSolveBlockResult<rake>
+        {
+            std::array<std::array<float, 6>, rake> torso = torso_inits;
+            std::array<float, rake> psi_left = psi_left_inits;
+            std::array<float, rake> psi_right = psi_right_inits;
+            constexpr float two_pi = 2.0f * static_cast<float>(M_PI);
+
+            for (std::size_t iter = 0; iter < max_iters; ++iter)
+            {
+                const auto eval = torso_free_loss_jacobian_block<rake>(torso, t_mid_pose, psi_left, psi_right);
+
+                for (std::size_t lane = 0; lane < rake; ++lane)
+                {
+                    if (eval.loss_left[lane] <= tol and eval.loss_right[lane] <= tol)
+                    {
+                        return {
+                            true, lane, eval.q[lane], torso[lane], psi_left[lane], psi_right[lane],
+                            eval.loss_left[lane], eval.loss_right[lane], iter};
+                    }
+                }
+
+                for (std::size_t lane = 0; lane < rake; ++lane)
+                {
+                    const auto delta =
+                        step(eval.jac_left[lane], eval.jac_right[lane], eval.loss_left[lane], eval.loss_right[lane]);
+
+                    {% for i in range(6) %}
+                    torso[lane][{{i}}] = std::clamp(
+                        torso[lane][{{i}}] - step_size * delta[{{i}}],
+                        static_cast<float>({{ at(rby1_torso_lower, i) }} + {{ at(rby1_torso_margins, i) }}),
+                        static_cast<float>({{ at(rby1_torso_upper, i) }} - {{ at(rby1_torso_margins, i) }}));
+                    {% endfor %}
+
+                    psi_left[lane] =
+                        std::fmod(std::fmod(psi_left[lane] - step_size * delta[6], two_pi) + two_pi, two_pi);
+                    psi_right[lane] =
+                        std::fmod(std::fmod(psi_right[lane] - step_size * delta[7], two_pi) + two_pi, two_pi);
+                }
+            }
+
+            const auto eval = torso_free_loss_jacobian_block<rake>(torso, t_mid_pose, psi_left, psi_right);
+            std::size_t best_lane = 0;
+            float best_total_loss = eval.loss_left[0] + eval.loss_right[0];
+            for (std::size_t lane = 1; lane < rake; ++lane)
+            {
+                const float total = eval.loss_left[lane] + eval.loss_right[lane];
+                if (total < best_total_loss)
+                {
+                    best_total_loss = total;
+                    best_lane = lane;
+                }
+            }
+
+            return {
+                false, best_lane, eval.q[best_lane], torso[best_lane], psi_left[best_lane], psi_right[best_lane],
+                eval.loss_left[best_lane], eval.loss_right[best_lane], max_iters};
+        }
+
+        template <std::size_t rake>
+        static inline auto solve_torso_for_mid_pose_block_gradient_descent(
+            const std::array<std::array<float, 6>, rake> &torso_inits,
+            const std::array<float, 7> &t_mid_pose,
+            const std::array<float, rake> &psi_left_inits,
+            const std::array<float, rake> &psi_right_inits,
+            std::size_t max_iters = 100,
+            float step_size = 0.1f,
+            float tol = 1e-6f) noexcept -> TorsoFreeSolveBlockResult<rake>
+        {
+            return solve_torso_for_mid_pose_block_impl<rake>(
+                torso_inits, t_mid_pose, psi_left_inits, psi_right_inits,
+                [](const std::array<float, 8> &jl, const std::array<float, 8> &jr, float ll, float lr) {
+                    return solve_torso_free_gradient_descent(jl, jr, ll, lr);
+                },
+                max_iters, step_size, tol);
+        }
+
+        template <std::size_t rake>
+        static inline auto solve_torso_for_mid_pose_block_lm_inner(
+            const std::array<std::array<float, 6>, rake> &torso_inits,
+            const std::array<float, 7> &t_mid_pose,
+            const std::array<float, rake> &psi_left_inits,
+            const std::array<float, rake> &psi_right_inits,
+            std::size_t max_iters = 50,
+            float step_size = 1.0f,
+            float tol = 1e-6f) noexcept -> TorsoFreeSolveBlockResult<rake>
+        {
+            return solve_torso_for_mid_pose_block_impl<rake>(
+                torso_inits, t_mid_pose, psi_left_inits, psi_right_inits,
+                [](const std::array<float, 8> &jl, const std::array<float, 8> &jr, float ll, float lr) {
+                    return solve_torso_free_lm_inner(jl, jr, ll, lr);
+                },
+                max_iters, step_size, tol);
+        }
+
+        // -----------------------------------------------------------------------------
+        // Independent (unconstrained) bimanual counterpart of the mid-pose search above:
+        // same idea -- differentiate the closed-form arm IK's feasibility loss back through
+        // torso and search over [torso_0..5, left_j15, right_j24] to drive it to zero -- but
+        // each hand's goal pose is an ordinary, independent input (RainbowIkCG) instead of
+        // derived from a shared T_mid plus fixed t_mid_left/t_mid_right offsets. No
+        // thread-local hand-offset bookkeeping is needed here (and so no compute_mid_pose()
+        // call before using it): pass each hand's own goal pose directly. Base fixed at the
+        // origin, same reasoning as torso_free_loss_jacobian above -- so "goal pose" here
+        // means relative to that fixed-at-origin base, same convention as t_mid_pose above.
+        // The step-solve (solve_torso_free_gradient_descent/_lm_inner) is reused verbatim
+        // from the mid-pose mode -- see trace_rby1_independent_loss_and_jacobian's header
+        // comment for why that's valid.
+        // -----------------------------------------------------------------------------
+
+        struct IndependentLossJacobian
+        {
+            bool feasible;
+            Ambient::ConfigurationArray q;
+            float loss_left;
+            float loss_right;
+            std::array<float, 8> jac_left;   // d(loss_left)/d([torso_0..5, left_j15, right_j24])
+            std::array<float, 8> jac_right;  // d(loss_right)/d([torso_0..5, left_j15, right_j24])
+        };
+
+        static inline auto independent_loss_jacobian(
+            const std::array<float, 6> &torso_in,
+            const std::array<float, 7> &left_pose_in,
+            const std::array<float, 7> &right_pose_in,
+            float left_j15_in,
+            float right_j24_in) noexcept -> IndependentLossJacobian
+        {
+            constexpr std::size_t rake = vamp::FloatVectorWidth;
+            using V = FloatVector<rake, 1>;
+
+            std::array<V, 4> base{V(0.0f), V(0.0f), V(1.0f), V(0.0f)};
+            std::array<V, 6> torso{
+                V(torso_in[0]), V(torso_in[1]), V(torso_in[2]),
+                V(torso_in[3]), V(torso_in[4]), V(torso_in[5])};
+            std::array<V, 7> left_pose{
+                V(left_pose_in[0]), V(left_pose_in[1]), V(left_pose_in[2]),
+                V(left_pose_in[3]), V(left_pose_in[4]), V(left_pose_in[5]), V(left_pose_in[6])};
+            std::array<V, 7> right_pose{
+                V(right_pose_in[0]), V(right_pose_in[1]), V(right_pose_in[2]),
+                V(right_pose_in[3]), V(right_pose_in[4]), V(right_pose_in[5]), V(right_pose_in[6])};
+            const V left_j15(left_j15_in);
+            const V right_j24(right_j24_in);
+
+            FloatVector<rake, {{param_independent_jac_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> q;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_left;
+            FloatVector<rake, 1> reach_violation_left;
+            FloatVector<rake, 1> loss_left;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_right;
+            FloatVector<rake, 1> reach_violation_right;
+            FloatVector<rake, 1> loss_right;
+            FloatVector<rake, 8> jac_left;
+            FloatVector<rake, 8> jac_right;
+
+            {{param_independent_jac_code}}
+
+            IndependentLossJacobian out;
+            out.feasible = (reach_violation_left[{0, 0}] <= 0.0f) and (reach_violation_right[{0, 0}] <= 0.0f);
+            out.loss_left = loss_left[{0, 0}];
+            out.loss_right = loss_right[{0, 0}];
+            for (std::size_t i = 0; i < Ambient::dimension; ++i)
+            {
+                out.q[i] = q[{i, 0}];
+            }
+            for (std::size_t i = 0; i < 8; ++i)
+            {
+                out.jac_left[i] = jac_left[{i, 0}];
+                out.jac_right[i] = jac_right[{i, 0}];
+            }
+            return out;
+        }
+
+        // Iteratively searches for [torso_0..5, left_j15, right_j24] that drive
+        // loss_left/loss_right to (near) zero for two independent fixed goal poses (base
+        // frame), starting from `torso_init`/`left_j15_init`/`right_j24_init`. Same
+        // clip/wrap/converged contract as solve_torso_for_mid_pose_impl above.
+        struct IndependentSolveResult
+        {
+            bool converged;
+            Ambient::ConfigurationArray q;
+            std::array<float, 6> torso;
+            float left_j15;
+            float right_j24;
+            float loss_left;
+            float loss_right;
+            std::size_t iterations;
+        };
+
+        template <typename StepFn>
+        static inline auto solve_torso_for_independent_poses_impl(
+            const std::array<float, 6> &torso_init,
+            const std::array<float, 7> &left_pose,
+            const std::array<float, 7> &right_pose,
+            float left_j15_init,
+            float right_j24_init,
+            StepFn &&step,
+            std::size_t max_iters,
+            float step_size,
+            float tol) noexcept -> IndependentSolveResult
+        {
+            std::array<float, 6> torso = torso_init;
+            float left_j15 = left_j15_init;
+            float right_j24 = right_j24_init;
+            constexpr float two_pi = 2.0f * static_cast<float>(M_PI);
+
+            for (std::size_t iter = 0; iter < max_iters; ++iter)
+            {
+                auto eval = independent_loss_jacobian(torso, left_pose, right_pose, left_j15, right_j24);
+
+                if (eval.loss_left <= tol and eval.loss_right <= tol)
+                {
+                    return {true, eval.q, torso, left_j15, right_j24, eval.loss_left, eval.loss_right, iter};
+                }
+
+                const auto delta = step(eval.jac_left, eval.jac_right, eval.loss_left, eval.loss_right);
+
+                {% for i in range(6) %}
+                torso[{{i}}] = std::clamp(
+                    torso[{{i}}] - step_size * delta[{{i}}],
+                    static_cast<float>({{ at(rby1_torso_lower, i) }} + {{ at(rby1_torso_margins, i) }}),
+                    static_cast<float>({{ at(rby1_torso_upper, i) }} - {{ at(rby1_torso_margins, i) }}));
+                {% endfor %}
+
+                left_j15 = std::fmod(std::fmod(left_j15 - step_size * delta[6], two_pi) + two_pi, two_pi);
+                right_j24 = std::fmod(std::fmod(right_j24 - step_size * delta[7], two_pi) + two_pi, two_pi);
+            }
+
+            auto eval = independent_loss_jacobian(torso, left_pose, right_pose, left_j15, right_j24);
+            return {false, eval.q, torso, left_j15, right_j24, eval.loss_left, eval.loss_right, max_iters};
+        }
+
+        static inline auto solve_torso_for_independent_poses_gradient_descent(
+            const std::array<float, 6> &torso_init,
+            const std::array<float, 7> &left_pose,
+            const std::array<float, 7> &right_pose,
+            float left_j15_init,
+            float right_j24_init,
+            std::size_t max_iters = 100,
+            float step_size = 0.1f,
+            float tol = 1e-6f) noexcept -> IndependentSolveResult
+        {
+            return solve_torso_for_independent_poses_impl(
+                torso_init, left_pose, right_pose, left_j15_init, right_j24_init,
+                [](const std::array<float, 8> &jl, const std::array<float, 8> &jr, float ll, float lr) {
+                    return solve_torso_free_gradient_descent(jl, jr, ll, lr);
+                },
+                max_iters, step_size, tol);
+        }
+
+        static inline auto solve_torso_for_independent_poses_lm_inner(
+            const std::array<float, 6> &torso_init,
+            const std::array<float, 7> &left_pose,
+            const std::array<float, 7> &right_pose,
+            float left_j15_init,
+            float right_j24_init,
+            std::size_t max_iters = 50,
+            float step_size = 1.0f,
+            float tol = 1e-6f) noexcept -> IndependentSolveResult
+        {
+            return solve_torso_for_independent_poses_impl(
+                torso_init, left_pose, right_pose, left_j15_init, right_j24_init,
+                [](const std::array<float, 8> &jl, const std::array<float, 8> &jr, float ll, float lr) {
+                    return solve_torso_free_lm_inner(jl, jr, ll, lr);
+                },
+                max_iters, step_size, tol);
+        }
+
+        // Block/FloatVector counterpart, same shape as TorsoFreeLossJacobianBlock/
+        // solve_torso_for_mid_pose_block_* above: `rake` independent [torso_0..5, left_j15,
+        // right_j24] attempts for the SAME pair of goal poses, stopping as soon as any lane
+        // converges.
+        template <std::size_t rake>
+        struct IndependentLossJacobianBlock
+        {
+            std::array<bool, rake> feasible;
+            std::array<Ambient::ConfigurationArray, rake> q;
+            std::array<float, rake> loss_left;
+            std::array<float, rake> loss_right;
+            std::array<std::array<float, 8>, rake> jac_left;
+            std::array<std::array<float, 8>, rake> jac_right;
+        };
+
+        template <std::size_t rake>
+        static inline auto independent_loss_jacobian_block(
+            const std::array<std::array<float, 6>, rake> &torso_lanes,
+            const std::array<float, 7> &left_pose_in,
+            const std::array<float, 7> &right_pose_in,
+            const std::array<float, rake> &left_j15_lanes,
+            const std::array<float, rake> &right_j24_lanes) noexcept -> IndependentLossJacobianBlock<rake>
+        {
+            static_assert(
+                rake == vamp::FloatVectorWidth,
+                "independent_loss_jacobian_block requires rake == vamp::FloatVectorWidth -- "
+                "param_independent_jac_code reads left_gcp/right_gcp directly by name at that "
+                "fixed width, same as resolve_block.");
+
+            using V = FloatVector<rake, 1>;
+
+            std::array<V, 4> base{V(0.0f), V(0.0f), V(1.0f), V(0.0f)};
+
+            std::array<V, 6> torso;
+            for (std::size_t j = 0; j < 6; ++j)
+            {
+                std::array<float, rake> column{};
+                for (std::size_t lane = 0; lane < rake; ++lane)
+                {
+                    column[lane] = torso_lanes[lane][j];
+                }
+                torso[j] = V(column);
+            }
+
+            std::array<V, 7> left_pose{
+                V(left_pose_in[0]), V(left_pose_in[1]), V(left_pose_in[2]),
+                V(left_pose_in[3]), V(left_pose_in[4]), V(left_pose_in[5]), V(left_pose_in[6])};
+            std::array<V, 7> right_pose{
+                V(right_pose_in[0]), V(right_pose_in[1]), V(right_pose_in[2]),
+                V(right_pose_in[3]), V(right_pose_in[4]), V(right_pose_in[5]), V(right_pose_in[6])};
+            const V left_j15(left_j15_lanes);
+            const V right_j24(right_j24_lanes);
+
+            FloatVector<rake, {{param_independent_jac_code_vars}}> v;
+            Ambient::ConfigurationBlock<rake> q;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_left;
+            FloatVector<rake, 1> reach_violation_left;
+            FloatVector<rake, 1> loss_left;
+            FloatVector<rake, {{param_ik_num_unclipped}}> u_right;
+            FloatVector<rake, 1> reach_violation_right;
+            FloatVector<rake, 1> loss_right;
+            FloatVector<rake, 8> jac_left;
+            FloatVector<rake, 8> jac_right;
+
+            {{param_independent_jac_code}}
+
+            IndependentLossJacobianBlock<rake> out;
+            for (std::size_t lane = 0; lane < rake; ++lane)
+            {
+                out.feasible[lane] =
+                    (reach_violation_left[{0, lane}] <= 0.0f) and (reach_violation_right[{0, lane}] <= 0.0f);
+                out.loss_left[lane] = loss_left[{0, lane}];
+                out.loss_right[lane] = loss_right[{0, lane}];
+                for (std::size_t i = 0; i < Ambient::dimension; ++i)
+                {
+                    out.q[lane][i] = q[{i, lane}];
+                }
+                for (std::size_t i = 0; i < 8; ++i)
+                {
+                    out.jac_left[lane][i] = jac_left[{i, lane}];
+                    out.jac_right[lane][i] = jac_right[{i, lane}];
+                }
+            }
+            return out;
+        }
+
+        template <std::size_t rake>
+        struct IndependentSolveBlockResult
+        {
+            bool converged;
+            std::size_t lane;
+            Ambient::ConfigurationArray q;
+            std::array<float, 6> torso;
+            float left_j15;
+            float right_j24;
+            float loss_left;
+            float loss_right;
+            std::size_t iterations;
+        };
+
+        template <std::size_t rake, typename StepFn>
+        static inline auto solve_torso_for_independent_poses_block_impl(
+            const std::array<std::array<float, 6>, rake> &torso_inits,
+            const std::array<float, 7> &left_pose,
+            const std::array<float, 7> &right_pose,
+            const std::array<float, rake> &left_j15_inits,
+            const std::array<float, rake> &right_j24_inits,
+            StepFn &&step,
+            std::size_t max_iters,
+            float step_size,
+            float tol) noexcept -> IndependentSolveBlockResult<rake>
+        {
+            std::array<std::array<float, 6>, rake> torso = torso_inits;
+            std::array<float, rake> left_j15 = left_j15_inits;
+            std::array<float, rake> right_j24 = right_j24_inits;
+            constexpr float two_pi = 2.0f * static_cast<float>(M_PI);
+
+            for (std::size_t iter = 0; iter < max_iters; ++iter)
+            {
+                const auto eval =
+                    independent_loss_jacobian_block<rake>(torso, left_pose, right_pose, left_j15, right_j24);
+
+                for (std::size_t lane = 0; lane < rake; ++lane)
+                {
+                    if (eval.loss_left[lane] <= tol and eval.loss_right[lane] <= tol)
+                    {
+                        return {
+                            true, lane, eval.q[lane], torso[lane], left_j15[lane], right_j24[lane],
+                            eval.loss_left[lane], eval.loss_right[lane], iter};
+                    }
+                }
+
+                for (std::size_t lane = 0; lane < rake; ++lane)
+                {
+                    const auto delta =
+                        step(eval.jac_left[lane], eval.jac_right[lane], eval.loss_left[lane], eval.loss_right[lane]);
+
+                    {% for i in range(6) %}
+                    torso[lane][{{i}}] = std::clamp(
+                        torso[lane][{{i}}] - step_size * delta[{{i}}],
+                        static_cast<float>({{ at(rby1_torso_lower, i) }} + {{ at(rby1_torso_margins, i) }}),
+                        static_cast<float>({{ at(rby1_torso_upper, i) }} - {{ at(rby1_torso_margins, i) }}));
+                    {% endfor %}
+
+                    left_j15[lane] =
+                        std::fmod(std::fmod(left_j15[lane] - step_size * delta[6], two_pi) + two_pi, two_pi);
+                    right_j24[lane] =
+                        std::fmod(std::fmod(right_j24[lane] - step_size * delta[7], two_pi) + two_pi, two_pi);
+                }
+            }
+
+            const auto eval =
+                independent_loss_jacobian_block<rake>(torso, left_pose, right_pose, left_j15, right_j24);
+            std::size_t best_lane = 0;
+            float best_total_loss = eval.loss_left[0] + eval.loss_right[0];
+            for (std::size_t lane = 1; lane < rake; ++lane)
+            {
+                const float total = eval.loss_left[lane] + eval.loss_right[lane];
+                if (total < best_total_loss)
+                {
+                    best_total_loss = total;
+                    best_lane = lane;
+                }
+            }
+
+            return {
+                false, best_lane, eval.q[best_lane], torso[best_lane], left_j15[best_lane], right_j24[best_lane],
+                eval.loss_left[best_lane], eval.loss_right[best_lane], max_iters};
+        }
+
+        template <std::size_t rake>
+        static inline auto solve_torso_for_independent_poses_block_gradient_descent(
+            const std::array<std::array<float, 6>, rake> &torso_inits,
+            const std::array<float, 7> &left_pose,
+            const std::array<float, 7> &right_pose,
+            const std::array<float, rake> &left_j15_inits,
+            const std::array<float, rake> &right_j24_inits,
+            std::size_t max_iters = 100,
+            float step_size = 0.1f,
+            float tol = 1e-6f) noexcept -> IndependentSolveBlockResult<rake>
+        {
+            return solve_torso_for_independent_poses_block_impl<rake>(
+                torso_inits, left_pose, right_pose, left_j15_inits, right_j24_inits,
+                [](const std::array<float, 8> &jl, const std::array<float, 8> &jr, float ll, float lr) {
+                    return solve_torso_free_gradient_descent(jl, jr, ll, lr);
+                },
+                max_iters, step_size, tol);
+        }
+
+        template <std::size_t rake>
+        static inline auto solve_torso_for_independent_poses_block_lm_inner(
+            const std::array<std::array<float, 6>, rake> &torso_inits,
+            const std::array<float, 7> &left_pose,
+            const std::array<float, 7> &right_pose,
+            const std::array<float, rake> &left_j15_inits,
+            const std::array<float, rake> &right_j24_inits,
+            std::size_t max_iters = 50,
+            float step_size = 1.0f,
+            float tol = 1e-6f) noexcept -> IndependentSolveBlockResult<rake>
+        {
+            return solve_torso_for_independent_poses_block_impl<rake>(
+                torso_inits, left_pose, right_pose, left_j15_inits, right_j24_inits,
+                [](const std::array<float, 8> &jl, const std::array<float, 8> &jr, float ll, float lr) {
+                    return solve_torso_free_lm_inner(jl, jr, ll, lr);
+                },
+                max_iters, step_size, tol);
         }
         {% endif %}
 
