@@ -113,6 +113,7 @@ add_library(cricket SHARED
     src/tracing/frame_jacobian.cc
     src/tracing/forward_dynamics.cc
     src/tracing/integrate_configuration.cc
+    src/tracing/constraints.cc
 )
 add_library(cricket::cricket ALIAS cricket)
 set_target_properties(cricket PROPERTIES POSITION_INDEPENDENT_CODE ON)

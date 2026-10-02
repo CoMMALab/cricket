@@ -51,6 +51,95 @@ namespace cricket
     auto trace_integrate_configuration(const pinocchio::Model &model, const std::string &language)
         -> Traced;
 
+    // Least-squares step used to project a configuration onto a constraint manifold.
+    enum class ProjMethod
+    {
+        InnerLM,   // J^T (J J^T + lambda I)^{-1} e: (6 n_eef)^2 factorization
+        OuterLM,   // (J^T J + lambda I)^{-1} J^T e: nq^2 factorization
+        GradDesc,  // J^T e
+    };
+
+    // TSR (task-space region) error for every end-effector of the robot.
+    // Input: q (nq), then per end-effector [rTe (7), wTr (7), lb (6), ub (6)] with transforms
+    // as wxyz quaternion + xyz translation. Output: d(err)/dq (6 n_eef x nq, row-major), then
+    // the raw error (6 n_eef); bounds are hinged at runtime, not on the tape.
+    auto trace_tsr_error(const RobotInfo &info, const std::string &language) -> Traced;
+
+    // Relative-pose (bimanual) TSR error between two end-effectors.
+    // Input: q (nq), then the reference relative transform lTr (7), lb (6), ub (6).
+    // Output: d(err)/dq (6 x nq, row-major), then the raw error (6).
+    auto trace_tsr_bimanual_error(
+        const RobotInfo &info,
+        const std::string &language,
+        std::size_t eef1 = 0,
+        std::size_t eef2 = 1) -> Traced;
+
+    // Projection step from a TSR error and Jacobian; `relative` selects the 6-row bimanual
+    // error instead of the 6 n_eef-row per-end-effector error.
+    // Input: J (row-major), then err. Output: gradient (nq).
+    auto trace_solve_tsr(
+        const RobotInfo &info,
+        const std::string &language,
+        ProjMethod method,
+        bool relative = false) -> Traced;
+
+    // Projection step from an arbitrary stacked error and Jacobian with err_size rows.
+    // Input: J (err_size x nq, row-major), then err (err_size). Output: gradient (nq).
+    auto trace_solve_jacobian(
+        const RobotInfo &info,
+        const std::string &language,
+        ProjMethod method,
+        std::size_t err_size) -> Traced;
+
+    // Center-of-mass position and Jacobian, optionally expressed relative to the mean
+    // position of a set of reference (body) frames, e.g. the feet of a standing humanoid so
+    // that a support polygon can be stated in the stance frame.
+    // Input: q (nq). Output: d(com)/dq (3 x nq, row-major), then com (3).
+    auto trace_com_jacobian(
+        const RobotInfo &info,
+        const std::vector<std::string> &reference_frames,
+        const std::string &language) -> Traced;
+
+    // Loop-closure distance constraint: the distance between two (body) frames must equal a
+    // fixed length, e.g. a rigid rod cut from a closed kinematic chain.
+    struct ClosedLoop
+    {
+        std::string start_frame;
+        std::string end_frame;
+        double length;
+    };
+
+    // Input: q (nq). Output: d(err)/dq (n_loops x nq, row-major), then err (n_loops).
+    auto trace_closed_loop_error(
+        const RobotInfo &info,
+        const std::vector<ClosedLoop> &loops,
+        const std::string &language) -> Traced;
+
+    // Lead-screw coupling of the first end-effector: axial advance along the reference
+    // frame's z-axis locked to rotation about it. h(q) is the conserved quantity of the
+    // coupling and dh/dq its Pfaffian row (the velocity form is dh/dq qdot = 0).
+    // Input: q (nq), then rTe (7), wTr (7), pitch (1) with transforms as wxyz quaternion +
+    // xyz translation. Output: d(h)/dq (1 x nq, row-major), then h (1).
+    auto trace_lead_screw_error(const RobotInfo &info, const std::string &language) -> Traced;
+
+    // Twist Jacobians of the first end-effector's offset frame, for constant-coefficient
+    // Pfaffian velocity constraints c_ref^T twist_ref + c_loc^T twist_loc = 0 whose rows
+    // are combined at runtime in vamp. Input: q (nq), then rTe (7), wTr (7); transforms
+    // are wxyz quaternion + xyz translation. Output (12 x nq, row-major): the twist
+    // Jacobian [linear; angular] of the offset frame (eef * rTe^-1) expressed in the
+    // reference frame wTr's axes, then the same expressed in the offset frame's own
+    // (body) axes. Purely geometric (no log map), so rows are smooth for unbounded
+    // rotation.
+    auto trace_twist_jacobians(const RobotInfo &info, const std::string &language) -> Traced;
+
+    // Derive every JSON-gated constraint kernel (TSR, bimanual TSR, center-of-mass,
+    // closed loops, lead screw, twist Jacobians) from the recipe keys already present in
+    // `data` ("constraints", "com", "closed_loops", "lead_screw", "twist"), tracing the
+    // kernels and setting the has_* template gates. Shared by the offline generator
+    // (fkcc_gen) and the JIT path (generate_robot_source) so both accept the same keys.
+    auto derive_constraint_traces(const RobotInfo &robot, nlohmann::json &data, const std::string &language)
+        -> void;
+
     // Strict recipe validation: throws if `data` contains keys cricket does not read
     // (typos otherwise fail silently, e.g. a misspelled flag defaulting to false), with a
     // nearest-match suggestion. Keys starting with '_' are ignored as comments. Checks

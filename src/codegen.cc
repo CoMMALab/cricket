@@ -174,6 +174,164 @@ namespace cricket
         return Traced{function_code.str(), handler.getTemporaryVariableCount(), n_out};
     }
 
+    auto derive_constraint_traces(const RobotInfo &robot, nlohmann::json &data, const std::string &language)
+        -> void
+    {
+        const auto set_trace = [&data](const Traced &traced, const std::string &key)
+        {
+            data[key + "_code"] = traced.code;
+            data[key + "_code_vars"] = traced.temp_variables;
+            data[key + "_code_output"] = traced.outputs;
+        };
+
+        const bool constraints = data.value("constraints", false);
+        data["has_constraints"] = constraints;
+        if (constraints)
+        {
+            set_trace(trace_tsr_error(robot, language), "tsr_error");
+            set_trace(
+                trace_solve_tsr(robot, language, ProjMethod::InnerLM), "solve_tsr_error_lm_inner");
+            set_trace(
+                trace_solve_tsr(robot, language, ProjMethod::OuterLM), "solve_tsr_error_lm_outer");
+            set_trace(
+                trace_solve_tsr(robot, language, ProjMethod::GradDesc),
+                "solve_tsr_error_gradient_descent");
+
+            if (robot.end_effector_indexes.size() > 1)
+            {
+                set_trace(trace_tsr_bimanual_error(robot, language), "tsr_bimanual_error");
+                set_trace(
+                    trace_solve_tsr(robot, language, ProjMethod::InnerLM, true),
+                    "solve_tsr_relative_error_lm_inner");
+                set_trace(
+                    trace_solve_tsr(robot, language, ProjMethod::OuterLM, true),
+                    "solve_tsr_relative_error_lm_outer");
+                set_trace(
+                    trace_solve_tsr(robot, language, ProjMethod::GradDesc, true),
+                    "solve_tsr_relative_error_gradient_descent");
+            }
+        }
+
+        // Center-of-mass kinematics. "com": true is the world-frame CoM. An object selects the frame:
+        //   {"frame": "world"}                                 world-frame CoM (the default frame)
+        //   {"frame": "feet", "reference_frames": [f1, f2]}    CoM minus the mean position of the reference
+        //                                                      frames (e.g. the feet), in world axes
+        // "reference_frames" is only valid, and required, with "frame": "feet".
+        // The support-polygon error consuming these is 2D (xy), hence err_size 2 solvers.
+        bool has_com = false;
+        std::vector<std::string> com_reference_frames;
+        if (data.contains("com"))
+        {
+            const auto &cm = data["com"];
+            if (cm.is_boolean())
+            {
+                has_com = cm.get<bool>();
+            }
+            else
+            {
+                has_com = true;
+                const auto frame = cm.value("frame", std::string("world"));
+                if (frame == "feet")
+                {
+                    if (not cm.contains("reference_frames") or cm["reference_frames"].empty())
+                    {
+                        throw std::runtime_error("\"com\": {\"frame\": \"feet\"} requires non-empty \"reference_frames\"");
+                    }
+
+                    com_reference_frames = cm["reference_frames"].get<std::vector<std::string>>();
+                }
+                else if (frame == "world")
+                {
+                    if (cm.contains("reference_frames"))
+                    {
+                        throw std::runtime_error(
+                            "\"com\": \"reference_frames\" is only valid with \"frame\": \"feet\" (the default frame is \"world\")");
+                    }
+                }
+                else
+                {
+                    throw std::runtime_error("\"com\": \"frame\" must be \"world\" or \"feet\", got \"" + frame + "\"");
+                }
+            }
+        }
+
+        data["has_com"] = has_com;
+        if (has_com)
+        {
+            data["com_reference_frames"] = com_reference_frames;
+            set_trace(trace_com_jacobian(robot, com_reference_frames, language), "com_jacobian");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::InnerLM, 2),
+                "solve_com_error_lm_inner");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::OuterLM, 2),
+                "solve_com_error_lm_outer");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::GradDesc, 2),
+                "solve_com_error_gradient_descent");
+        }
+
+        // Loop-closure distance constraints: "closed_loops" is a list of
+        // {"start_frame", "end_frame", "length"} objects.
+        const bool has_closed_loops = data.contains("closed_loops");
+        data["has_closed_loops"] = has_closed_loops;
+        if (has_closed_loops)
+        {
+            std::vector<ClosedLoop> loops;
+            for (const auto &cl : data["closed_loops"])
+            {
+                loops.push_back(
+                    {cl["start_frame"].get<std::string>(),
+                     cl["end_frame"].get<std::string>(),
+                     cl["length"].get<double>()});
+            }
+
+            data["num_closed_loops"] = loops.size();
+            set_trace(trace_closed_loop_error(robot, loops, language), "closed_loop_error");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::InnerLM, loops.size()),
+                "solve_closed_loop_error_lm_inner");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::OuterLM, loops.size()),
+                "solve_closed_loop_error_lm_outer");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::GradDesc, loops.size()),
+                "solve_closed_loop_error_gradient_descent");
+        }
+
+        // Lead-screw coupling: "lead_screw": true generates the scalar screw invariant h(q)
+        // of the first end-effector (axial advance minus pitch-scaled rotation about a
+        // reference frame's z-axis) with err_size-1 projection solvers. dh/dq serves as the
+        // Pfaffian row of the coupling; the solvers serve its integrable (holonomic)
+        // representation.
+        const bool has_lead_screw = data.value("lead_screw", false);
+        data["has_lead_screw"] = has_lead_screw;
+        if (has_lead_screw)
+        {
+            set_trace(trace_lead_screw_error(robot, language), "lead_screw_error");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::InnerLM, 1),
+                "solve_lead_screw_error_lm_inner");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::OuterLM, 1),
+                "solve_lead_screw_error_lm_outer");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::GradDesc, 1),
+                "solve_lead_screw_error_gradient_descent");
+        }
+
+        // Twist Jacobians: "twist": true generates the reference-frame and body-frame twist
+        // Jacobians of the first end-effector's offset frame, combined at runtime with
+        // constant coefficients into Pfaffian velocity-constraint rows (lead screw,
+        // knife-edge, no-slip) without further codegen.
+        const bool has_twist = data.value("twist", false);
+        data["has_twist"] = has_twist;
+        if (has_twist)
+        {
+            set_trace(trace_twist_jacobians(robot, language), "twist_jacobians");
+        }
+    }
+
     namespace
     {
         auto edit_distance(std::string_view a, std::string_view b) -> std::size_t
@@ -249,14 +407,21 @@ namespace cricket
             "template",
             "subtemplates",
             "output",
+            "constraints",
             "compact_collisions",
             "skip_static_environment_collisions",
             "active_joints",
             "default_configuration",
             "parts",
             "disabled_collisions",
+            "com",
+            "closed_loops",
+            "lead_screw",
+            "twist",
         };
         static const std::vector<std::string_view> bounds_keys = {"lower", "upper"};
+        static const std::vector<std::string_view> com_keys = {"frame", "reference_frames"};
+        static const std::vector<std::string_view> loop_keys = {"start_frame", "end_frame", "length"};
         static const std::vector<std::string_view> part_keys = {
             "prefix", "urdf", "srdf", "parent", "xyz", "rpy", "quat"};
         static const std::vector<std::string_view> subtemplate_keys = {"name", "template"};
@@ -289,6 +454,8 @@ namespace cricket
         };
 
         check_object("bounds", bounds_keys);
+        check_object("com", com_keys);
+        check_array("closed_loops", loop_keys);
         check_array("parts", part_keys);
         check_array("subtemplates", subtemplate_keys);
 
@@ -337,6 +504,7 @@ namespace cricket
             data["module_name"] = module_name;
         }
 
+        derive_constraint_traces(robot, data, opts.language);
 
         auto eefk = trace_sphere_cc_fk(robot, opts.language, false, false, true);
         data["eefk_code"] = eefk.code;
