@@ -1,5 +1,6 @@
 {
     "name": "BimanualIiwa",
+    "module_name": "bimanual_iiwa",
     "urdf": "bimanual_iiwa/bimanual_iiwa_spherized.urdf",
     "srdf": "bimanual_iiwa/bimanual_iiwa.srdf",
     "end_effector": [

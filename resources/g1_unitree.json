@@ -1,5 +1,6 @@
 {
     "name": "G1Unitree",
+    "module_name": "g1_unitree",
     "urdf": "g1_description/spherized.urdf",
     "srdf": "g1_description/g1_29dof.srdf",
     "end_effector": ["left_rubber_hand", "right_rubber_hand", "left_foot", "right_foot"],
