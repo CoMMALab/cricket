@@ -298,9 +298,10 @@ struct {{name}}
         {{ccfkee_code}}
         {% include "ccfk" %}
 
-        // Single-attachment API: attachments ride on the first end-effector.
-        // attaching at {{ at(end_effectors, 0) }}
-        set_attachment_pose(environment, to_isometry(&y[{{ccfkee_code_output - 12 * num_end_effectors}}]));
+        {% for k in range(num_end_effectors) %}
+        // attaching at {{ at(end_effectors, k) }}
+        set_attachment_pose(environment, {{k}}, to_isometry(&y[{{ccfkee_code_output - 12 * (num_end_effectors - k)}}]));
+        {% endfor %}
 
         //
         // attachment vs. environment collisions
@@ -309,19 +310,30 @@ struct {{name}}
         {
             return false;
         }
+        {% if num_end_effectors > 1 %}
+
+        //
+        // attachment vs. attachment collisions (across end-effectors)
+        //
+        if (attachment_attachment_collision(environment)) [[unlikely]]
+        {
+            return false;
+        }
+        {% endif %}
 
         //
         // attachment vs. robot collisions
         //
 
-        {% set eef_collisions = at(end_effector_collisions, 0) %}
+        {% for k in range(num_end_effectors) %}
+        {% set eef_collisions = at(end_effector_collisions, k) %}
         {% for i in range(length(eef_collisions)) %}
         {% set link_index = at(eef_collisions, i) %}
         {% set link_bs = at(bounding_sphere_index, link_index) %}
         {% set link_spheres = at(per_link_spheres, link_index) %}
 
-        // Attachment vs. {{ at(link_names, link_index )}}
-        if (attachment_sphere_collision<decltype(x[0])>(environment,
+        // {{ at(end_effectors, k) }} attachments vs. {{ at(link_names, link_index )}}
+        if (attachment_sphere_collision<decltype(x[0])>(environment, {{k}},
                                                         y[{{(n_spheres + link_bs) * 4 + 0}}],
                                                         y[{{(n_spheres + link_bs) * 4 + 1}}],
                                                         y[{{(n_spheres + link_bs) * 4 + 2}}],
@@ -329,7 +341,7 @@ struct {{name}}
         {
             {% for j in range(length(link_spheres)) %}
             {% set sphere_index = at(link_spheres, j) %}
-            if (attachment_sphere_collision<decltype(x[0])>(environment,
+            if (attachment_sphere_collision<decltype(x[0])>(environment, {{k}},
                                                             y[{{sphere_index * 4 + 0}}],
                                                             y[{{sphere_index * 4 + 1}}],
                                                             y[{{sphere_index * 4 + 2}}],
@@ -339,6 +351,7 @@ struct {{name}}
             }
             {% endfor %}
         }
+        {% endfor %}
         {% endfor %}
 
         return true;
