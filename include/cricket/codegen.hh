@@ -51,12 +51,18 @@ namespace cricket
     auto trace_integrate_configuration(const pinocchio::Model &model, const std::string &language)
         -> Traced;
 
+    // Strict recipe validation: throws if `data` contains keys cricket does not read
+    // (typos otherwise fail silently, e.g. a misspelled flag defaulting to false), with a
+    // nearest-match suggestion. Keys starting with '_' are ignored as comments. Checks
+    // nested blocks (bounds, com, closed_loops, parts, subtemplates) too.
+    auto validate_recipe(const nlohmann::json &data) -> void;
+
     struct GenOptions
     {
         std::filesystem::path urdf;
         std::optional<std::filesystem::path> dynamics_urdf;
         std::optional<std::filesystem::path> srdf;
-        std::optional<std::string> end_effector;
+        std::vector<std::string> end_effectors;
         std::filesystem::path template_path;
         std::map<std::string, std::filesystem::path> subtemplates;
         std::string language = "c++";

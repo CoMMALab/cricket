@@ -5,12 +5,15 @@
 #include <vamp/collision/environment.hh>
 #include <vamp/collision/validity.hh>
 
+#include <Eigen/Geometry>
+
+// clang-format off
 // NOLINTBEGIN(*-magic-numbers)
 namespace vamp::robots
 {
 struct {{name}}
 {
-    static constexpr const char *name = "{{lower(name)}}";
+    static constexpr const char *name = "{{module_name}}";
     static constexpr std::size_t dimension = {{n_q}};
     static constexpr std::size_t sample_dimension = {{n_u}};
     static constexpr std::size_t n_spheres = {{n_spheres}};
@@ -20,18 +23,20 @@ struct {{name}}
     static constexpr float max_radius_mobile = {{max_radius_mobile}};
     static constexpr float min_bounding_radius_mobile = {{min_bounding_radius_mobile}};
     static constexpr float max_bounding_radius_mobile = {{max_bounding_radius_mobile}};
-    static constexpr std::array<float, 3> base_position = {{{join(base_position, ", ")}}};
+    static constexpr std::array<float, 3> base_position = { {{join(base_position, ", ")}} };
     static constexpr std::size_t resolution = {{resolution}};
     static constexpr bool euclidean = {{euclidean}};
+    static constexpr std::array<std::size_t, {{length(so3_offsets)}}> so3_offsets = { {{join(so3_offsets, ", ")}} };
 
     static constexpr std::array<std::string_view, dimension> joint_names = {"{{join(joint_names, "\", \"")}}"};
     static constexpr const char *end_effector = "{{end_effector}}";
 
     using Configuration = FloatVector<dimension>;
-    using ConfigurationArray = std::array<FloatT, dimension>;
+    struct alignas(FloatVectorAlignment) ConfigurationArray
+        : std::array<FloatT, dimension>
+    {
+    };
     using Sample = FloatVector<sample_dimension>;
-    
-    static constexpr std::array<std::size_t, {{length(so3_offsets)}}> so3_offsets = { {{join(so3_offsets, ", ")}} };
 
     struct alignas(FloatVectorAlignment) ConfigurationBuffer
         : std::array<float, Configuration::num_scalars_rounded>
@@ -117,7 +122,10 @@ struct {{name}}
         return q;
         {% else %}
         {% if mapconfig_code_vars > 0 %}std::array<float, {{mapconfig_code_vars}}> v;{% endif %}
-        ConfigurationBuffer y;
+        // Value-init: pad lanes past `dimension` must be zero, since Configuration
+        // loads the full rounded width and full-width reductions (e.g. squared_l2_norm)
+        // include them.
+        ConfigurationBuffer y{};
         const auto x = x_in.to_array();
         {{mapconfig_code}}
         return Configuration(y.data());
@@ -144,7 +152,10 @@ struct {{name}}
         return a_in.interpolate(b_in, t);
         {% else %}
         {% if interpolate_code_vars > 0 %}std::array<float, {{interpolate_code_vars}}> v;{% endif %}
-        ConfigurationBuffer y;
+        // Value-init: pad lanes past `dimension` must be zero, since Configuration
+        // loads the full rounded width and full-width reductions (e.g. squared_l2_norm)
+        // include them.
+        ConfigurationBuffer y{};
         const auto a = a_in.to_array();
         const auto b = b_in.to_array();
         {{interpolate_code}}
@@ -168,9 +179,12 @@ struct {{name}}
         {{interpolate_block_code}}
     }
 
-    template <std::size_t rake>
-    static inline void sphere_fk(const ConfigurationBlock<rake> &x, Spheres<rake> &out) noexcept
+    // The FK/CC kernels read only rows 0..dimension-1, so they accept any block with at least
+    // that many rows.
+    template <std::size_t rake, std::size_t stride = dimension>
+    static inline void sphere_fk(const FloatVector<rake, stride> &x, Spheres<rake> &out) noexcept
     {
+        static_assert(stride >= dimension);
         std::array<FloatVector<rake, 1>, {{spherefk_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{spherefk_code_output}}> y;
 
@@ -187,11 +201,12 @@ struct {{name}}
 
     using Debug = std::pair<std::vector<std::vector<std::string>>, std::vector<std::pair<std::size_t, std::size_t>>>;
 
-    template <std::size_t rake>
+    template <std::size_t rake, std::size_t stride = dimension>
         static inline auto fkcc_debug(
             const vamp::collision::Environment<FloatVector<rake>> &environment,
-            const ConfigurationBlock<rake> &x) noexcept -> Debug
+            const FloatVector<rake, stride> &x) noexcept -> Debug
     {
+        static_assert(stride >= dimension);
         std::array<FloatVector<rake, 1>, {{ccfk_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{ccfk_code_output}}> y;
 
@@ -199,16 +214,30 @@ struct {{name}}
 
         Debug output;
 
-        {% for i in range(n_spheres) %}
+        {% for i in range(n_spheres) %}{% if at(sphere_env_skip, i) %}
+        output.first.emplace_back();{% else %}
         output.first.emplace_back(
             sphere_environment_get_collisions<decltype(x[0])>(
                 environment,
                 y[{{ i * 4 + 0 }}],
                 y[{{ i * 4 + 1 }}],
                 y[{{ i * 4 + 2 }}],
-                y[{{ i * 4 + 3 }}]));
+                y[{{ i * 4 + 3 }}]));{% endif %}
         {% endfor %}
 
+        {% if compact_collisions %}
+        for (std::size_t i = 0; i < cc_self_pair_a.size(); ++i)
+        {
+            const auto a = cc_self_pair_a[i] * 4;
+            const auto b = cc_self_pair_b[i] * 4;
+            if (sphere_sphere_self_collision<decltype(x[0])>(
+                    y[a + 0], y[a + 1], y[a + 2], y[a + 3],
+                    y[b + 0], y[b + 1], y[b + 2], y[b + 3]))
+            {
+                output.second.emplace_back(cc_self_pair_a[i], cc_self_pair_b[i]);
+            }
+        }
+        {% else %}
         {% for i in range(length(allowed_link_pairs)) %}
         {% set pair = at(allowed_link_pairs, i) %}
         {% set link_1_index = at(pair, 0) %}
@@ -237,15 +266,17 @@ struct {{name}}
         {% endfor %}
         {% endfor %}
         {% endfor %}
+        {% endif %}
 
         return output;
     }
 
-    template <std::size_t rake>
+    template <std::size_t rake, std::size_t stride = dimension>
         static inline bool fkcc(
             const vamp::collision::Environment<FloatVector<rake>> &environment,
-            const ConfigurationBlock<rake> &x) noexcept
+            const FloatVector<rake, stride> &x) noexcept
     {
+        static_assert(stride >= dimension);
         std::array<FloatVector<rake, 1>, {{ccfk_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{ccfk_code_output}}> y;
 
@@ -255,19 +286,21 @@ struct {{name}}
         return true;
     }
 
-    template <std::size_t rake>
+    template <std::size_t rake, std::size_t stride = dimension>
     static inline bool fkcc_attach(
         const vamp::collision::Environment<FloatVector<rake>> &environment,
-        const ConfigurationBlock<rake> &x) noexcept
+        const FloatVector<rake, stride> &x) noexcept
     {
+        static_assert(stride >= dimension);
         std::array<FloatVector<rake, 1>, {{ccfkee_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{ccfkee_code_output}}> y;
 
         {{ccfkee_code}}
         {% include "ccfk" %}
 
-        // attaching at {{ end_effector }}
-        set_attachment_pose(environment, to_isometry(&y[{{ccfkee_code_output - 12}}]));
+        // Single-attachment API: attachments ride on the first end-effector.
+        // attaching at {{ at(end_effectors, 0) }}
+        set_attachment_pose(environment, to_isometry(&y[{{ccfkee_code_output - 12 * num_end_effectors}}]));
 
         //
         // attachment vs. environment collisions
@@ -281,8 +314,9 @@ struct {{name}}
         // attachment vs. robot collisions
         //
 
-        {% for i in range(length(end_effector_collisions)) %}
-        {% set link_index = at(end_effector_collisions, i) %}
+        {% set eef_collisions = at(end_effector_collisions, 0) %}
+        {% for i in range(length(eef_collisions)) %}
+        {% set link_index = at(eef_collisions, i) %}
         {% set link_bs = at(bounding_sphere_index, link_index) %}
         {% set link_spheres = at(per_link_spheres, link_index) %}
 
@@ -310,15 +344,44 @@ struct {{name}}
         return true;
     }
 
-    static inline auto eefk(const std::array<float, {{n_q}}> &x) noexcept -> Eigen::Isometry3f
+    static inline auto eefk(const std::array<float, {{n_q}}> &x, std::size_t eef_index = 0) noexcept -> Eigen::Isometry3f
     {
         std::array<float, {{eefk_code_vars}}> v;
         std::array<float, {{eefk_code_output}}> y;
 
         {{eefk_code}}
 
-        return to_isometry(y.data());
+        return to_isometry(y.data() + 12 * eef_index);
     }
+
+
+
+
+
+
+    {% if compact_collisions %}
+    struct CCEnvLink { unsigned int bs_array_idx; unsigned int body_start; unsigned int body_count; };
+    struct CCSelfPair { unsigned int bs1_idx; unsigned int bs2_idx; unsigned int pair_start; unsigned int pair_count; };
+
+    static constexpr std::array<CCEnvLink, {{ length(compact_env_entries) }}> cc_env_links = {
+        {% for e in compact_env_entries %}CCEnvLink{ {{at(e,0)}}, {{at(e,1)}}, {{at(e,2)}} },
+        {% endfor %}
+    };
+    static constexpr std::array<unsigned int, {{ length(compact_env_body_idx) }}> cc_env_body_idx = {
+        {% for v in compact_env_body_idx %}{{v}}, {% endfor %}
+    };
+    static constexpr std::array<CCSelfPair, {{ length(compact_self_entries) }}> cc_self_pairs = {
+        {% for e in compact_self_entries %}CCSelfPair{ {{at(e,0)}}, {{at(e,1)}}, {{at(e,2)}}, {{at(e,3)}} },
+        {% endfor %}
+    };
+    static constexpr std::array<unsigned int, {{ length(compact_self_pair_a) }}> cc_self_pair_a = {
+        {% for v in compact_self_pair_a %}{{v}}, {% endfor %}
+    };
+    static constexpr std::array<unsigned int, {{ length(compact_self_pair_b) }}> cc_self_pair_b = {
+        {% for v in compact_self_pair_b %}{{v}}, {% endfor %}
+    };
+    {% endif %}
+
 };
 }
 
