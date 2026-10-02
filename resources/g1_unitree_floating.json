@@ -1,0 +1,34 @@
+{
+    "name": "G1Unitree",
+    "urdf": "g1_description/spherized_floating.urdf",
+    "srdf": "g1_description/g1_29dof.srdf",
+    "bounds": {
+        "lower": [
+            -2.0,
+            -2.0,
+            -2.0
+        ],
+        "upper": [
+            2.0,
+            2.0,
+            2.0
+        ]
+    },
+    "end_effector": [
+        "left_rubber_hand",
+        "right_rubber_hand",
+        "left_foot",
+        "right_foot"
+    ],
+    "constraints": true,
+    "com": true,
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [
+        {
+            "name": "ccfk",
+            "template": "templates/ccfk_template.hh"
+        }
+    ],
+    "output": "g1_unitree_floating_fk.hh"
+}
