@@ -563,6 +563,63 @@ struct {{name}}
     }
     {% endif %}
 
+    {% if has_env_collision %}
+    //
+    // Environment collision (one representative "middle" sphere per link)
+    //
+
+    static constexpr bool has_env_collision = true;
+    static constexpr std::size_t n_env_collision_spheres = {{n_env_collision_spheres}};
+    static constexpr std::array<float, n_env_collision_spheres> env_collision_radii = { {{join(env_collision_radii, ", ")}} };
+    static constexpr std::array<std::size_t, n_env_collision_spheres> env_collision_link_indices = { {{join(env_collision_link_indices, ", ")}} };
+
+    // Input: q (dimension). Output: d(pos)/dq (3 * n_env_collision_spheres * dimension,
+    // row-major), then pos (3 * n_env_collision_spheres) -- the world position of each
+    // representative sphere (env_collision_radii[i] is its fixed radius). The actual signed
+    // distance to the environment and its gradient are computed at runtime (see
+    // vamp::collision::sphere_environment_min_distance_gradient) and chain-ruled through
+    // this Jacobian by the caller before calling one of the solvers below.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto env_collision_jacobian(const InputVector &x, OutputVector &out) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{env_collision_jacobian_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{env_collision_jacobian_code_output}}> y;
+
+        {{env_collision_jacobian_code}}
+
+        for (auto i = 0U; i < {{env_collision_jacobian_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Input for the solvers: J (n_env_collision_spheres * dimension, row-major), then err
+    // (n_env_collision_spheres).
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_env_collision_error_lm_inner(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_env_collision_error_lm_inner_code_vars}}> v;
+
+        {{solve_env_collision_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_env_collision_error_lm_outer(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_env_collision_error_lm_outer_code_vars}}> v;
+
+        {{solve_env_collision_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_env_collision_error_gradient_descent(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_env_collision_error_gradient_descent_code_vars}}> v;
+
+        {{solve_env_collision_error_gradient_descent_code}}
+    }
+    {% endif %}
+
     {% if has_lead_screw %}
     //
     // Lead-screw coupling constraint functions

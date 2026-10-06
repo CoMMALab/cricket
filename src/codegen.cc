@@ -330,6 +330,74 @@ namespace cricket
         {
             set_trace(trace_twist_jacobians(robot, language), "twist_jacobians");
         }
+
+        // Environment-collision constraint: "env_collision": true (or an object with an
+        // optional "skip_static_environment_collisions" override) generates a differentiable
+        // per-link distance-to-environment penalty using ONE representative sphere per link
+        // -- the "middle" element of that link's per_link_spheres list (see
+        // RobotInfo::env_collision_middle_spheres) -- rather than every sphere or a bounding
+        // sphere. The actual signed distance and its gradient are evaluated at runtime in
+        // vamp (the environment's obstacle count/type isn't known at codegen time); only the
+        // representative sphere's position and Jacobian are traced here, then chain-ruled at
+        // runtime and solved with the generated solve_env_collision_error_* kernels below,
+        // exactly like closed_loops above.
+        bool has_env_collision = false;
+        bool env_collision_skip_static = false;
+        if (data.contains("env_collision"))
+        {
+            const auto &ec = data["env_collision"];
+            if (ec.is_boolean())
+            {
+                has_env_collision = ec.get<bool>();
+            }
+            else
+            {
+                has_env_collision = true;
+                if (ec.contains("skip_static_environment_collisions"))
+                {
+                    env_collision_skip_static = ec["skip_static_environment_collisions"].get<bool>();
+                }
+            }
+        }
+
+        data["has_env_collision"] = has_env_collision;
+        if (has_env_collision)
+        {
+            auto middle_spheres = robot.env_collision_middle_spheres(env_collision_skip_static);
+            if (middle_spheres.empty())
+            {
+                throw std::runtime_error(
+                    "env_collision requested but the robot has no environment-checked collision "
+                    "spheres");
+            }
+
+            std::vector<float> radii;
+            std::vector<std::size_t> link_indices;
+            radii.reserve(middle_spheres.size());
+            link_indices.reserve(middle_spheres.size());
+            for (const auto &sphere : middle_spheres)
+            {
+                radii.push_back(sphere.radius);
+                link_indices.push_back(sphere.parent_frame);
+            }
+
+            data["n_env_collision_spheres"] = middle_spheres.size();
+            data["env_collision_radii"] = radii;
+            data["env_collision_link_indices"] = link_indices;
+
+            set_trace(
+                trace_env_collision_jacobian(robot, middle_spheres, language),
+                "env_collision_jacobian");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::InnerLM, middle_spheres.size()),
+                "solve_env_collision_error_lm_inner");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::OuterLM, middle_spheres.size()),
+                "solve_env_collision_error_lm_outer");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::GradDesc, middle_spheres.size()),
+                "solve_env_collision_error_gradient_descent");
+        }
     }
 
     namespace
@@ -418,10 +486,13 @@ namespace cricket
             "closed_loops",
             "lead_screw",
             "twist",
+            "env_collision",
         };
         static const std::vector<std::string_view> bounds_keys = {"lower", "upper"};
         static const std::vector<std::string_view> com_keys = {"frame", "reference_frames"};
         static const std::vector<std::string_view> loop_keys = {"start_frame", "end_frame", "length"};
+        static const std::vector<std::string_view> env_collision_keys = {
+            "skip_static_environment_collisions"};
         static const std::vector<std::string_view> part_keys = {
             "prefix", "urdf", "srdf", "parent", "xyz", "rpy", "quat"};
         static const std::vector<std::string_view> subtemplate_keys = {"name", "template"};
@@ -456,6 +527,7 @@ namespace cricket
         check_object("bounds", bounds_keys);
         check_object("com", com_keys);
         check_array("closed_loops", loop_keys);
+        check_object("env_collision", env_collision_keys);
         check_array("parts", part_keys);
         check_array("subtemplates", subtemplate_keys);
 

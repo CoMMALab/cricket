@@ -6,6 +6,7 @@
     "constraints": true,
     "lead_screw": true,
     "twist": true,
+    "env_collision": true,
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],

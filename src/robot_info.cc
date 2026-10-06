@@ -879,6 +879,28 @@ namespace cricket
         return json;
     }
 
+    auto RobotInfo::env_collision_middle_spheres(bool skip_static_environment) const
+        -> std::vector<SphereInfo>
+    {
+        const auto is_static_link = [&](std::size_t link_index)
+        { return model.frames[link_index].parentJoint == 0; };
+
+        std::vector<SphereInfo> middle_spheres;
+        middle_spheres.reserve(links_with_geometry.size());
+        for (const auto link_index : links_with_geometry)
+        {
+            if (skip_static_environment and is_static_link(link_index))
+            {
+                continue;
+            }
+
+            const auto &body = per_link_spheres[link_index];
+            middle_spheres.push_back(spheres[body[body.size() / 2]]);
+        }
+
+        return middle_spheres;
+    }
+
     auto RobotInfo::dof_to_joint_names() -> std::vector<std::string>
     {
         std::vector<std::size_t> dof_to_joint_id(model.nq);

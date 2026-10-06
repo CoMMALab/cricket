@@ -400,6 +400,63 @@ namespace cricket
         return emit_error_and_jacobian(error_func, nq, nq, loops.size(), language);
     }
 
+    auto trace_env_collision_jacobian(
+        const RobotInfo &info,
+        const std::vector<SphereInfo> &middle_spheres,
+        const std::string &language) -> Traced
+    {
+        if (middle_spheres.empty())
+        {
+            throw std::runtime_error("trace_env_collision_jacobian requires at least one sphere");
+        }
+
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+
+        ADModel ad_model = info.model.cast<ADCG>();
+        ADData ad_data(ad_model);
+
+        ADVectorXs ad_inp(nq);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            ad_inp[i] = ADCG(0.0);
+        }
+
+        Independent(ad_inp);
+
+        ADVectorXs ad_q(nq);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            ad_q[i] = ad_inp[i];
+        }
+
+        forwardKinematics(ad_model, ad_data, ad_q);
+        updateFramePlacements(ad_model, ad_data);
+
+        const std::size_t n_out = 3 * middle_spheres.size();
+        ADVectorXs data(n_out);
+
+        for (auto i = 0U; i < middle_spheres.size(); ++i)
+        {
+            const auto &sphere = middle_spheres[i];
+            const auto &joint_placement = ad_data.oMi[sphere.parent_joint];
+
+            Eigen::Matrix<ADCG, 3, 1> local_translation;
+            local_translation[0] = sphere.relative.translation()[0];
+            local_translation[1] = sphere.relative.translation()[1];
+            local_translation[2] = sphere.relative.translation()[2];
+
+            const Eigen::Matrix<ADCG, 3, 1> world_position =
+                joint_placement.rotation() * local_translation + joint_placement.translation();
+
+            data[3 * i + 0] = world_position[0];
+            data[3 * i + 1] = world_position[1];
+            data[3 * i + 2] = world_position[2];
+        }
+
+        ADFun<CGD> error_func(ad_inp, data);
+        return emit_error_and_jacobian(error_func, nq, nq, n_out, language);
+    }
+
     auto trace_lead_screw_error(const RobotInfo &info, const std::string &language) -> Traced
     {
         const auto nq = static_cast<std::size_t>(info.model.nq);

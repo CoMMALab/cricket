@@ -133,6 +133,16 @@ namespace cricket
 
         auto reduce_model(const JointSelection &selection) -> void;
 
+        // One representative sphere per environment-checked link, for a differentiable
+        // "push out of environment collision" constraint (see trace_env_collision_jacobian
+        // in codegen.hh): the middle element of that link's per_link_spheres list, i.e.
+        // spheres[per_link_spheres[link][per_link_spheres[link].size()/2]] -- not every
+        // sphere of the link, and not its CGAL bounding_spheres min-enclosing sphere.
+        // Applies the same "skip_static_environment" link filter as json() (a static link's
+        // world pose doesn't depend on q, so it's not worth a constraint row).
+        auto env_collision_middle_spheres(bool skip_static_environment = false) const
+            -> std::vector<SphereInfo>;
+
         auto dof_to_joint_names() -> std::vector<std::string>;
         auto get_frames_colliding_end_effector(std::size_t frame_index) -> std::vector<std::size_t>;
         auto extract_spheres() -> void;

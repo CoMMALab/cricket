@@ -115,6 +115,23 @@ namespace cricket
         const std::vector<ClosedLoop> &loops,
         const std::string &language) -> Traced;
 
+    // Position of each of `middle_spheres` (see RobotInfo::env_collision_middle_spheres --
+    // one representative "middle" sphere per environment-checked link, not every sphere of
+    // the link and not its bounding sphere) and its Jacobian w.r.t. q. Feeds a differentiable
+    // "push out of environment collision" constraint: since the environment's obstacle count
+    // and types aren't known at codegen time, the actual signed-distance value and gradient
+    // are computed at runtime in vamp (against a live vamp::collision::Environment) and
+    // chain-ruled through this Jacobian, then solved with the generic
+    // solve_env_collision_error_* kernels below (trace_solve_jacobian with
+    // err_size = middle_spheres.size(), same as closed_loops above).
+    // Input: q (nq). Output: d(pos)/dq (3 * middle_spheres.size() x nq, row-major), then
+    // pos (3 * middle_spheres.size()). Sphere radii don't depend on q and aren't part of this trace -- they're
+    // rendered as plain compile-time data (see `env_collision_radii` in derive_constraint_traces).
+    auto trace_env_collision_jacobian(
+        const RobotInfo &info,
+        const std::vector<SphereInfo> &middle_spheres,
+        const std::string &language) -> Traced;
+
     // Lead-screw coupling of the first end-effector: axial advance along the reference
     // frame's z-axis locked to rotation about it. h(q) is the conserved quantity of the
     // coupling and dh/dq its Pfaffian row (the velocity form is dh/dq qdot = 0).
