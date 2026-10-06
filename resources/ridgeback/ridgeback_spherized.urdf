@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Clearpath Ridgeback omnidirectional base, as modeled by robosuite's RidgebackSimpleBase
+  (robosuite/models/assets/bases/ridgeback_simple_base.xml). Link and joint names match the
+  robosuite model with the "mobilebase0_" prefix it gets in an environment.
+
+  The root link, robot0_base, is the robot's spawn frame: in a robosuite env its world pose is
+  env.sim.data.get_body_xpos("robot0_base"), which robosuite places 0.0262 m above the floor.
+  The planar base motion is a prismatic x, prismatic y, revolute yaw chain, matching robosuite's
+  joint_mobile_forward/side/yaw. MuJoCo leaves x/y unlimited; the +/-5 m limits here are a
+  planning domain placeholder.
+
+  Collision geometry: spheres generated with foam for the chassis, riser, and top plate.
+
+  Arms mount on mobilebase0_support (0.28 m above mobilebase0_base_link).
+-->
+<robot name="ridgeback">
+  <material name="ridgeback_black"><color rgba="0.15 0.15 0.15 1"/></material>
+  <material name="ridgeback_light_grey"><color rgba="0.4 0.4 0.4 1"/></material>
+  <material name="ridgeback_yellow"><color rgba="0.8 0.8 0.0 1"/></material>
+  <material name="ridgeback_white"><color rgba="0.9 0.9 0.9 1"/></material>
+  <material name="ridgeback_wheel"><color rgba="0.2 0.2 0.2 1"/></material>
+
+  <link name="robot0_base"/>
+  <link name="mobilebase0_joint_mobile_forward_link"/>
+  <link name="mobilebase0_joint_mobile_side_link"/>
+  <joint name="mobilebase0_joint_mobile_forward" type="prismatic">
+    <parent link="robot0_base"/>
+    <child link="mobilebase0_joint_mobile_forward_link"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-5" upper="5" effort="600" velocity="1"/>
+  </joint>
+  <joint name="mobilebase0_joint_mobile_side" type="prismatic">
+    <parent link="mobilebase0_joint_mobile_forward_link"/>
+    <child link="mobilebase0_joint_mobile_side_link"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-5" upper="5" effort="600" velocity="1"/>
+  </joint>
+  <joint name="mobilebase0_joint_mobile_yaw" type="revolute">
+    <parent link="mobilebase0_joint_mobile_side_link"/>
+    <child link="mobilebase0_base_link"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159265" upper="3.14159265" effort="600" velocity="1.5"/>
+  </joint>
+
+  <link name="mobilebase0_base_link"/>
+  <joint name="mobilebase0_chassis_joint" type="fixed">
+    <parent link="mobilebase0_base_link"/>
+    <child link="mobilebase0_chassis_link"/>
+  </joint>
+  <link name="mobilebase0_chassis_link">
+    <inertial>
+      <origin xyz="0.012 0.002 0.067" rpy="1.57079633 0 1.57079633"/>
+      <mass value="165.304"/>
+      <inertia ixx="4.4744" iyy="7.1624" izz="4.6155" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual>
+      <geometry><mesh filename="meshes/body.stl"/></geometry>
+      <material name="ridgeback_black"/>
+    </visual>
+    <collision>
+      <origin xyz="0.164955 0.000786193 0.133605"/>
+      <geometry><sphere radius="0.476762"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.164699 0.00528319 0.131821"/>
+      <geometry><sphere radius="0.470624"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="mobilebase0_riser_joint" type="fixed">
+    <origin xyz="0 0 0.22"/>
+    <parent link="mobilebase0_chassis_link"/>
+    <child link="mobilebase0_riser_link"/>
+  </joint>
+  <link name="mobilebase0_riser_link">
+    <visual>
+      <origin xyz="0 0 0.0275" rpy="0 0 0.78539816"/>
+      <geometry><box size="0.493 0.493 0.055"/></geometry>
+      <material name="ridgeback_light_grey"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.217968 -0.025984 0.0275"/>
+      <geometry><sphere radius="0.136297"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.105727 0.109762 0.027503"/>
+      <geometry><sphere radius="0.133245"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.03005 0.217764 0.0275"/>
+      <geometry><sphere radius="0.137207"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.114298 0.061862 0.0275"/>
+      <geometry><sphere radius="0.134728"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.069572 -0.108613 0.027498"/>
+      <geometry><sphere radius="0.132897"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.231669 -0.006467 0.0275"/>
+      <geometry><sphere radius="0.120424"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.105203 -0.139242 0.0275"/>
+      <geometry><sphere radius="0.115987"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.012794 -0.245965 0.027499"/>
+      <geometry><sphere radius="0.107187"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="mobilebase0_top_joint" type="fixed">
+    <origin xyz="0 0 -0.22"/>
+    <parent link="mobilebase0_riser_link"/>
+    <child link="mobilebase0_top_link"/>
+  </joint>
+  <link name="mobilebase0_top_link">
+    <visual>
+      <geometry><mesh filename="meshes/top.stl"/></geometry>
+      <material name="ridgeback_black"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.353709 -0.231575 0.275966"/>
+      <geometry><sphere radius="0.208899"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.060406 -0.244739 0.275478"/>
+      <geometry><sphere radius="0.240016"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.314916 0.0933999 0.275623"/>
+      <geometry><sphere radius="0.215574"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.226769 0.279702 0.276139"/>
+      <geometry><sphere radius="0.198468"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.104023 0.0371359 0.27562"/>
+      <geometry><sphere radius="0.238702"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.295148 -0.256545 0.276208"/>
+      <geometry><sphere radius="0.223526"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.161258 0.36476 0.276463"/>
+      <geometry><sphere radius="0.238063"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.40892 0.12139 0.276465"/>
+      <geometry><sphere radius="0.230124"/></geometry>
+    </collision>
+  </link>
+
+  <joint name="mobilebase0_mid_mount_joint" type="fixed">
+    <origin xyz="0 0 0.06"/>
+    <parent link="mobilebase0_riser_link"/>
+    <child link="mobilebase0_mid_mount"/>
+  </joint>
+  <link name="mobilebase0_mid_mount"/>
+  <joint name="mobilebase0_support_joint" type="fixed">
+    <parent link="mobilebase0_mid_mount"/>
+    <child link="mobilebase0_support"/>
+  </joint>
+  <link name="mobilebase0_support"/>
+
+  <!-- Covers and lights (visual only) -->
+  <joint name="mobilebase0_right_side_cover_joint" type="fixed">
+    <parent link="mobilebase0_chassis_link"/>
+    <child link="mobilebase0_right_side_cover_link"/>
+  </joint>
+  <link name="mobilebase0_right_side_cover_link">
+    <visual>
+      <geometry><mesh filename="meshes/side-cover.stl"/></geometry>
+      <material name="ridgeback_yellow"/>
+    </visual>
+  </link>
+  <joint name="mobilebase0_left_side_cover_joint" type="fixed">
+    <parent link="mobilebase0_chassis_link"/>
+    <child link="mobilebase0_left_side_cover_link"/>
+  </joint>
+  <link name="mobilebase0_left_side_cover_link">
+    <visual>
+      <origin rpy="0 0 3.14159265"/>
+      <geometry><mesh filename="meshes/side-cover.stl"/></geometry>
+      <material name="ridgeback_yellow"/>
+    </visual>
+  </link>
+  <joint name="mobilebase0_front_cover_joint" type="fixed">
+    <parent link="mobilebase0_chassis_link"/>
+    <child link="mobilebase0_front_cover_link"/>
+  </joint>
+  <link name="mobilebase0_front_cover_link">
+    <visual>
+      <geometry><mesh filename="meshes/end-cover.stl"/></geometry>
+      <material name="ridgeback_black"/>
+    </visual>
+  </link>
+  <joint name="mobilebase0_rear_cover_joint" type="fixed">
+    <parent link="mobilebase0_chassis_link"/>
+    <child link="mobilebase0_rear_cover_link"/>
+  </joint>
+  <link name="mobilebase0_rear_cover_link">
+    <visual>
+      <origin rpy="0 0 3.14159265"/>
+      <geometry><mesh filename="meshes/end-cover.stl"/></geometry>
+      <material name="ridgeback_black"/>
+    </visual>
+  </link>
+  <joint name="mobilebase0_front_lights_joint" type="fixed">
+    <parent link="mobilebase0_chassis_link"/>
+    <child link="mobilebase0_front_lights_link"/>
+  </joint>
+  <link name="mobilebase0_front_lights_link">
+    <visual>
+      <geometry><mesh filename="meshes/lights.stl"/></geometry>
+      <material name="ridgeback_white"/>
+    </visual>
+  </link>
+  <joint name="mobilebase0_rear_lights_joint" type="fixed">
+    <parent link="mobilebase0_chassis_link"/>
+    <child link="mobilebase0_rear_lights_link"/>
+  </joint>
+  <link name="mobilebase0_rear_lights_link">
+    <visual>
+      <origin rpy="0 0 3.14159265"/>
+      <geometry><mesh filename="meshes/lights.stl"/></geometry>
+      <material name="ridgeback_black"/>
+    </visual>
+  </link>
+
+  <!-- Axle, rockers, and wheels (visual only). robosuite's simple base draws each mecanum wheel
+       as 12 roller spheres; this uses the single Ridgeback wheel mesh instead. -->
+  <joint name="mobilebase0_axle_joint" type="fixed">
+    <origin xyz="0 0 0.05"/>
+    <parent link="mobilebase0_chassis_link"/>
+    <child link="mobilebase0_axle_link"/>
+  </joint>
+  <link name="mobilebase0_axle_link">
+    <visual>
+      <origin rpy="0 1.57079633 0"/>
+      <geometry><mesh filename="meshes/axle.stl"/></geometry>
+      <material name="ridgeback_black"/>
+    </visual>
+  </link>
+
+  <joint name="mobilebase0_front_rocker_joint" type="fixed">
+    <origin xyz="0.319 0 0"/>
+    <parent link="mobilebase0_axle_link"/>
+    <child link="mobilebase0_front_rocker_link"/>
+  </joint>
+  <link name="mobilebase0_front_rocker_link">
+    <inertial>
+      <origin rpy="1.57079633 0 1.57079633"/>
+      <mass value="10.267"/>
+      <inertia ixx="0.0288" iyy="0.4324" izz="0.413" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual>
+      <origin rpy="1.57079633 0 1.57079633"/>
+      <geometry><mesh filename="meshes/rocker.stl"/></geometry>
+      <material name="ridgeback_black"/>
+    </visual>
+  </link>
+  <joint name="mobilebase0_rear_rocker_joint" type="fixed">
+    <origin xyz="-0.319 0 0"/>
+    <parent link="mobilebase0_axle_link"/>
+    <child link="mobilebase0_rear_rocker_link"/>
+  </joint>
+  <link name="mobilebase0_rear_rocker_link">
+    <inertial>
+      <origin rpy="1.57079633 0 1.57079633"/>
+      <mass value="10.267"/>
+      <inertia ixx="0.0288" iyy="0.4324" izz="0.413" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual>
+      <origin rpy="1.57079633 0 1.57079633"/>
+      <geometry><mesh filename="meshes/rocker.stl"/></geometry>
+      <material name="ridgeback_black"/>
+    </visual>
+  </link>
+
+  <joint name="mobilebase0_front_left_wheel_joint" type="fixed">
+    <origin xyz="0 0.2755 0"/>
+    <parent link="mobilebase0_front_rocker_link"/>
+    <child link="mobilebase0_front_left_wheel_link"/>
+  </joint>
+  <link name="mobilebase0_front_left_wheel_link">
+    <inertial>
+      <mass value="2.3"/>
+      <inertia ixx="0.0033212" iyy="0.0066424" izz="0.0033212" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual>
+      <origin rpy="1.57079633 0 0"/>
+      <geometry><mesh filename="meshes/wheel.stl"/></geometry>
+      <material name="ridgeback_wheel"/>
+    </visual>
+  </link>
+  <joint name="mobilebase0_front_right_wheel_joint" type="fixed">
+    <origin xyz="0 -0.2755 0"/>
+    <parent link="mobilebase0_front_rocker_link"/>
+    <child link="mobilebase0_front_right_wheel_link"/>
+  </joint>
+  <link name="mobilebase0_front_right_wheel_link">
+    <inertial>
+      <mass value="2.3"/>
+      <inertia ixx="0.0033212" iyy="0.0066424" izz="0.0033212" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual>
+      <origin rpy="1.57079633 0 0"/>
+      <geometry><mesh filename="meshes/wheel.stl"/></geometry>
+      <material name="ridgeback_wheel"/>
+    </visual>
+  </link>
+  <joint name="mobilebase0_rear_left_wheel_joint" type="fixed">
+    <origin xyz="0 0.2755 0"/>
+    <parent link="mobilebase0_rear_rocker_link"/>
+    <child link="mobilebase0_rear_left_wheel_link"/>
+  </joint>
+  <link name="mobilebase0_rear_left_wheel_link">
+    <inertial>
+      <mass value="2.3"/>
+      <inertia ixx="0.0033212" iyy="0.0066424" izz="0.0033212" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual>
+      <origin rpy="1.57079633 0 0"/>
+      <geometry><mesh filename="meshes/wheel.stl"/></geometry>
+      <material name="ridgeback_wheel"/>
+    </visual>
+  </link>
+  <joint name="mobilebase0_rear_right_wheel_joint" type="fixed">
+    <origin xyz="0 -0.2755 0"/>
+    <parent link="mobilebase0_rear_rocker_link"/>
+    <child link="mobilebase0_rear_right_wheel_link"/>
+  </joint>
+  <link name="mobilebase0_rear_right_wheel_link">
+    <inertial>
+      <mass value="2.3"/>
+      <inertia ixx="0.0033212" iyy="0.0066424" izz="0.0033212" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual>
+      <origin rpy="1.57079633 0 0"/>
+      <geometry><mesh filename="meshes/wheel.stl"/></geometry>
+      <material name="ridgeback_wheel"/>
+    </visual>
+  </link>
+</robot>

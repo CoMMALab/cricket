@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Semantic description of the Ridgeback base (ridgeback.urdf / ridgeback_spherized.urdf).
+  The base's motion is part of the URDF (prismatic x, prismatic y, revolute yaw from robot0_base),
+  so there is no virtual joint. Composites (see ../compose.py) add these entries to their SRDF.
+-->
+<robot name="ridgeback">
+  <group name="mobilebase0">
+    <joint name="mobilebase0_joint_mobile_forward"/>
+    <joint name="mobilebase0_joint_mobile_side"/>
+    <joint name="mobilebase0_joint_mobile_yaw"/>
+  </group>
+  <group_state group="mobilebase0" name="origin">
+    <joint name="mobilebase0_joint_mobile_forward" value="0"/>
+    <joint name="mobilebase0_joint_mobile_side" value="0"/>
+    <joint name="mobilebase0_joint_mobile_yaw" value="0"/>
+  </group_state>
+
+  <!-- The links with collision geometry are rigidly attached to each other. -->
+  <disable_collisions link1="mobilebase0_chassis_link" link2="mobilebase0_riser_link" reason="Adjacent"/>
+  <disable_collisions link1="mobilebase0_riser_link" link2="mobilebase0_top_link" reason="Adjacent"/>
+  <disable_collisions link1="mobilebase0_chassis_link" link2="mobilebase0_top_link" reason="Default"/>
+</robot>
