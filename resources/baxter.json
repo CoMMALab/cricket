@@ -4,6 +4,8 @@
     "srdf": "baxter/baxter.srdf",
     "end_effector": "right_gripper",
     "resolution": 64,
+    "constraints": true,
+    "env_collision": true,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
     "output": "baxter_fk.hh"
