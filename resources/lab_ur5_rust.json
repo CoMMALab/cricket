@@ -1,0 +1,14 @@
+{
+    "name": "LabUr5",
+    "urdf": "lab_ur5/lab_ur5_spherized_cabling.urdf",
+    "srdf": "lab_ur5/lab_ur5.srdf",
+    "end_effector": "robotiq_85_base_link",
+    "resolution": 32,
+    "template": "templates/fk_template.rs",
+    "subtemplates": [
+        { "name": "ccfk", "template": "templates/ccfk_template.rs" }
+    ],
+    "output": "lab_ur5_fk.rs",
+    "language": "rust",
+    "forward_dynamics": true
+}
