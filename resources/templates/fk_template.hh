@@ -418,6 +418,25 @@ struct {{name}}
         {{solve_tsr_error_gradient_descent_code}}
     }
 
+    // Smooth equality form of the per-end-effector TSR pose error, for exact charts: for each
+    // end-effector err = [p; vee(R - R^T) / 2] of the offset frame in the reference frame.
+    // Input: q (dimension), qdot (dimension), then per end-effector rTe (7), wTr (7).
+    // Output: d(err)/dq (6 n_eef * dimension, row-major), err (6 n_eef), then the drift
+    // d²(err)/dq²[qdot, qdot] (6 n_eef).
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto tsr_equality(const InputVector &x, OutputVector &out) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{tsr_equality_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{tsr_equality_code_output}}> y;
+
+        {{tsr_equality_code}}
+
+        for (auto i = 0U; i < {{tsr_equality_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
     {% if num_end_effectors > 1 %}
     // Relative-pose TSR between the first two end-effectors.
     // Input: q (dimension), then the reference relative transform lTr (7), lb (6), ub (6).
@@ -431,6 +450,60 @@ struct {{name}}
         {{tsr_bimanual_error_code}}
 
         for (auto i = 0U; i < {{tsr_bimanual_error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Smooth equality form of the relative pose, for exact charts: err = [p; vee(R - R^T) / 2]
+    // of the relative-pose error transform, zero exactly on the rigid relative pose.
+    // Input: q (dimension), qdot (dimension), then lTr (7).
+    // Output: d(err)/dq (6 * dimension, row-major), err (6), then the drift
+    // d²(err)/dq²[qdot, qdot] (6).
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto tsr_bimanual_equality(const InputVector &x, OutputVector &out) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{tsr_bimanual_equality_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{tsr_bimanual_equality_code_output}}> y;
+
+        {{tsr_bimanual_equality_code}}
+
+        for (auto i = 0U; i < {{tsr_bimanual_equality_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // tsr_bimanual_equality without the drift (same inputs, qdot ignored), for Newton iterations.
+    // Output: d(err)/dq (6 * dimension, row-major), then err (6).
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto tsr_bimanual_equality_fj(const InputVector &x, OutputVector &out) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{tsr_bimanual_equality_fj_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{tsr_bimanual_equality_fj_code_output}}> y;
+
+        {{tsr_bimanual_equality_fj_code}}
+
+        for (auto i = 0U; i < {{tsr_bimanual_equality_fj_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Exact-chart normal-space step of the relative-pose equality form (6 rows): solves
+    // (J N^T) w = rhs by unrolled LU without pivoting (N preconditioned by the caller so J N^T is
+    // near the identity) and returns the joint-space step N^T w.
+    // Input: J (6 * dimension, row-major), rhs (6), N (6 * dimension, row-major).
+    // Output: step (dimension), then the LU pivots (6).
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_tsr_bimanual_exact(const InputVector &x, OutputVector &out) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_tsr_bimanual_exact_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{solve_tsr_bimanual_exact_code_output}}> y;
+
+        {{solve_tsr_bimanual_exact_code}}
+
+        for (auto i = 0U; i < {{solve_tsr_bimanual_exact_code_output}}; ++i)
         {
             out[i] = y[i];
         }

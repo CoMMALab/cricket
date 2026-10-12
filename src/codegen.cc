@@ -188,6 +188,7 @@ namespace cricket
         if (constraints)
         {
             set_trace(trace_tsr_error(robot, language), "tsr_error");
+            set_trace(trace_tsr_equality(robot, language), "tsr_equality");
             set_trace(
                 trace_solve_tsr(robot, language, ProjMethod::InnerLM), "solve_tsr_error_lm_inner");
             set_trace(
@@ -199,6 +200,9 @@ namespace cricket
             if (robot.end_effector_indexes.size() > 1)
             {
                 set_trace(trace_tsr_bimanual_error(robot, language), "tsr_bimanual_error");
+                set_trace(trace_tsr_bimanual_equality(robot, language), "tsr_bimanual_equality");
+                set_trace(trace_tsr_bimanual_equality(robot, language, 0, 1, false), "tsr_bimanual_equality_fj");
+                set_trace(trace_solve_exact_normal(robot, language, 6), "solve_tsr_bimanual_exact");
                 set_trace(
                     trace_solve_tsr(robot, language, ProjMethod::InnerLM, true),
                     "solve_tsr_relative_error_lm_inner");
@@ -427,19 +431,19 @@ namespace cricket
         data["flask_interpolate_block_code"] = flask_interp_block.code;
         data["flask_interpolate_block_code_vars"] = flask_interp_block.temp_variables;
 
-        auto flask_rnea = trace_flask_rnea(robot.model, language);
+        auto flask_rnea = trace_flask_rnea(robot, language);
         data["flask_rnea_code"] = flask_rnea.code;
         data["flask_rnea_code_vars"] = flask_rnea.temp_variables;
 
-        auto flask_rnea_block = trace_flask_rnea_block(robot.model, language);
+        auto flask_rnea_block = trace_flask_rnea_block(robot, language);
         data["flask_rnea_block_code"] = flask_rnea_block.code;
         data["flask_rnea_block_code_vars"] = flask_rnea_block.temp_variables;
 
-        auto flask_ke = trace_flask_kinetic_energy(robot.model, language);
+        auto flask_ke = trace_flask_kinetic_energy(robot, language);
         data["flask_kinetic_energy_code"] = flask_ke.code;
         data["flask_kinetic_energy_code_vars"] = flask_ke.temp_variables;
 
-        auto flask_ke_block = trace_flask_kinetic_energy_block(robot.model, language);
+        auto flask_ke_block = trace_flask_kinetic_energy_block(robot, language);
         data["flask_kinetic_energy_block_code"] = flask_ke_block.code;
         data["flask_kinetic_energy_block_code_vars"] = flask_ke_block.temp_variables;
 

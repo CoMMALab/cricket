@@ -41,6 +41,50 @@ namespace cricket
             }
         }
 
+        // Attachment payloads: each end-effector carries 10 runtime dynamic parameters
+        // (pinocchio order: m, m c, inertia about the end-effector frame) read from the input
+        // vector at `offset`, added to the inertia of the frame's parent joint. The payload is
+        // moved into the joint frame in dynamic-parameter form, which is linear and so never
+        // divides by the (possibly zero) payload mass; only the combined body is converted
+        // back, dividing by its total mass. All zeros is the bare robot.
+        void add_payloads(const RobotInfo &info, ADModel &ad_model, const ADVectorXs &input, std::size_t offset)
+        {
+            using Vec3 = Eigen::Matrix<ADCG, 3, 1>;
+            using Mat3 = Eigen::Matrix<ADCG, 3, 3>;
+            const auto skew = [](const Vec3 &v) -> Mat3
+            {
+                Mat3 s;
+                s << ADCG(0.), -v[2], v[1], v[2], ADCG(0.), -v[0], -v[1], v[0], ADCG(0.);
+                return s;
+            };
+
+            for (std::size_t k = 0U; k < info.end_effector_indexes.size(); ++k)
+            {
+                const auto &frame = info.model.frames[info.end_effector_indexes[k]];
+                const Eigen::Matrix<ADCG, 10, 1> pi = input.segment<10>(offset + 10 * k);
+                const Mat3 R = frame.placement.rotation().cast<ADCG>();
+                const Vec3 p = frame.placement.translation().cast<ADCG>();
+
+                const ADCG &m = pi[0];
+                const Vec3 h = R * pi.segment<3>(1);  // first moment, rotated into the joint frame
+                Mat3 I;
+                I << pi[4], pi[5], pi[7], pi[5], pi[6], pi[8], pi[7], pi[8], pi[9];
+                const Mat3 Ij = R * I * R.transpose() - skew(h) * skew(p) - skew(p) * skew(h) -
+                                m * skew(p) * skew(p);
+
+                Eigen::Matrix<ADCG, 10, 1> total = ad_model.inertias[frame.parentJoint].toDynamicParameters();
+                total[0] += m;
+                total.segment<3>(1) += h + m * p;
+                total[4] += Ij(0, 0);
+                total[5] += Ij(0, 1);
+                total[6] += Ij(1, 1);
+                total[7] += Ij(0, 2);
+                total[8] += Ij(1, 2);
+                total[9] += Ij(2, 2);
+                ad_model.inertias[frame.parentJoint] = pinocchio::InertiaTpl<ADCG>::FromDynamicParameters(total);
+            }
+        }
+
         // Minimum-acceleration (LQMT, r = 2) cubic between flat states a = (y0, yd0) and
         // b = (yf, ydf) over duration T, evaluated at fraction t of T.
         // Outputs 3n rows: [y(tT); yd(tT); ydd(tT)].
@@ -109,20 +153,19 @@ namespace cricket
                 3 * nq};
         }
 
-        // Inverse dynamics tau = RNEA(q, v, a) with input x = [q; v; a] (3n rows), n outputs.
+        // Inverse dynamics tau = RNEA(q, v, a) with input [x; payload]: x = [q; v; a] (3n rows)
+        // and the end-effector payloads (10 per end-effector); n outputs.
         auto trace_flask_rnea_impl(
-            const pinocchio::Model &model,
+            const RobotInfo &info,
             const std::string &language,
             std::vector<VarSegment> input_segments,
             std::vector<VarSegment> output_segments) -> Traced
         {
+            const auto &model = info.model;
             check_flat_manipulator(model);
 
             const auto nq = static_cast<std::size_t>(model.nq);
-            const std::size_t n_input = 3 * nq;
-
-            ADModel ad_model = model.cast<ADCG>();
-            ADData ad_data(ad_model);
+            const std::size_t n_input = 3 * nq + 10 * info.end_effector_indexes.size();
 
             ADVectorXs ad_input(n_input);
             for (std::size_t i = 0U; i < n_input; ++i)
@@ -131,6 +174,10 @@ namespace cricket
             }
 
             CppAD::Independent(ad_input);
+
+            ADModel ad_model = model.cast<ADCG>();
+            add_payloads(info, ad_model, ad_input, 3 * nq);
+            ADData ad_data(ad_model);
 
             ADVectorXs ad_q = ad_input.head(nq);
             ADVectorXs ad_v = ad_input.segment(nq, nq);
@@ -161,21 +208,20 @@ namespace cricket
                 nq};
         }
 
-        // Kinetic energy (1/2) v^T M(q) v with input x = [q; v] (2n rows), 1 output.
+        // Kinetic energy (1/2) v^T M(q) v with input [x; payload]: x = [q; v] (2n rows) and the
+        // end-effector payloads (10 per end-effector); 1 output.
         auto trace_flask_kinetic_energy_impl(
-            const pinocchio::Model &model,
+            const RobotInfo &info,
             const std::string &language,
             std::vector<VarSegment> input_segments,
             std::vector<VarSegment> output_segments) -> Traced
         {
+            const auto &model = info.model;
             check_flat_manipulator(model);
             check_has_dynamics(model);
 
             const auto nq = static_cast<std::size_t>(model.nq);
-            const std::size_t n_input = 2 * nq;
-
-            ADModel ad_model = model.cast<ADCG>();
-            ADData ad_data(ad_model);
+            const std::size_t n_input = 2 * nq + 10 * info.end_effector_indexes.size();
 
             ADVectorXs ad_input(n_input);
             for (std::size_t i = 0U; i < n_input; ++i)
@@ -184,6 +230,10 @@ namespace cricket
             }
 
             CppAD::Independent(ad_input);
+
+            ADModel ad_model = model.cast<ADCG>();
+            add_payloads(info, ad_model, ad_input, 2 * nq);
+            ADData ad_data(ad_model);
 
             ADVectorXs ad_q = ad_input.head(nq);
             ADVectorXs ad_v = ad_input.segment(nq, nq);
@@ -293,32 +343,38 @@ namespace cricket
             {{"out", 3 * nq, true}});
     }
 
-    auto trace_flask_rnea(const pinocchio::Model &model, const std::string &language) -> Traced
+    auto trace_flask_rnea(const RobotInfo &info, const std::string &language) -> Traced
     {
-        const auto nq = static_cast<std::size_t>(model.nq);
-        return trace_flask_rnea_impl(model, language, {{"x", 3 * nq, true}}, {});
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+        const auto np = 10 * info.end_effector_indexes.size();
+        return trace_flask_rnea_impl(info, language, {{"x", 3 * nq, true}, {"payload", np, true}}, {});
     }
 
-    auto trace_flask_rnea_block(const pinocchio::Model &model, const std::string &language) -> Traced
+    auto trace_flask_rnea_block(const RobotInfo &info, const std::string &language) -> Traced
     {
         // Input x is a ConfigurationBlock: each row is already a full lane vector, so index directly.
         const std::string lang = (language == "c++") ? "c++_block" : language;
-        const auto nq = static_cast<std::size_t>(model.nq);
-        return trace_flask_rnea_impl(model, lang, {{"x", 3 * nq, true}}, {{"tau", nq, true}});
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+        const auto np = 10 * info.end_effector_indexes.size();
+        return trace_flask_rnea_impl(
+            info, lang, {{"x", 3 * nq, true}, {"payload", np, true}}, {{"tau", nq, true}});
     }
 
-    auto trace_flask_kinetic_energy(const pinocchio::Model &model, const std::string &language) -> Traced
+    auto trace_flask_kinetic_energy(const RobotInfo &info, const std::string &language) -> Traced
     {
-        const auto nq = static_cast<std::size_t>(model.nq);
-        return trace_flask_kinetic_energy_impl(model, language, {{"x", 2 * nq, true}}, {});
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+        const auto np = 10 * info.end_effector_indexes.size();
+        return trace_flask_kinetic_energy_impl(
+            info, language, {{"x", 2 * nq, true}, {"payload", np, true}}, {});
     }
 
-    auto trace_flask_kinetic_energy_block(const pinocchio::Model &model, const std::string &language)
-        -> Traced
+    auto trace_flask_kinetic_energy_block(const RobotInfo &info, const std::string &language) -> Traced
     {
         const std::string lang = (language == "c++") ? "c++_block" : language;
-        const auto nq = static_cast<std::size_t>(model.nq);
-        return trace_flask_kinetic_energy_impl(model, lang, {{"x", 2 * nq, true}}, {{"ke", 1, true}});
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+        const auto np = 10 * info.end_effector_indexes.size();
+        return trace_flask_kinetic_energy_impl(
+            info, lang, {{"x", 2 * nq, true}, {"payload", np, true}}, {{"ke", 1, true}});
     }
 
     auto trace_flask_eef_velocity(const RobotInfo &info, const std::string &language) -> Traced

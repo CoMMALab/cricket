@@ -45,16 +45,15 @@ namespace cricket
     auto trace_flask_interpolate_block(const pinocchio::Model &model, const std::string &language)
         -> Traced;
 
-    // Inverse dynamics via RNEA; input x = [q; v; a] (3n rows), outputs n torques.
-    auto trace_flask_rnea(const pinocchio::Model &model, const std::string &language) -> Traced;
-    auto trace_flask_rnea_block(const pinocchio::Model &model, const std::string &language) -> Traced;
+    // Inverse dynamics via RNEA; input x = [q; v; a] (3n rows) plus the end-effector payloads
+    // (10 per end-effector), outputs n torques.
+    auto trace_flask_rnea(const RobotInfo &info, const std::string &language) -> Traced;
+    auto trace_flask_rnea_block(const RobotInfo &info, const std::string &language) -> Traced;
 
-    // Kinetic energy (1/2) v^T M(q) v; input x = [q; v] (2n rows), 1 output. Requires link
-    // masses in the URDF.
-    auto trace_flask_kinetic_energy(const pinocchio::Model &model, const std::string &language)
-        -> Traced;
-    auto trace_flask_kinetic_energy_block(const pinocchio::Model &model, const std::string &language)
-        -> Traced;
+    // Kinetic energy (1/2) v^T M(q) v; input x = [q; v] (2n rows) plus the end-effector
+    // payloads (10 per end-effector), 1 output. Requires link masses in the URDF.
+    auto trace_flask_kinetic_energy(const RobotInfo &info, const std::string &language) -> Traced;
+    auto trace_flask_kinetic_energy_block(const RobotInfo &info, const std::string &language) -> Traced;
 
     // World-aligned linear velocity of every end-effector origin; input x = [q; v] (2n rows),
     // 3 outputs per end-effector.
@@ -84,6 +83,25 @@ namespace cricket
         std::size_t eef1 = 0,
         std::size_t eef2 = 1) -> Traced;
 
+    // Smooth equality form of the per-end-effector TSR pose error (exact charts): for each
+    // end-effector err = [p; vee(R - R^T) / 2] of the offset frame in the reference frame, zero
+    // exactly where they coincide. Input: q (nq), qdot (nq), then per end-effector rTe (7), wTr
+    // (7). Output: d(err)/dq (6 n_eef x nq, row-major), err (6 n_eef), then the drift
+    // d²(err)/dq²[qdot, qdot] (6 n_eef).
+    auto trace_tsr_equality(const RobotInfo &info, const std::string &language) -> Traced;
+
+    // Smooth equality form of the relative pose (exact charts): err = [p; vee(R - R^T) / 2] of
+    // the relative-pose error transform, zero exactly on the rigid relative pose.
+    // Input: q (nq), qdot (nq), lTr (7). Output: d(err)/dq (6 x nq, row-major), err (6), then
+    // the drift d²(err)/dq²[qdot, qdot] (6); without `drift`, only J and err (qdot is ignored),
+    // for Newton iterations that need no second-order term.
+    auto trace_tsr_bimanual_equality(
+        const RobotInfo &info,
+        const std::string &language,
+        std::size_t eef1 = 0,
+        std::size_t eef2 = 1,
+        bool drift = true) -> Traced;
+
     // Projection step from a TSR error and Jacobian; `relative` selects the 6-row bimanual
     // error instead of the 6 n_eef-row per-end-effector error.
     // Input: J (row-major), then err. Output: gradient (nq).
@@ -99,6 +117,17 @@ namespace cricket
         const RobotInfo &info,
         const std::string &language,
         ProjMethod method,
+        std::size_t err_size) -> Traced;
+
+    // Exact-chart normal-space step for err_size equality rows: with M = J N^T (N's rows are
+    // normal directions, err_size x nq), solves M w = rhs by unrolled LU without pivoting and
+    // returns the joint-space step N^T w. Callers precondition N (N <- N P with P an inverse of
+    // M at a nearby point) so M stays near the identity, where pivoting is unnecessary.
+    // Input: J (err_size x nq, row-major), rhs (err_size), N (err_size x nq, row-major).
+    // Output: step (nq), then the LU pivots (err_size).
+    auto trace_solve_exact_normal(
+        const RobotInfo &info,
+        const std::string &language,
         std::size_t err_size) -> Traced;
 
     // Center-of-mass position and Jacobian, optionally expressed relative to the mean

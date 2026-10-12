@@ -35,6 +35,29 @@
             {{join(effort_limits, ", ")}}
         };
 
+        // Uniform derating of effort_limits in the torque check (1 = the limits as given).
+        static inline float effort_scale = 1.F;
+
+        // End-effector payloads: 10 dynamic parameters per end-effector (pinocchio order: m,
+        // m c, inertia about the end-effector frame), added at runtime to the inertia the
+        // RNEA and kinetic-energy kernels see. All zeros is the bare robot. Planning reads them
+        // from the environment's attachments (Attachment::inertia).
+        static constexpr std::size_t payload_dimension = 10 * {{num_end_effectors}};
+        using Payload = std::array<float, payload_dimension>;
+        template <std::size_t rake>
+        using PayloadBlock = std::array<FloatVector<rake, 1>, payload_dimension>;
+
+        template <std::size_t rake>
+        static inline auto broadcast_payload(const Payload &payload) noexcept -> PayloadBlock<rake>
+        {
+            PayloadBlock<rake> out;
+            for (auto i = 0U; i < payload_dimension; ++i)
+            {
+                out[i] = FloatVector<rake, 1>::fill(payload[i]);
+            }
+            return out;
+        }
+
         using Configuration = FloatVector<dimension>;
         struct alignas(FloatVectorAlignment) ConfigurationArray
             : std::array<FloatT, dimension>
@@ -152,7 +175,8 @@
         }
 
         // Joint torques for a flat state row-stack x = [q; qd; qdd]
-        static inline auto torques(const std::array<float, {{n_x}}> &x) noexcept -> std::array<float, flat_dimension>
+        static inline auto torques(const std::array<float, {{n_x}}> &x, const Payload &payload = {}) noexcept
+            -> std::array<float, flat_dimension>
         {
             {% if flask_rnea_code_vars > 0 %}std::array<float, {{flask_rnea_code_vars}}> v;{% endif %}
             std::array<float, flat_dimension> y;
@@ -161,7 +185,8 @@
         }
 
         // Kinetic energy (1/2) qd^T M(q) qd of a flat state x = [q; qd]
-        static inline auto kinetic_energy(const std::array<float, dimension> &x) noexcept -> float
+        static inline auto kinetic_energy(const std::array<float, dimension> &x, const Payload &payload = {}) noexcept
+            -> float
         {
             {% if flask_kinetic_energy_code_vars > 0 %}std::array<float, {{flask_kinetic_energy_code_vars}}> v;{% endif %}
             std::array<float, 1> y;
@@ -171,7 +196,7 @@
 
         // Per-lane kinetic energy; reads only the [q; qd] rows of the block
         template <std::size_t rake>
-        static inline auto kinetic_energy_block(const ConfigurationBlock<rake> &x) noexcept
+        static inline auto kinetic_energy_block(const ConfigurationBlock<rake> &x, const PayloadBlock<rake> &payload) noexcept
             -> FloatVector<rake, 1>
         {
             {% if flask_kinetic_energy_block_code_vars > 0 %}std::array<FloatVector<rake, 1>, {{flask_kinetic_energy_block_code_vars}}> v;{% endif %}
@@ -228,24 +253,45 @@
             {{flask_interpolate_block_code}}
         }
 
-        // Position/velocity bounds on rows 0..2n-1 and torque limits via RNEA on all 3n rows.
-        // Cubic edges can overshoot bounds mid-path even when both endpoints are valid.
+        // Joint torques of a block of flat state row-stacks x = [q; qd; qdd] (one per lane), carrying
+        // the end-effector payloads: limits_check's RNEA, returned.
         template <std::size_t rake>
-        static inline bool limits_check(const ConfigurationBlock<rake> &x) noexcept
+        static inline auto torques_block(const ConfigurationBlock<rake> &x, const PayloadBlock<rake> &payload) noexcept
+            -> std::array<FloatVector<rake, 1>, flat_dimension>
         {
+            {% if flask_rnea_block_code_vars > 0 %}std::array<FloatVector<rake, 1>, {{flask_rnea_block_code_vars}}> v;{% endif %}
+            std::array<FloatVector<rake, 1>, flat_dimension> tau;
+            {{flask_rnea_block_code}}
+
+            return tau;
+        }
+
+        // Position/velocity bounds on rows 0..2n-1 (unless `bounds` is false) and torque limits
+        // (scaled by `margin`) via RNEA on all 3n rows, carrying the end-effector payloads. Cubic
+        // edges can overshoot bounds mid-path even when both endpoints are valid.
+        template <std::size_t rake>
+        static inline bool limits_check(
+            const ConfigurationBlock<rake> &x,
+            const PayloadBlock<rake> &payload,
+            float margin = 1.F,
+            bool bounds = true) noexcept
+        {
+            if (bounds)
+            {
             {% for index in range(n_z) -%}
             if (not ((x[{{index}}] >= {{ at(z_lower, index) }}).all() and (x[{{index}}] <= {{ at(z_upper, index) }}).all()))
             {
                 return false;
             }
             {% endfor %}
+            }
 
             {% if flask_rnea_block_code_vars > 0 %}std::array<FloatVector<rake, 1>, {{flask_rnea_block_code_vars}}> v;{% endif %}
             std::array<FloatVector<rake, 1>, flat_dimension> tau;
             {{flask_rnea_block_code}}
 
             {% for index in range(n_q) -%}
-            if ((tau[{{index}}].abs() > {{ at(effort_limits, index) }}).any())
+            if ((tau[{{index}}].abs() > {{ at(effort_limits, index) }} * effort_scale * margin).any())
             {
                 return false;
             }
@@ -277,7 +323,7 @@
                 const vamp::collision::Environment<FloatVector<rake>> &environment,
                 const ConfigurationBlock<rake> &x) noexcept
         {
-            return limits_check<rake>(x) and Ambient::fkcc<rake>(environment, x);
+            return limits_check<rake>(x, broadcast_payload<rake>({})) and Ambient::fkcc<rake>(environment, x);
         }
 
         template <std::size_t rake>
@@ -285,7 +331,8 @@
             const vamp::collision::Environment<FloatVector<rake>> &environment,
             const ConfigurationBlock<rake> &x) noexcept
         {
-            return limits_check<rake>(x) and Ambient::fkcc_attach<rake>(environment, x);
+            return limits_check<rake>(x, vamp::collision::attachment_payload<{{num_end_effectors}}>(environment)) and
+                   Ambient::fkcc_attach<rake>(environment, x);
         }
 
         static inline auto eefk(const std::array<float, dimension> &x, std::size_t eef_index = 0) noexcept

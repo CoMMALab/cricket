@@ -3,6 +3,7 @@
 #include "internal.hh"
 #include "se3_ops.hh"
 #include "cholesky.hh"
+#include "lu.hh"
 
 #include <pinocchio/algorithm/center-of-mass.hpp>
 #include <pinocchio/algorithm/frames.hpp>
@@ -192,6 +193,186 @@ namespace cricket
         return emit_error_and_jacobian(error_func, num_inp, nq, task_dim, language);
     }
 
+    auto trace_tsr_equality(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+        const auto n_eef = info.end_effector_indexes.size();
+
+        ADModel ad_model = info.model.cast<ADCG>();
+        ADData ad_data(ad_model);
+
+        // Taped inputs: q (nq), then per end-effector rTe (7), wTr (7)
+        const std::size_t n_tape = nq + 2 * tf_dim * n_eef;
+        ADVectorXs ad_inp(n_tape);
+        for (auto i = 0U; i < n_tape; ++i)
+        {
+            ad_inp[i] = ADCG(0.0);
+        }
+
+        Independent(ad_inp);
+
+        ADVectorXs ad_q = ad_inp.head(nq);
+        forwardKinematics(ad_model, ad_data, ad_q);
+        updateFramePlacements(ad_model, ad_data);
+
+        const std::size_t n_out = task_dim * n_eef;
+        ADVectorXs err(n_out);
+        for (auto k = 0U; k < n_eef; ++k)
+        {
+            const std::size_t offset = nq + 2 * tf_dim * k;
+            const auto rTe = read_transform(ad_inp, offset);
+            const auto wTr = read_transform(ad_inp, offset + tf_dim);
+            const auto rTobj = wTr.inverse() * (ad_data.oMf[info.end_effector_indexes[k]] * rTe.inverse());
+
+            // Smooth on all of SE(3), zero exactly where the offset frame coincides with the
+            // reference frame; near it, the rows change at the rate of the offset frame's twist
+            // expressed in the reference frame (linear velocity of its origin first).
+            const auto &R = rTobj.rotation_impl();
+            err.segment(task_dim * k, task_dim) << rTobj.translation_impl(), ADCG(0.5) * (R(2, 1) - R(1, 2)),
+                ADCG(0.5) * (R(0, 2) - R(2, 0)), ADCG(0.5) * (R(1, 0) - R(0, 1));
+        }
+
+        ADFun<CGD> f(ad_inp, err);
+
+        // Emitted inputs: q (nq), qdot (nq), then per end-effector rTe (7), wTr (7).
+        CodeHandler<double> handler;
+        CppAD::vector<CGD> x(2 * nq + 2 * tf_dim * n_eef);
+        handler.makeVariables(x);
+
+        CppAD::vector<CGD> xt(n_tape), dx(n_tape), ddx(n_tape);
+        for (auto i = 0U; i < n_tape; ++i)
+        {
+            const bool is_q = i < nq;
+            xt[i] = is_q ? x[i] : x[nq + i];
+            dx[i] = is_q ? x[nq + i] : CGD(0.0);
+            ddx[i] = CGD(0.0);
+        }
+
+        const CppAD::vector<CGD> jac = f.Jacobian(xt);
+        const CppAD::vector<CGD> e0 = f.Forward(0, xt);
+        f.Forward(1, dx);
+        const CppAD::vector<CGD> e2 = f.Forward(2, ddx);
+
+        CppAD::vector<CGD> out;
+        for (auto i = 0U; i < n_out; ++i)
+        {
+            for (auto j = 0U; j < nq; ++j)
+            {
+                out.push_back(jac[i * n_tape + j]);
+            }
+        }
+
+        for (auto i = 0U; i < n_out; ++i)
+        {
+            out.push_back(e0[i]);
+        }
+
+        for (auto i = 0U; i < n_out; ++i)
+        {
+            out.push_back(CGD(2.0) * e2[i]);
+        }
+
+        return Traced{generate_code(handler, out, language), handler.getTemporaryVariableCount(), out.size()};
+    }
+
+    auto trace_tsr_bimanual_equality(
+        const RobotInfo &info,
+        const std::string &language,
+        std::size_t eef1,
+        std::size_t eef2,
+        bool drift) -> Traced
+    {
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+
+        if (info.end_effector_indexes.size() < 2)
+        {
+            throw std::runtime_error("trace_tsr_bimanual_equality requires at least two end-effectors");
+        }
+
+        ADModel ad_model = info.model.cast<ADCG>();
+        ADData ad_data(ad_model);
+
+        // Taped inputs: q (nq), then the reference relative transform lTr (7)
+        const std::size_t n_tape = nq + tf_dim;
+        ADVectorXs ad_inp(n_tape);
+        for (auto i = 0U; i < n_tape; ++i)
+        {
+            ad_inp[i] = ADCG(0.0);
+        }
+
+        Independent(ad_inp);
+
+        ADVectorXs ad_q = ad_inp.head(nq);
+        forwardKinematics(ad_model, ad_data, ad_q);
+        updateFramePlacements(ad_model, ad_data);
+
+        const auto lTr = read_transform(ad_inp, nq);
+        const auto &lTw = ad_data.oMf[info.end_effector_indexes[eef1]];
+        const auto &rTw = ad_data.oMf[info.end_effector_indexes[eef2]];
+        const auto errT = (lTw.inverse() * rTw) * lTr.inverse();
+
+        // Smooth on all of SE(3): translation and the skew part of the rotation error, both
+        // zero exactly on the rigid relative pose (near it, vee((R - R^T) / 2) = sin(theta) axis
+        // agrees with log3 to first order).
+        const auto &R = errT.rotation_impl();
+        ADVectorXs err(task_dim);
+        err << errT.translation_impl(), ADCG(0.5) * (R(2, 1) - R(1, 2)), ADCG(0.5) * (R(0, 2) - R(2, 0)),
+            ADCG(0.5) * (R(1, 0) - R(0, 1));
+
+        ADFun<CGD> f(ad_inp, err);
+
+        // Emitted inputs: q (nq), qdot (nq), lTr (7). The drift d²err/dq²[qdot, qdot] is twice
+        // the second-order Taylor coefficient of err(q + s qdot) at s = 0.
+        CodeHandler<double> handler;
+        CppAD::vector<CGD> x(2 * nq + tf_dim);
+        handler.makeVariables(x);
+
+        CppAD::vector<CGD> xt(n_tape), dx(n_tape), ddx(n_tape);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            xt[i] = x[i];
+            dx[i] = x[nq + i];
+            ddx[i] = CGD(0.0);
+        }
+
+        for (auto i = 0U; i < tf_dim; ++i)
+        {
+            xt[nq + i] = x[2 * nq + i];
+            dx[nq + i] = CGD(0.0);
+            ddx[nq + i] = CGD(0.0);
+        }
+
+        const CppAD::vector<CGD> jac = f.Jacobian(xt);
+        const CppAD::vector<CGD> e0 = f.Forward(0, xt);
+        CppAD::vector<CGD> e2;
+        if (drift)
+        {
+            f.Forward(1, dx);
+            e2 = f.Forward(2, ddx);
+        }
+
+        CppAD::vector<CGD> out;
+        for (auto i = 0U; i < task_dim; ++i)
+        {
+            for (auto j = 0U; j < nq; ++j)
+            {
+                out.push_back(jac[i * n_tape + j]);
+            }
+        }
+
+        for (auto i = 0U; i < task_dim; ++i)
+        {
+            out.push_back(e0[i]);
+        }
+
+        for (auto i = 0U; drift and i < task_dim; ++i)
+        {
+            out.push_back(CGD(2.0) * e2[i]);
+        }
+
+        return Traced{generate_code(handler, out, language), handler.getTemporaryVariableCount(), out.size()};
+    }
+
     auto trace_solve_tsr(
         const RobotInfo &info,
         const std::string &language,
@@ -277,6 +458,49 @@ namespace cricket
             generate_code(handler, result, language),
             handler.getTemporaryVariableCount(),
             result.size()};
+    }
+
+    auto trace_solve_exact_normal(const RobotInfo &info, const std::string &language, std::size_t err_size)
+        -> Traced
+    {
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+
+        // Input layout (must match vamp's normal-solve buffer): J, rhs, N.
+        const std::size_t num_inp = err_size * nq + err_size + err_size * nq;
+        ADVectorXs ad_inp(num_inp);
+        for (auto i = 0U; i < num_inp; ++i)
+        {
+            ad_inp[i] = ADCG(0.0);
+        }
+
+        Independent(ad_inp);
+
+        ADMatrixXs J(err_size, nq), N(err_size, nq);
+        ADVectorXs rhs(err_size);
+        for (auto i = 0U; i < err_size; ++i)
+        {
+            for (auto j = 0U; j < nq; ++j)
+            {
+                J(i, j) = ad_inp[i * nq + j];
+                N(i, j) = ad_inp[err_size * nq + err_size + i * nq + j];
+            }
+
+            rhs[i] = ad_inp[err_size * nq + i];
+        }
+
+        ADVectorXs pivots(err_size);
+        const ADVectorXs w = lu_solve_nopivot<ADMatrixXs, ADVectorXs>(J * N.transpose(), rhs, pivots);
+        const ADVectorXs step = N.transpose() * w;
+
+        ADVectorXs out(nq + err_size);
+        out << step, pivots;
+        ADFun<CGD> solve_func(ad_inp, out);
+
+        CodeHandler<double> handler;
+        CppAD::vector<CGD> ind_vars(num_inp);
+        handler.makeVariables(ind_vars);
+        CppAD::vector<CGD> result = solve_func.Forward(0, ind_vars);
+        return Traced{generate_code(handler, result, language), handler.getTemporaryVariableCount(), result.size()};
     }
 
     auto trace_com_jacobian(
