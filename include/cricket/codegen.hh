@@ -57,6 +57,11 @@ namespace cricket
         InnerLM,   // J^T (J J^T + lambda I)^{-1} e: (6 n_eef)^2 factorization
         OuterLM,   // (J^T J + lambda I)^{-1} J^T e: nq^2 factorization
         GradDesc,  // J^T e
+        // Inner-form LM with the joint limits as constraints: min 1/2 |J dq + e|^2 + 1/2 lambda |dq|^2
+        // s.t. lower - q <= dq <= upper - q, by an unrolled active-set solve (see tracing/bounded_ls.hh).
+        // Takes two extra inputs (the allowed step to each limit) and relies on conditionals, so it is
+        // generated only for the C++ language (as SIMD blends), never for Rust.
+        BoundedLS,
     };
 
     // TSR (task-space region) error for every end-effector of the robot.
@@ -76,7 +81,8 @@ namespace cricket
 
     // Projection step from a TSR error and Jacobian; `relative` selects the 6-row bimanual
     // error instead of the 6 n_eef-row per-end-effector error.
-    // Input: J (row-major), then err. Output: gradient (nq).
+    // Input: J (row-major), then err (and lower - q, upper - q for ProjMethod::BoundedLS).
+    // Output: gradient (nq).
     auto trace_solve_tsr(
         const RobotInfo &info,
         const std::string &language,
@@ -84,7 +90,8 @@ namespace cricket
         bool relative = false) -> Traced;
 
     // Projection step from an arbitrary stacked error and Jacobian with err_size rows.
-    // Input: J (err_size x nq, row-major), then err (err_size). Output: gradient (nq).
+    // Input: J (err_size x nq, row-major), then err (err_size); for ProjMethod::BoundedLS also
+    // lower - q (nq) and upper - q (nq). Output: gradient (nq).
     auto trace_solve_jacobian(
         const RobotInfo &info,
         const std::string &language,

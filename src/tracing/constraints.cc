@@ -3,6 +3,7 @@
 #include "internal.hh"
 #include "se3_ops.hh"
 #include "cholesky.hh"
+#include "bounded_ls.hh"
 
 #include <pinocchio/algorithm/center-of-mass.hpp>
 #include <pinocchio/algorithm/frames.hpp>
@@ -225,9 +226,20 @@ namespace cricket
 
         const auto nq = static_cast<std::size_t>(info.model.nq);
 
+        const bool bounded = method == ProjMethod::BoundedLS;
+        if (bounded and language == "rust")
+        {
+            // The Rust backend cannot emit conditionals, which the active-set solver is made of.
+            throw std::runtime_error("ProjMethod::BoundedLS is not supported for the rust language");
+        }
+
+        // The SIMD blends the conditionals compile to come from the block language
+        const std::string lang = (bounded and language == "c++") ? "c++_block" : language;
+
         // Input layout (must match vamp's JacobianProjectInp::operator[]):
-        // J (err_size x nq, row-major), then err (err_size)
-        const std::size_t num_inp = err_size * nq + err_size;
+        // J (err_size x nq, row-major), then err (err_size), then, for BoundedLS only, the allowed step
+        // to the lower joint limit (lower - q, nq) and to the upper limit (upper - q, nq)
+        const std::size_t num_inp = err_size * nq + err_size + (bounded ? 2 * nq : 0);
 
         ADVectorXs ad_inp(num_inp);
         for (auto i = 0U; i < num_inp; ++i)
@@ -276,6 +288,21 @@ namespace cricket
                 grad = J.transpose() * err;
                 break;
             }
+            case ProjMethod::BoundedLS:
+            {
+                ADVectorXs lower(nq);
+                ADVectorXs upper(nq);
+                for (auto i = 0U; i < nq; ++i)
+                {
+                    lower[i] = ad_inp[err_size * nq + err_size + i];
+                    upper[i] = ad_inp[err_size * nq + err_size + nq + i];
+                }
+
+                // Every iteration either fixes a joint at a bound, frees one, or finishes the solve
+                const std::size_t iterations = std::min<std::size_t>(nq + 2, 10);
+                grad = bounded_ls_step<ADMatrixXs, ADVectorXs, ADCG>(J, err, lower, upper, damp, iterations);
+                break;
+            }
         }
 
         ADFun<CGD> solve_func(ad_inp, grad);
@@ -287,7 +314,7 @@ namespace cricket
         CppAD::vector<CGD> result = solve_func.Forward(0, ind_vars);
 
         return Traced{
-            generate_code(handler, result, language),
+            generate_code(handler, result, lang),
             handler.getTemporaryVariableCount(),
             result.size()};
     }

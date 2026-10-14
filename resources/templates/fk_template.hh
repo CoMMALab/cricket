@@ -419,6 +419,21 @@ struct {{name}}
         {{solve_tsr_error_gradient_descent_code}}
     }
 
+    {% if has_bounded_ls %}
+    // Bounded least-squares projection step for the TSR error.
+    // Input: the solver input above, then lower - q (dimension entries) and upper - q (dimension entries): the
+    // allowed step to each joint limit. Minimises the damped least squares subject to those bounds.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_error_bounded_ls(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{solve_tsr_error_bounded_ls_code_vars}}> v;
+
+        {{solve_tsr_error_bounded_ls_code}}
+    }
+    {% endif %}
+
     {% if num_end_effectors > 1 %}
     // Relative-pose TSR between the first two end-effectors.
     // Input: q (dimension), then the reference relative transform lTr (7), lb (6), ub (6).
@@ -463,6 +478,21 @@ struct {{name}}
 
         {{solve_tsr_relative_error_gradient_descent_code}}
     }
+
+    {% if has_bounded_ls %}
+    // Bounded least-squares projection step for the relative-pose TSR error.
+    // Input: the solver input above, then lower - q (dimension entries) and upper - q (dimension entries): the
+    // allowed step to each joint limit. Minimises the damped least squares subject to those bounds.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_relative_error_bounded_ls(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{solve_tsr_relative_error_bounded_ls_code_vars}}> v;
+
+        {{solve_tsr_relative_error_bounded_ls_code}}
+    }
+    {% endif %}
     {% endif %}
     {% endif %}
 
@@ -514,6 +544,21 @@ struct {{name}}
 
         {{solve_com_error_gradient_descent_code}}
     }
+
+    {% if has_bounded_ls %}
+    // Bounded least-squares projection step for the center-of-mass error.
+    // Input: the solver input above, then lower - q (dimension entries) and upper - q (dimension entries): the
+    // allowed step to each joint limit. Minimises the damped least squares subject to those bounds.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_com_error_bounded_ls(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{solve_com_error_bounded_ls_code_vars}}> v;
+
+        {{solve_com_error_bounded_ls_code}}
+    }
+    {% endif %}
     {% endif %}
 
     {% if has_closed_loops %}
@@ -565,6 +610,21 @@ struct {{name}}
 
         {{solve_closed_loop_error_gradient_descent_code}}
     }
+
+    {% if has_bounded_ls %}
+    // Bounded least-squares projection step for the closed-loop error.
+    // Input: the solver input above, then lower - q (dimension entries) and upper - q (dimension entries): the
+    // allowed step to each joint limit. Minimises the damped least squares subject to those bounds.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_closed_loop_error_bounded_ls(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{solve_closed_loop_error_bounded_ls_code_vars}}> v;
+
+        {{solve_closed_loop_error_bounded_ls_code}}
+    }
+    {% endif %}
     {% endif %}
 
     {% if has_lead_screw %}
@@ -620,6 +680,21 @@ struct {{name}}
 
         {{solve_lead_screw_error_gradient_descent_code}}
     }
+
+    {% if has_bounded_ls %}
+    // Bounded least-squares projection step for the lead-screw error.
+    // Input: the solver input above, then lower - q (dimension entries) and upper - q (dimension entries): the
+    // allowed step to each joint limit. Minimises the damped least squares subject to those bounds.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_lead_screw_error_bounded_ls(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{solve_lead_screw_error_bounded_ls_code_vars}}> v;
+
+        {{solve_lead_screw_error_bounded_ls_code}}
+    }
+    {% endif %}
     {% endif %}
 
     {% if has_twist %}

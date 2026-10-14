@@ -184,6 +184,11 @@ namespace cricket
             data[key + "_code_output"] = traced.outputs;
         };
 
+        // The bounded least-squares projection solver is built from conditionals (SIMD blends), which
+        // the Rust backend cannot emit, so it is generated for C++ only.
+        const bool bounded_ls = language != "rust";
+        data["has_bounded_ls"] = bounded_ls;
+
         const bool constraints = data.value("constraints", false);
         data["has_constraints"] = constraints;
         if (constraints)
@@ -196,6 +201,12 @@ namespace cricket
             set_trace(
                 trace_solve_tsr(robot, language, ProjMethod::GradDesc),
                 "solve_tsr_error_gradient_descent");
+            if (bounded_ls)
+            {
+                set_trace(
+                    trace_solve_tsr(robot, language, ProjMethod::BoundedLS),
+                    "solve_tsr_error_bounded_ls");
+            }
 
             if (robot.end_effector_indexes.size() > 1)
             {
@@ -209,6 +220,12 @@ namespace cricket
                 set_trace(
                     trace_solve_tsr(robot, language, ProjMethod::GradDesc, true),
                     "solve_tsr_relative_error_gradient_descent");
+                if (bounded_ls)
+                {
+                    set_trace(
+                        trace_solve_tsr(robot, language, ProjMethod::BoundedLS, true),
+                        "solve_tsr_relative_error_bounded_ls");
+                }
             }
         }
 
@@ -269,6 +286,12 @@ namespace cricket
             set_trace(
                 trace_solve_jacobian(robot, language, ProjMethod::GradDesc, 2),
                 "solve_com_error_gradient_descent");
+            if (bounded_ls)
+            {
+                set_trace(
+                    trace_solve_jacobian(robot, language, ProjMethod::BoundedLS, 2),
+                    "solve_com_error_bounded_ls");
+            }
         }
 
         // Loop-closure distance constraints: "closed_loops" is a list of
@@ -297,6 +320,12 @@ namespace cricket
             set_trace(
                 trace_solve_jacobian(robot, language, ProjMethod::GradDesc, loops.size()),
                 "solve_closed_loop_error_gradient_descent");
+            if (bounded_ls)
+            {
+                set_trace(
+                    trace_solve_jacobian(robot, language, ProjMethod::BoundedLS, loops.size()),
+                    "solve_closed_loop_error_bounded_ls");
+            }
         }
 
         // Lead-screw coupling: "lead_screw": true generates the scalar screw invariant h(q)
@@ -318,6 +347,12 @@ namespace cricket
             set_trace(
                 trace_solve_jacobian(robot, language, ProjMethod::GradDesc, 1),
                 "solve_lead_screw_error_gradient_descent");
+            if (bounded_ls)
+            {
+                set_trace(
+                    trace_solve_jacobian(robot, language, ProjMethod::BoundedLS, 1),
+                    "solve_lead_screw_error_bounded_ls");
+            }
         }
 
         // Twist Jacobians: "twist": true generates the reference-frame and body-frame twist
