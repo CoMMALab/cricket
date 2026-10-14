@@ -179,6 +179,11 @@ if(BUILD_TESTING)
   target_compile_definitions(tracing_test PRIVATE
       CRICKET_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
   add_test(NAME tracing_test COMMAND tracing_test)
+
+  add_executable(spline_test tests/spline_test.cc)
+  target_include_directories(spline_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_link_libraries(spline_test PRIVATE cricket::cricket)
+  add_test(NAME spline_test COMMAND spline_test)
 endif()
 
 add_executable(fkcc_gen src/fkcc_gen.cc)
