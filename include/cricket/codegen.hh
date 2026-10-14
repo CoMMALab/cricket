@@ -70,6 +70,14 @@ namespace cricket
     // the raw error (6 n_eef); bounds are hinged at runtime, not on the tape.
     auto trace_tsr_error(const RobotInfo &info, const std::string &language) -> Traced;
 
+    // Position error of the first end-effector against a cubic B-spline curve with N control points, with the
+    // curve parameter t as an extra variable: err = FK(q).translation - P(t) (3 rows).
+    // Input: q (nq), t, control points (3 N, x y z per point), knots (N + 4); see SplineInputLayout in
+    // tracing/spline.hh. Output: d(err)/d(q, t) (3 x (nq + 1), row-major, t last), then the error (3).
+    // Uses conditionals, so it is generated only for the C++ language (as SIMD blends). Instantiated for N = 20.
+    template <std::size_t N>
+    auto trace_spline_error(const RobotInfo &info, const std::string &language) -> Traced;
+
     // Relative-pose (bimanual) TSR error between two end-effectors.
     // Input: q (nq), then the reference relative transform lTr (7), lb (6), ub (6).
     // Output: d(err)/dq (6 x nq, row-major), then the raw error (6).

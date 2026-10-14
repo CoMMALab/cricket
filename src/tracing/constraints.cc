@@ -84,6 +84,66 @@ namespace cricket
             return spline;
         }
 
+        // Point on the spline at the traced parameter t.
+        //
+        // The span containing t is chosen inside the trace: for each span a CondExp picks that span's window
+        // (the four control points that influence it, and the six knots bspline_basis reads) when t lies
+        // before the span's end, and otherwise keeps the choice made for the later spans. Spans are visited
+        // from the last to the first, so the result is the first span whose end is after t, and t = 1 stays
+        // in the last span. The selected values do not depend on t, so d(point)/dt flows only through the
+        // basis. bspline_basis then runs once, not once per span.
+        template <std::size_t N>
+        auto spline_point(const SplineInputs<N> &spline) -> Eigen::Vector3<ADCG>
+        {
+            constexpr std::size_t degree = CubicBSpline::degree;
+            constexpr std::size_t window_knots = 2 * degree;  // U[i - 2] .. U[i + 3] for span i
+
+            std::array<Eigen::Vector3<ADCG>, degree + 1> window_points;
+            std::array<ADCG, window_knots> window;
+
+            // start from the last span, i = N - 1
+            for (auto j = 0U; j <= degree; ++j)
+            {
+                window_points[j] = spline.control_points[N - 1 - degree + j];
+            }
+
+            for (auto j = 0U; j < window_knots; ++j)
+            {
+                window[j] = spline.knots[N - 1 - (degree - 1) + j];
+            }
+
+            for (std::size_t span = N - 2; span >= degree; --span)
+            {
+                const ADCG &span_end = spline.knots[span + 1];
+
+                for (auto j = 0U; j <= degree; ++j)
+                {
+                    for (auto axis = 0U; axis < 3; ++axis)
+                    {
+                        window_points[j][axis] = CondExpLt(
+                            spline.t, span_end, spline.control_points[span - degree + j][axis], window_points[j][axis]);
+                    }
+                }
+
+                for (auto j = 0U; j < window_knots; ++j)
+                {
+                    window[j] = CondExpLt(spline.t, span_end, spline.knots[span - (degree - 1) + j], window[j]);
+                }
+            }
+
+            // window[degree - 1] is the span's start knot U[i]; bspline_basis reads from U[i - 2] to U[i + 3]
+            ADCG basis[degree + 1];
+            bspline_basis<ADCG, degree>(&window[degree - 1], spline.t, basis);
+
+            Eigen::Vector3<ADCG> point = basis[0] * window_points[0];
+            for (auto j = 1U; j <= degree; ++j)
+            {
+                point += basis[j] * window_points[j];
+            }
+
+            return point;
+        }
+
         // se(3) displacement of a relative transform: [translation; log3(rotation)].
         auto se3_displacement(const SE3Tpl<ADCG> &transform) -> ADVectorXs
         {
@@ -93,8 +153,10 @@ namespace cricket
             return displacement;
         }
 
-        // Emit code computing [d(err)/dq (row-major), err] for an error function whose first
-        // nq inputs are the configuration. The bound inputs are part of the tape but do not
+        // Emit code computing [d(err)/d(first n_vars inputs) (row-major), err] for an error function whose
+        // first n_vars inputs are the variables to differentiate: the configuration (n_vars = nq), or for
+        // the spline constraint the configuration and the curve parameter (n_vars = nq + 1).
+        // The bound inputs are part of the tape but do not
         // affect the emitted error: hinging the error against the bounds during tracing would
         // wrongly zero gradients, so the hinge is applied at runtime in vamp instead.
         //
@@ -105,7 +167,7 @@ namespace cricket
         auto emit_error_and_jacobian(
             ADFun<CGD> &error_func,
             std::size_t num_inp,
-            std::size_t nq,
+            std::size_t n_vars,
             std::size_t n_out,
             const std::string &language_in,
             bool conditionals = false) -> Traced
@@ -124,13 +186,13 @@ namespace cricket
             CppAD::vector<CGD> error_vec = error_func.Forward(0, ind_vars);
             CppAD::vector<CGD> jac = error_func.Jacobian(ind_vars);
 
-            // Jacobian with respect to the configuration only
-            CppAD::vector<CGD> jac_e_q(n_out * nq);
+            // Jacobian with respect to the first n_vars inputs only
+            CppAD::vector<CGD> jac_e_q(n_out * n_vars);
             for (auto i = 0U; i < n_out; ++i)
             {
-                for (auto j = 0U; j < nq; ++j)
+                for (auto j = 0U; j < n_vars; ++j)
                 {
-                    jac_e_q[i * nq + j] = jac[i * num_inp + j];
+                    jac_e_q[i * n_vars + j] = jac[i * num_inp + j];
                 }
             }
 
@@ -193,6 +255,58 @@ namespace cricket
         ADFun<CGD> error_func(ad_inp, data);
         return emit_error_and_jacobian(error_func, num_inp, nq, n_out, language, true);
     }
+
+    template <std::size_t N>
+    auto trace_spline_error(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        using Layout = SplineInputLayout<N>;
+
+        if (info.end_effector_indexes.empty())
+        {
+            throw std::runtime_error("trace_spline_error requires an end-effector");
+        }
+
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+
+        ADModel ad_model = info.model.cast<ADCG>();
+        ADData ad_data(ad_model);
+
+        // Input layout (see SplineInputLayout): q (nq), t, control points (3 N), knots (N + 4)
+        const std::size_t num_inp = Layout::total(nq);
+
+        ADVectorXs ad_inp(num_inp);
+        for (auto i = 0U; i < num_inp; ++i)
+        {
+            ad_inp[i] = ADCG(0.0);
+        }
+
+        Independent(ad_inp);
+
+        ADVectorXs ad_q(nq);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            ad_q[i] = ad_inp[i];
+        }
+
+        forwardKinematics(ad_model, ad_data, ad_q);
+        updateFramePlacements(ad_model, ad_data);
+
+        // position error of the first end-effector against the curve point at t
+        const auto spline = read_spline<N>(ad_inp, nq);
+        const Eigen::Vector3<ADCG> curve_point = spline_point<N>(spline);
+        const Eigen::Vector3<ADCG> eef_position = ad_data.oMf[info.end_effector_indexes[0]].translation();
+
+        constexpr std::size_t n_out = 3;
+        ADVectorXs data(n_out);
+        data = eef_position - curve_point;
+
+        ADFun<CGD> error_func(ad_inp, data);
+
+        // d(err)/d(q, t): the curve parameter is the input right after q, so it is the last column
+        return emit_error_and_jacobian(error_func, num_inp, nq + 1, n_out, language, true);
+    }
+
+    template auto trace_spline_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
 
     auto trace_tsr_bimanual_error(
         const RobotInfo &info,
