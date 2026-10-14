@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <stdexcept>
 #include <vector>
 
 namespace cricket
@@ -52,6 +53,10 @@ namespace cricket
 
         std::vector<Eigen::Vector3d> control_points;
         std::vector<double> knots;
+
+        // t at which fit_cubic_bspline() made the curve pass through each input point (empty if the spline
+        // was built by hand)
+        std::vector<double> parameters;
 
         auto size() const -> std::size_t
         {
@@ -102,4 +107,82 @@ namespace cricket
             return point;
         }
     };
+
+    // Cubic B-spline that passes through `points` (at least four, R^3), by global interpolation in three
+    // stages:
+    //   1. parameters: point k gets t_k = (distance along the polyline up to k) / (total length), so t_0 = 0
+    //      and t_{n-1} = 1 and uneven spacing is respected;
+    //   2. knots: four 0s, then the average of `degree` consecutive t_k for each interior knot, then four 1s;
+    //   3. control points: solve  sum_j N_j(t_k) P_j = x_k  for k = 0 .. n-1. Each row has at most four
+    //      non-zeros (the basis of t_k's span); it is solved densely, which is instant for n around 20.
+    //
+    // The points must not repeat consecutively: a zero chord would give two equal t_k and a singular system.
+    inline auto fit_cubic_bspline(const std::vector<Eigen::Vector3d> &points) -> CubicBSpline
+    {
+        constexpr int degree = CubicBSpline::degree;
+        const std::size_t n = points.size();
+        if (n < static_cast<std::size_t>(degree) + 1)
+        {
+            throw std::invalid_argument("a cubic B-spline needs at least four points");
+        }
+
+        CubicBSpline spline;
+
+        // 1. parameters
+        spline.parameters.assign(n, 0.0);
+        double total = 0.0;
+        for (std::size_t k = 1; k < n; ++k)
+        {
+            total += (points[k] - points[k - 1]).norm();
+        }
+
+        double travelled = 0.0;
+        for (std::size_t k = 1; k < n; ++k)
+        {
+            travelled += (points[k] - points[k - 1]).norm();
+            spline.parameters[k] = travelled / total;
+        }
+
+        spline.parameters[n - 1] = 1.0;
+
+        // 2. knots: n + 4 in total; knots[0..3] = 0 and knots[n..n+3] = 1 already, the n - 4 interior ones are
+        // knots[4 .. n-1], the average of parameters[j .. j+2] for j = 1 .. n-4
+        spline.knots.assign(n + degree + 1, 0.0);
+        for (std::size_t j = 1; j + degree < n; ++j)
+        {
+            spline.knots[j + degree] = (spline.parameters[j] + spline.parameters[j + 1] + spline.parameters[j + 2]) / 3.0;
+        }
+
+        for (std::size_t i = n; i < n + degree + 1; ++i)
+        {
+            spline.knots[i] = 1.0;
+        }
+
+        // 3. control points
+        Eigen::MatrixXd system = Eigen::MatrixXd::Zero(n, n);
+        Eigen::MatrixXd rhs(n, 3);
+        for (std::size_t k = 0; k < n; ++k)
+        {
+            const double t = spline.parameters[k];
+            const auto span = spline.find_span(t);
+
+            double basis[degree + 1];
+            bspline_basis<double, degree>(&spline.knots[span], t, basis);
+            for (int j = 0; j <= degree; ++j)
+            {
+                system(k, span - degree + j) = basis[j];
+            }
+
+            rhs.row(k) = points[k].transpose();
+        }
+
+        const Eigen::MatrixXd solution = system.partialPivLu().solve(rhs);
+        spline.control_points.resize(n);
+        for (std::size_t k = 0; k < n; ++k)
+        {
+            spline.control_points[k] = solution.row(k).transpose();
+        }
+
+        return spline;
+    }
 }  // namespace cricket

@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
+#include <stdexcept>
 #include <vector>
 
 static int failures = 0;
@@ -144,6 +145,71 @@ int main()
             CHECK(point.y() >= -1.0 - 1e-12 and point.y() <= 3.0 + 1e-12);
             CHECK(point.z() >= -1e-12 and point.z() <= 2.0 + 1e-12);
         }
+    }
+
+    // Step 4: fit a spline through k points on a helix with uneven spacing
+    {
+        std::vector<Eigen::Vector3d> points;
+        for (std::size_t i = 0; i < k; ++i)
+        {
+            const double s = static_cast<double>(i) / static_cast<double>(k - 1);
+            const double angle = 6.28318530718 * std::pow(s, 1.3);
+            points.emplace_back(0.5 * std::cos(angle) + 0.6, 0.5 * std::sin(angle), 0.2 + 0.4 * s);
+        }
+
+        const auto spline = cricket::fit_cubic_bspline(points);
+
+        // Layout: k control points, k + 4 knots, k - 3 pieces
+        CHECK(spline.size() == k);
+        CHECK(spline.knots.size() == k + 4);
+        CHECK(spline.segments() == k - 3);
+        CHECK(spline.parameters.size() == k);
+
+        // Parameters run from 0 to 1, strictly increasing, and are not uniform (the spacing is uneven)
+        CHECK(spline.parameters.front() == 0.0);
+        CHECK(spline.parameters.back() == 1.0);
+        for (std::size_t i = 1; i < k; ++i)
+        {
+            CHECK(spline.parameters[i] > spline.parameters[i - 1]);
+        }
+
+        CHECK(std::abs(spline.parameters[1] - 1.0 / static_cast<double>(k - 1)) > 1e-3);
+
+        // Clamped knots: four 0s, strictly increasing interior, four 1s
+        for (int i = 0; i < 4; ++i)
+        {
+            CHECK(spline.knots[i] == 0.0);
+            CHECK(spline.knots[k + i] == 1.0);
+        }
+
+        for (std::size_t i = 3; i < k; ++i)
+        {
+            CHECK(spline.knots[i] < spline.knots[i + 1]);
+        }
+
+        // The curve passes through every input point, at that point's parameter
+        for (std::size_t i = 0; i < k; ++i)
+        {
+            CHECK_NEAR((spline.value(spline.parameters[i]) - points[i]).norm(), 0.0, 1e-9);
+        }
+
+        // The end control points are the first and last point (clamped), the others are not the waypoints
+        CHECK_NEAR((spline.control_points.front() - points.front()).norm(), 0.0, 1e-12);
+        CHECK_NEAR((spline.control_points.back() - points.back()).norm(), 0.0, 1e-12);
+        CHECK((spline.control_points[10] - points[10]).norm() > 1e-3);
+
+        // Fewer than four points cannot define a cubic
+        bool threw = false;
+        try
+        {
+            cricket::fit_cubic_bspline(std::vector<Eigen::Vector3d>(points.begin(), points.begin() + 3));
+        }
+        catch (const std::invalid_argument &)
+        {
+            threw = true;
+        }
+
+        CHECK(threw);
     }
 
     if (failures != 0)
