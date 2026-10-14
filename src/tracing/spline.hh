@@ -2,6 +2,7 @@
 
 #include <Eigen/Dense>
 
+#include <algorithm>
 #include <cstddef>
 #include <vector>
 
@@ -60,6 +61,45 @@ namespace cricket
         auto segments() const -> std::size_t
         {
             return control_points.size() - degree;
+        }
+
+        // Knot span i with knots[i] <= t < knots[i + 1], in [degree, size() - 1]. Only these spans have
+        // length (the clamped end knots are repeated), and t = 1 belongs to the last one.
+        auto find_span(double t) const -> std::size_t
+        {
+            const std::size_t n = control_points.size();
+            if (t >= knots[n])
+            {
+                return n - 1;
+            }
+
+            if (t <= knots[degree])
+            {
+                return degree;
+            }
+
+            // first knot greater than t, among knots[degree] .. knots[n]; the span is the one before it
+            const auto upper = std::upper_bound(knots.begin() + degree, knots.begin() + n + 1, t);
+            return static_cast<std::size_t>(upper - knots.begin()) - 1;
+        }
+
+        // Point on the curve at t (clamped to [0, 1]): the four basis values of t's span weight the four
+        // control points that influence that span.
+        auto value(double t) const -> Eigen::Vector3d
+        {
+            t = std::clamp(t, 0.0, 1.0);
+            const auto span = find_span(t);
+
+            double basis[degree + 1];
+            bspline_basis<double, degree>(&knots[span], t, basis);
+
+            Eigen::Vector3d point = Eigen::Vector3d::Zero();
+            for (int j = 0; j <= degree; ++j)
+            {
+                point += basis[j] * control_points[span - degree + j];
+            }
+
+            return point;
         }
     };
 }  // namespace cricket
