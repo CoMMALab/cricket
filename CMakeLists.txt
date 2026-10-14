@@ -184,6 +184,25 @@ if(BUILD_TESTING)
   target_include_directories(spline_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
   target_link_libraries(spline_test PRIVATE cricket::cricket)
   add_test(NAME spline_test COMMAND spline_test)
+
+  add_executable(spline_trace_test tests/spline_trace_test.cc)
+  target_include_directories(spline_trace_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_link_libraries(spline_trace_test PRIVATE cricket::cricket)
+  add_test(NAME spline_trace_test COMMAND spline_trace_test)
+
+  # Not a test: evaluates the spline constraint without tracing and through the traced kernel, and prints both
+  add_executable(spline_kernel_eval tests/spline_kernel_eval.cc)
+  target_include_directories(spline_kernel_eval PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_link_libraries(spline_kernel_eval PRIVATE cricket::cricket ${CMAKE_DL_LIBS})
+  target_compile_definitions(spline_kernel_eval PRIVATE
+      CRICKET_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+      CRICKET_CXX="${CMAKE_CXX_COMPILER}")
+
+  # Not a test: prints the generated spline kernel, to read it
+  add_executable(print_spline_kernel tests/print_spline_kernel.cc)
+  target_link_libraries(print_spline_kernel PRIVATE cricket::cricket)
+  target_compile_definitions(print_spline_kernel PRIVATE
+      CRICKET_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 add_executable(fkcc_gen src/fkcc_gen.cc)

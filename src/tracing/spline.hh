@@ -106,6 +106,29 @@ namespace cricket
 
             return point;
         }
+
+        // dP/dt. The derivative of a degree-3 B-spline is a degree-2 B-spline on the same knots whose control
+        // points are Q_m = 3 (P_{m+1} - P_m) / (U_{m+4} - U_{m+1}) (the hodograph).
+        auto derivative(double t) const -> Eigen::Vector3d
+        {
+            t = std::clamp(t, 0.0, 1.0);
+            const auto span = find_span(t);
+
+            // degree - 1 = 2: three basis functions, N_{span-2,2} .. N_{span,2}
+            double basis[degree];
+            bspline_basis<double, degree - 1>(&knots[span], t, basis);
+
+            Eigen::Vector3d velocity = Eigen::Vector3d::Zero();
+            for (int j = 0; j < degree; ++j)
+            {
+                const std::size_t m = span - degree + j;  // Q_m pairs with the basis function N_{m+1,2}
+                const Eigen::Vector3d q = static_cast<double>(degree) * (control_points[m + 1] - control_points[m]) /
+                                          (knots[m + degree + 1] - knots[m + 1]);
+                velocity += basis[j] * q;
+            }
+
+            return velocity;
+        }
     };
 
     // Order of the inputs of the traced spline constraint, for a spline with N control points (N is fixed when

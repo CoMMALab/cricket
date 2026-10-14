@@ -4,7 +4,7 @@
 #include "se3_ops.hh"
 #include "cholesky.hh"
 #include "bounded_ls.hh"
-#include "spline.hh"
+#include "spline_trace.hh"
 
 #include <pinocchio/algorithm/center-of-mass.hpp>
 #include <pinocchio/algorithm/frames.hpp>
@@ -48,102 +48,6 @@ namespace cricket
             return SE3Tpl<ADCG>(rotation, translation);
         }
 
-        // The spline part of the traced inputs: the curve parameter, and the data of a spline with N control
-        // points (its control points and knots)
-        template <std::size_t N>
-        struct SplineInputs
-        {
-            ADCG t;
-            std::array<Eigen::Vector3<ADCG>, SplineInputLayout<N>::control_points> control_points;
-            std::array<ADCG, SplineInputLayout<N>::knots> knots;
-        };
-
-        // Read the spline inputs off the input tape, which is laid out as SplineInputLayout<N> says; `nq` is
-        // the number of joints in front of them.
-        template <std::size_t N>
-        auto read_spline(const ADVectorXs &inp, std::size_t nq) -> SplineInputs<N>
-        {
-            using Layout = SplineInputLayout<N>;
-
-            SplineInputs<N> spline;
-            spline.t = inp[Layout::t_idx(nq)];
-
-            for (auto point = 0U; point < Layout::control_points; ++point)
-            {
-                for (auto axis = 0U; axis < 3; ++axis)
-                {
-                    spline.control_points[point][axis] = inp[Layout::control_point_idx(nq, point, axis)];
-                }
-            }
-
-            for (auto i = 0U; i < Layout::knots; ++i)
-            {
-                spline.knots[i] = inp[Layout::knot_idx(nq, i)];
-            }
-
-            return spline;
-        }
-
-        // Point on the spline at the traced parameter t.
-        //
-        // The span containing t is chosen inside the trace: for each span a CondExp picks that span's window
-        // (the four control points that influence it, and the six knots bspline_basis reads) when t lies
-        // before the span's end, and otherwise keeps the choice made for the later spans. Spans are visited
-        // from the last to the first, so the result is the first span whose end is after t, and t = 1 stays
-        // in the last span. The selected values do not depend on t, so d(point)/dt flows only through the
-        // basis. bspline_basis then runs once, not once per span.
-        template <std::size_t N>
-        auto spline_point(const SplineInputs<N> &spline) -> Eigen::Vector3<ADCG>
-        {
-            constexpr std::size_t degree = CubicBSpline::degree;
-            constexpr std::size_t window_knots = 2 * degree;  // U[i - 2] .. U[i + 3] for span i
-
-            std::array<Eigen::Vector3<ADCG>, degree + 1> window_points;
-            std::array<ADCG, window_knots> window;
-
-            // start from the last span, i = N - 1
-            for (auto j = 0U; j <= degree; ++j)
-            {
-                window_points[j] = spline.control_points[N - 1 - degree + j];
-            }
-
-            for (auto j = 0U; j < window_knots; ++j)
-            {
-                window[j] = spline.knots[N - 1 - (degree - 1) + j];
-            }
-
-            for (std::size_t span = N - 2; span >= degree; --span)
-            {
-                const ADCG &span_end = spline.knots[span + 1];
-
-                for (auto j = 0U; j <= degree; ++j)
-                {
-                    for (auto axis = 0U; axis < 3; ++axis)
-                    {
-                        window_points[j][axis] = CondExpLt(
-                            spline.t, span_end, spline.control_points[span - degree + j][axis], window_points[j][axis]);
-                    }
-                }
-
-                for (auto j = 0U; j < window_knots; ++j)
-                {
-                    window[j] = CondExpLt(spline.t, span_end, spline.knots[span - (degree - 1) + j], window[j]);
-                }
-            }
-
-            // window[degree - 1] is the span's start knot U[i]; bspline_basis reads from U[i - 2] to U[i + 3]
-            ADCG basis[degree + 1];
-            bspline_basis<ADCG, degree>(&window[degree - 1], spline.t, basis);
-
-            Eigen::Vector3<ADCG> point = basis[0] * window_points[0];
-            for (auto j = 1U; j <= degree; ++j)
-            {
-                point += basis[j] * window_points[j];
-            }
-
-            return point;
-        }
-
         // se(3) displacement of a relative transform: [translation; log3(rotation)].
         auto se3_displacement(const SE3Tpl<ADCG> &transform) -> ADVectorXs
         {
@@ -177,7 +81,11 @@ namespace cricket
                 throw std::runtime_error("TSR-style errors use the se(3) log map, which needs conditionals the rust language cannot emit");
             }
 
-            const std::string language = (conditionals and language_in == "c++") ? "c++_block" : language_in;
+            // "c++_scalar" is plain scalar C++, where each conditional prints as if/else: it runs on doubles,
+            // for tests and for reading the code. The vamp kernels use the block language.
+            const std::string language = language_in == "c++_scalar"           ? "c++"
+                                         : (conditionals and language_in == "c++") ? "c++_block"
+                                                                                   : language_in;
 
             CodeHandler<double> handler;
             CppAD::vector<CGD> ind_vars(num_inp);
@@ -280,6 +188,20 @@ namespace cricket
             ad_inp[i] = ADCG(0.0);
         }
 
+        // The tape is recorded at these values, so they must be a valid spline: the basis recursion divides by
+        // knot differences, and all-zero knots would give 0 / 0 = NaN on the tape (which CppAD rejects). The
+        // recorded operations (including each CondExp) do not depend on the values, only the check does.
+        // Clamped uniform knots, t in the middle.
+        ad_inp[Layout::t_idx(nq)] = ADCG(0.5);
+        for (std::size_t i = 0; i < Layout::knots; ++i)
+        {
+            const double knot = i < CubicBSpline::degree + 1 ? 0.0
+                                : i >= N                      ? 1.0
+                                                              : static_cast<double>(i - CubicBSpline::degree) /
+                                                                    static_cast<double>(N - CubicBSpline::degree);
+            ad_inp[Layout::knot_idx(nq, i)] = ADCG(knot);
+        }
+
         Independent(ad_inp);
 
         ADVectorXs ad_q(nq);
@@ -292,8 +214,8 @@ namespace cricket
         updateFramePlacements(ad_model, ad_data);
 
         // position error of the first end-effector against the curve point at t
-        const auto spline = read_spline<N>(ad_inp, nq);
-        const Eigen::Vector3<ADCG> curve_point = spline_point<N>(spline);
+        const auto spline = read_spline<ADCG, N>(ad_inp, nq);
+        const Eigen::Vector3<ADCG> curve_point = spline_point<ADCG, N>(spline);
         const Eigen::Vector3<ADCG> eef_position = ad_data.oMf[info.end_effector_indexes[0]].translation();
 
         constexpr std::size_t n_out = 3;

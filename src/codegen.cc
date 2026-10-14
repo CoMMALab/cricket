@@ -229,6 +229,26 @@ namespace cricket
             }
         }
 
+        // Position constraint against a cubic B-spline curve with the curve parameter as an extra variable
+        // ("spline_constraint": true). The kernel selects the spline span with conditionals (SIMD blends), so
+        // it is C++ only (requesting it for rust is an error), and generated only on request: it is large.
+        // The number of control points is fixed in the kernel (see spline_control_points).
+        const bool spline_constraint = data.value("spline_constraint", false);
+        if (spline_constraint and language == "rust")
+        {
+            throw std::runtime_error("\"spline_constraint\" needs conditionals, which the rust language cannot emit");
+        }
+
+        data["has_spline_constraint"] = spline_constraint;
+        if (spline_constraint)
+        {
+            constexpr std::size_t spline_control_points = 20;
+            data["spline_control_points"] = spline_control_points;
+            data["spline_knots"] = spline_control_points + 4;
+
+            set_trace(trace_spline_error<spline_control_points>(robot, language), "spline_error");
+        }
+
         // Center-of-mass kinematics. "com": true is the world-frame CoM. An object selects the frame:
         //   {"frame": "world"}                                 world-frame CoM (the default frame)
         //   {"frame": "feet", "reference_frames": [f1, f2]}    CoM minus the mean position of the reference

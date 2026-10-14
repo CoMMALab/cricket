@@ -74,7 +74,8 @@ namespace cricket
     // curve parameter t as an extra variable: err = FK(q).translation - P(t) (3 rows).
     // Input: q (nq), t, control points (3 N, x y z per point), knots (N + 4); see SplineInputLayout in
     // tracing/spline.hh. Output: d(err)/d(q, t) (3 x (nq + 1), row-major, t last), then the error (3).
-    // Uses conditionals, so it is generated only for the C++ language (as SIMD blends). Instantiated for N = 20.
+    // Uses conditionals, so it is generated only for the C++ language (as SIMD blends); "c++_scalar" gives
+    // plain scalar C++ (conditionals as if/else) that runs on doubles, for tests. Instantiated for N = 20.
     template <std::size_t N>
     auto trace_spline_error(const RobotInfo &info, const std::string &language) -> Traced;
 
