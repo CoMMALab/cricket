@@ -4,6 +4,7 @@
 #include "se3_ops.hh"
 #include "cholesky.hh"
 #include "bounded_ls.hh"
+#include "spline.hh"
 
 #include <pinocchio/algorithm/center-of-mass.hpp>
 #include <pinocchio/algorithm/frames.hpp>
@@ -15,6 +16,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <array>
 #include <iterator>
 #include <stdexcept>
 
@@ -44,6 +46,42 @@ namespace cricket
             }
 
             return SE3Tpl<ADCG>(rotation, translation);
+        }
+
+        // The spline part of the traced inputs: the curve parameter, and the data of a spline with N control
+        // points (its control points and knots)
+        template <std::size_t N>
+        struct SplineInputs
+        {
+            ADCG t;
+            std::array<Eigen::Vector3<ADCG>, SplineInputLayout<N>::control_points> control_points;
+            std::array<ADCG, SplineInputLayout<N>::knots> knots;
+        };
+
+        // Read the spline inputs off the input tape, which is laid out as SplineInputLayout<N> says; `nq` is
+        // the number of joints in front of them.
+        template <std::size_t N>
+        auto read_spline(const ADVectorXs &inp, std::size_t nq) -> SplineInputs<N>
+        {
+            using Layout = SplineInputLayout<N>;
+
+            SplineInputs<N> spline;
+            spline.t = inp[Layout::t_idx(nq)];
+
+            for (auto point = 0U; point < Layout::control_points; ++point)
+            {
+                for (auto axis = 0U; axis < 3; ++axis)
+                {
+                    spline.control_points[point][axis] = inp[Layout::control_point_idx(nq, point, axis)];
+                }
+            }
+
+            for (auto i = 0U; i < Layout::knots; ++i)
+            {
+                spline.knots[i] = inp[Layout::knot_idx(nq, i)];
+            }
+
+            return spline;
         }
 
         // se(3) displacement of a relative transform: [translation; log3(rotation)].
