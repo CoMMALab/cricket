@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <stdexcept>
 #include <vector>
+#include <iostream>
 
 static int failures = 0;
 
@@ -210,6 +211,55 @@ int main()
         }
 
         CHECK(threw);
+    }
+
+    std::cout << "spline_test: " << failures << " check(s) failed\n";
+
+    // Trace input layout for N = 20 control points and a 7-joint robot:
+    // q at 0..6, t at 7, control points at 8..67, knots at 68..91, 92 inputs in all
+    {
+        using Layout = cricket::SplineInputLayout<20>;
+        constexpr std::size_t nq = 7;
+
+        static_assert(Layout::control_points == 20);
+        static_assert(Layout::knots == 24);
+        static_assert(Layout::pieces == 17);
+        static_assert(Layout::spline_inputs == 85);
+
+        CHECK(Layout::t_idx(nq) == 7);
+        CHECK(Layout::control_point_idx(nq, 0, 0) == 8);
+        CHECK(Layout::control_point_idx(nq, 0, 2) == 10);
+        CHECK(Layout::control_point_idx(nq, 1, 0) == 11);
+        CHECK(Layout::control_point_idx(nq, 19, 2) == 67);
+        CHECK(Layout::knot_idx(nq, 0) == 68);
+        CHECK(Layout::knot_idx(nq, 23) == 91);
+        CHECK(Layout::total(nq) == 92);
+
+        // Every input has exactly one slot: the indices of q, t, control points and knots tile 0 .. total - 1
+        std::vector<int> seen(Layout::total(nq), 0);
+        for (std::size_t j = 0; j < nq; ++j)
+        {
+            ++seen[j];
+        }
+
+        ++seen[Layout::t_idx(nq)];
+        for (std::size_t p = 0; p < Layout::control_points; ++p)
+        {
+            for (std::size_t axis = 0; axis < 3; ++axis)
+            {
+                ++seen[Layout::control_point_idx(nq, p, axis)];
+            }
+        }
+
+        for (std::size_t i = 0; i < Layout::knots; ++i)
+        {
+            ++seen[Layout::knot_idx(nq, i)];
+        }
+
+        for (const auto count : seen)
+        {
+            CHECK(count == 1);
+        }
     }
 
     if (failures != 0)
