@@ -381,6 +381,8 @@ struct {{name}}
     template <std::size_t rake, typename InputVector, typename OutputVector>
     static inline auto tsr_error(const InputVector &x, OutputVector &out) noexcept
     {
+        // V is referenced by the SIMD blends emitted for the se(3) log map's conditionals
+        using V = FloatVector<rake, 1>;
         std::array<FloatVector<rake, 1>, {{tsr_error_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{tsr_error_code_output}}> y;
 
@@ -424,6 +426,8 @@ struct {{name}}
     template <std::size_t rake, typename InputVector, typename OutputVector>
     static inline auto tsr_bimanual_error(const InputVector &x, OutputVector &out) noexcept
     {
+        // V is referenced by the SIMD blends emitted for the se(3) log map's conditionals
+        using V = FloatVector<rake, 1>;
         std::array<FloatVector<rake, 1>, {{tsr_bimanual_error_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{tsr_bimanual_error_code_output}}> y;
 
@@ -579,6 +583,8 @@ struct {{name}}
     template <std::size_t rake, typename InputVector, typename OutputVector>
     static inline auto lead_screw_error(const InputVector &x, OutputVector &out) noexcept
     {
+        // V is referenced by the SIMD blends emitted for the se(3) log map's conditionals
+        using V = FloatVector<rake, 1>;
         std::array<FloatVector<rake, 1>, {{lead_screw_error_code_vars}}> v;
         std::array<FloatVector<rake, 1>, {{lead_screw_error_code_output}}> y;
 

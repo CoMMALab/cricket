@@ -58,13 +58,26 @@ namespace cricket
         // nq inputs are the configuration. The bound inputs are part of the tape but do not
         // affect the emitted error: hinging the error against the bounds during tracing would
         // wrongly zero gradients, so the hinge is applied at runtime in vamp instead.
+        //
+        // `conditionals` marks errors whose tape contains CondExp operations (the se(3) log map, through
+        // CppAD's atan2). Those are generated with the block language, which turns each into a SIMD
+        // blend; the scalar C++ language would print `if/else`, which cannot take SIMD vectors, and the
+        // Rust backend cannot emit conditionals at all.
         auto emit_error_and_jacobian(
             ADFun<CGD> &error_func,
             std::size_t num_inp,
             std::size_t nq,
             std::size_t n_out,
-            const std::string &language) -> Traced
+            const std::string &language_in,
+            bool conditionals = false) -> Traced
         {
+            if (conditionals and language_in == "rust")
+            {
+                throw std::runtime_error("TSR-style errors use the se(3) log map, which needs conditionals the rust language cannot emit");
+            }
+
+            const std::string language = (conditionals and language_in == "c++") ? "c++_block" : language_in;
+
             CodeHandler<double> handler;
             CppAD::vector<CGD> ind_vars(num_inp);
             handler.makeVariables(ind_vars);
@@ -139,7 +152,7 @@ namespace cricket
         }
 
         ADFun<CGD> error_func(ad_inp, data);
-        return emit_error_and_jacobian(error_func, num_inp, nq, n_out, language);
+        return emit_error_and_jacobian(error_func, num_inp, nq, n_out, language, true);
     }
 
     auto trace_tsr_bimanual_error(
@@ -189,7 +202,7 @@ namespace cricket
         ADVectorXs data = se3_displacement(errT);
 
         ADFun<CGD> error_func(ad_inp, data);
-        return emit_error_and_jacobian(error_func, num_inp, nq, task_dim, language);
+        return emit_error_and_jacobian(error_func, num_inp, nq, task_dim, language, true);
     }
 
     auto trace_solve_tsr(
@@ -446,7 +459,7 @@ namespace cricket
         data[0] = displacement[2] - advance_per_radian * displacement[5];
 
         ADFun<CGD> error_func(ad_inp, data);
-        return emit_error_and_jacobian(error_func, num_inp, nq, 1, language);
+        return emit_error_and_jacobian(error_func, num_inp, nq, 1, language, true);
     }
 
     auto trace_twist_jacobians(const RobotInfo &info, const std::string &language) -> Traced
