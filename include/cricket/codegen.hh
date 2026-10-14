@@ -99,13 +99,23 @@ namespace cricket
         bool relative = false) -> Traced;
 
     // Projection step from an arbitrary stacked error and Jacobian with err_size rows.
-    // Input: J (err_size x nq, row-major), then err (err_size); for ProjMethod::BoundedLS also
-    // lower - q (nq) and upper - q (nq). Output: gradient (nq).
+    // Input: J (err_size x n_vars, row-major), then err (err_size); for ProjMethod::BoundedLS also
+    // lower - x (n_vars) and upper - x (n_vars). Output: gradient (n_vars).
+    // The unknowns x are the nq joints followed by `extra_vars` more variables (0 for the TSR constraints).
     auto trace_solve_jacobian(
         const RobotInfo &info,
         const std::string &language,
         ProjMethod method,
-        std::size_t err_size) -> Traced;
+        std::size_t err_size,
+        std::size_t extra_vars = 0) -> Traced;
+
+    // Projection step for the spline constraint (see trace_spline_error): err is the 3-vector position error
+    // and the unknowns are the joints followed by the curve parameter t, so n_vars = nq + 1.
+    // Input: J (3 x (nq + 1), row-major), then err (3); for ProjMethod::BoundedLS also lower - x (nq + 1) and
+    // upper - x (nq + 1), where the last entry of each is 0 - t and 1 - t (this is what bounds t to [0, 1]).
+    // These inputs are exactly the outputs of trace_spline_error, in the same order, followed by the bounds.
+    // Output: step (nq + 1), the last entry being the step in t.
+    auto trace_solve_spline(const RobotInfo &info, const std::string &language, ProjMethod method) -> Traced;
 
     // Center-of-mass position and Jacobian, optionally expressed relative to the mean
     // position of a set of reference (body) frames, e.g. the feet of a standing humanoid so

@@ -2,7 +2,7 @@
 //
 //   1. non-traced: forward kinematics and the Jacobian from pinocchio, the curve point and its derivative
 //      from the host spline (src/tracing/spline.hh). Plain code, no CppAD.
-//   2. traced: the generated kernel (trace_spline_error, in the "c++_scalar" language, plain C++ where each
+//   2. traced: the generated kernels (trace_spline_error and trace_solve_spline, in the "c++_scalar" language, plain C++ where each
 //      conditional is an if/else). The code is written to a temporary file, compiled into a shared library
 //      with the compiler this was built with, loaded, and called.
 //
@@ -17,7 +17,8 @@
 //              are the waypoints (default: tests/eef_bookshelf_small.json; a helix if that file is missing)
 //   keep       keep the generated source and library (their paths are printed)
 //   dump       write a JSON file (spline, waypoints, arm, projection steps) that tests/view_spline.py shows in viser
-//   iterations number of Gauss-Newton projection steps recorded in the dump
+//   iterations projection steps from (q, t) onto the curve, run on the generated error kernel and the generated
+//              bounded least-squares solve (t kept in [0, 1]); the iterates are printed and go into the dump
 //
 // To plug in other numbers, change the arguments, or edit the `Inputs` section in main().
 
@@ -121,61 +122,88 @@ namespace
         return x;
     }
 
-    // Compile the traced code into a shared library, load it, and run it on `x`
-    auto traced_output(
-        const cricket::Traced &traced,
-        const std::vector<double> &x,
-        bool keep) -> std::vector<double>
+    // A traced function compiled into a shared library and loaded, so it can be called many times:
+    // kernel(x) runs the generated code on the flat input vector x and returns its outputs.
+    class LoadedKernel
     {
-        const auto directory = std::filesystem::temp_directory_path() / ("spline_kernel_eval_" + std::to_string(::getpid()));
-        std::filesystem::create_directories(directory);
-
-        const auto source = directory / "kernel.cc";
-        const auto library = directory / "kernel.so";
+    public:
+        LoadedKernel(const cricket::Traced &traced, const std::string &name, bool keep)
+          : outputs_(traced.outputs)
+          , directory_(
+                std::filesystem::temp_directory_path() /
+                ("spline_kernel_eval_" + std::to_string(::getpid()) + "_" + name))
+          , keep_(keep)
         {
-            std::ofstream out(source);
-            out << "#include <cmath>\n"
-                << "using std::sin; using std::cos; using std::sqrt; using std::atan2; using std::fabs;\n"
-                << "extern \"C\" void kernel(const double *x, double *y)\n{\n"
-                << "    double v[" << std::max<std::size_t>(traced.temp_variables, 1) << "];\n"
-                << traced.code << "\n}\n";
+            std::filesystem::create_directories(directory_);
+
+            const auto source = directory_ / "kernel.cc";
+            const auto library = directory_ / "kernel.so";
+            {
+                std::ofstream out(source);
+                out << "#include <cmath>\n"
+                    << "using std::sin; using std::cos; using std::sqrt; using std::atan2; using std::fabs;\n"
+                    << "extern \"C\" void kernel(const double *x, double *y)\n{\n"
+                    << "    double v[" << std::max<std::size_t>(traced.temp_variables, 1) << "];\n"
+                    << traced.code << "\n}\n";
+            }
+
+            const std::string command = std::string(CRICKET_CXX) + " -O1 -shared -fPIC -o " + library.string() +
+                                        " " + source.string() + " 2>&1";
+            if (std::system(command.c_str()) != 0)
+            {
+                throw std::runtime_error("compiling the generated kernel failed: " + command);
+            }
+
+            handle_ = dlopen(library.c_str(), RTLD_NOW);
+            if (handle_ == nullptr)
+            {
+                throw std::runtime_error(std::string("dlopen failed: ") + dlerror());
+            }
+
+            kernel_ = reinterpret_cast<Function>(dlsym(handle_, "kernel"));
+            if (kernel_ == nullptr)
+            {
+                throw std::runtime_error("the generated library has no `kernel` symbol");
+            }
+
+            if (keep_)
+            {
+                std::printf("kept %s: %s, %s\n\n", name.c_str(), source.c_str(), library.c_str());
+            }
         }
 
-        const std::string command = std::string(CRICKET_CXX) + " -O1 -shared -fPIC -o " + library.string() + " " +
-                                    source.string() + " 2>&1";
-        if (std::system(command.c_str()) != 0)
+        ~LoadedKernel()
         {
-            throw std::runtime_error("compiling the generated kernel failed: " + command);
+            if (handle_ != nullptr)
+            {
+                dlclose(handle_);
+            }
+
+            if (not keep_)
+            {
+                std::filesystem::remove_all(directory_);
+            }
         }
 
-        void *handle = dlopen(library.c_str(), RTLD_NOW);
-        if (handle == nullptr)
+        LoadedKernel(const LoadedKernel &) = delete;
+        auto operator=(const LoadedKernel &) -> LoadedKernel & = delete;
+
+        auto operator()(const std::vector<double> &x) const -> std::vector<double>
         {
-            throw std::runtime_error(std::string("dlopen failed: ") + dlerror());
+            std::vector<double> y(outputs_, 0.0);
+            kernel_(x.data(), y.data());
+            return y;
         }
 
-        using Kernel = void (*)(const double *, double *);
-        const auto kernel = reinterpret_cast<Kernel>(dlsym(handle, "kernel"));
-        if (kernel == nullptr)
-        {
-            throw std::runtime_error("the generated library has no `kernel` symbol");
-        }
+    private:
+        using Function = void (*)(const double *, double *);
 
-        std::vector<double> y(traced.outputs, 0.0);
-        kernel(x.data(), y.data());
-        dlclose(handle);
-
-        if (keep)
-        {
-            std::printf("kept: %s, %s\n\n", source.c_str(), library.c_str());
-        }
-        else
-        {
-            std::filesystem::remove_all(directory);
-        }
-
-        return y;
-    }
+        std::size_t outputs_;
+        std::filesystem::path directory_;
+        bool keep_;
+        void *handle_ = nullptr;
+        Function kernel_ = nullptr;
+    };
 
     void print_output(const char *label, const std::vector<double> &y, std::size_t nq)
     {
@@ -285,6 +313,76 @@ namespace
             trail.push_back(next);
         }
 
+        return trail;
+    }
+
+    // The same projection as project(), but on the generated code: each step runs the error kernel (J and err at
+    // (q, t)), appends the allowed step to every bound (limit - x; t is bounded to [0, 1]), runs the bounded
+    // least-squares solve, and applies  x <- x - gradient.  Prints one row per iterate.
+    auto project_traced(
+        const cricket::RobotInfo &info,
+        const LoadedKernel &error_kernel,
+        const LoadedKernel &solve_kernel,
+        const Eigen::VectorXd &q0,
+        double t0,
+        const cricket::CubicBSpline &spline,
+        std::size_t iterations) -> std::vector<Iterate>
+    {
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+        const std::size_t n = nq + 1;  // the unknowns: the joints and t
+
+        std::printf("projection on the generated kernels (error kernel, then the bounded solve)\n");
+        std::printf("  step   |err| (m)          t   |gradient|\n");
+
+        std::vector<Iterate> trail{{q0, t0}};
+        for (std::size_t iteration = 0; iteration <= iterations; ++iteration)
+        {
+            const auto &current = trail.back();
+
+            // stage 1: [J (3 x n, row-major), err (3)], which is also the start of the solve's input
+            auto solve_input = error_kernel(kernel_inputs(current.q, current.t, spline));
+            const double error_norm =
+                Eigen::Vector3d(solve_input[3 * n], solve_input[3 * n + 1], solve_input[3 * n + 2]).norm();
+
+            // the allowed step to the lower bounds, then to the upper bounds
+            for (std::size_t joint = 0; joint < nq; ++joint)
+            {
+                solve_input.push_back(info.model.lowerPositionLimit[static_cast<Eigen::Index>(joint)] - current.q[joint]);
+            }
+
+            solve_input.push_back(0.0 - current.t);
+            for (std::size_t joint = 0; joint < nq; ++joint)
+            {
+                solve_input.push_back(info.model.upperPositionLimit[static_cast<Eigen::Index>(joint)] - current.q[joint]);
+            }
+
+            solve_input.push_back(1.0 - current.t);
+
+            // stage 2: the step (nq joints, then t)
+            const auto gradient = solve_kernel(solve_input);
+            double gradient_norm = 0.0;
+            for (const double g : gradient)
+            {
+                gradient_norm += g * g;
+            }
+
+            std::printf("  %4zu   %.6f   %.5f   %.3e\n", iteration, error_norm, current.t, std::sqrt(gradient_norm));
+            if (iteration == iterations)
+            {
+                break;
+            }
+
+            Iterate next = current;
+            for (std::size_t joint = 0; joint < nq; ++joint)
+            {
+                next.q[joint] -= gradient[joint];
+            }
+
+            next.t = std::clamp(current.t - gradient[nq], 0.0, 1.0);
+            trail.push_back(next);
+        }
+
+        std::printf("\n");
         return trail;
     }
 
@@ -604,7 +702,8 @@ int main(int argc, char **argv)
         print_output("non-traced (pinocchio + host spline)", expected, nq);
 
         const auto traced = cricket::trace_spline_error<N>(info, "c++_scalar");
-        const auto actual = traced_output(traced, kernel_inputs(q, t, spline), keep);
+        const LoadedKernel error_kernel(traced, "error", keep);
+        const auto actual = error_kernel(kernel_inputs(q, t, spline));
         print_output("traced kernel (generated code, compiled and loaded)", actual, nq);
 
         double worst = 0.0;
@@ -613,18 +712,40 @@ int main(int argc, char **argv)
             worst = std::max(worst, std::abs(expected[i] - actual[i]));
         }
 
-        std::printf("largest difference between the two: %.3e\n", worst);
+        std::printf("largest difference between the two: %.3e\n\n", worst);
 
-        if (not dump.empty())
+        // The projection loop on the generated code: the error kernel and the bounded solve with t in [0, 1]
+        if (iterations > 0)
         {
-            const auto trail = project(info, q, t, spline, iterations);
-            write_dump(dump, info, spline, waypoints, expected, actual, trail);
+            const auto solve = cricket::trace_solve_spline(info, "c++_scalar", cricket::ProjMethod::BoundedLS);
+            const LoadedKernel solve_kernel(solve, "solve", keep);
+            const auto trail = project_traced(info, error_kernel, solve_kernel, q, t, spline, iterations);
+
+            // ... against the stand-in (plain Gauss-Newton with pinocchio's Jacobian, no bounds)
+            const auto reference_trail = project(info, q, t, spline, iterations);
+            double dq = 0.0;
+            for (std::size_t joint = 0; joint < nq; ++joint)
+            {
+                dq = std::max(dq, std::abs(trail.back().q[joint] - reference_trail.back().q[joint]));
+            }
+
             std::printf(
-                "dump written to %s (%zu projection steps: |err| %.4f -> %.6f); view with tests/view_spline.py\n",
-                dump.c_str(),
-                iterations,
-                (arm_positions(info, trail.front().q).back() - spline.value(trail.front().t)).norm(),
-                (arm_positions(info, trail.back().q).back() - spline.value(trail.back().t)).norm());
+                "final state, generated kernels vs the Gauss-Newton stand-in: max |dq| = %.2e, |dt| = %.2e\n"
+                "(they need not match exactly: the traced solve is damped and keeps q and t inside their bounds)\n\n",
+                dq,
+                std::abs(trail.back().t - reference_trail.back().t));
+
+            if (not dump.empty())
+            {
+                write_dump(dump, info, spline, waypoints, expected, actual, trail);
+                std::printf(
+                    "dump written to %s (%zu projection steps on the generated kernels: |err| %.4f -> %.6f); "
+                    "view with tests/view_spline.py\n",
+                    dump.c_str(),
+                    iterations,
+                    (arm_positions(info, trail.front().q).back() - spline.value(trail.front().t)).norm(),
+                    (arm_positions(info, trail.back().q).back() - spline.value(trail.back().t)).norm());
+            }
         }
 
         return worst < 1e-6 ? 0 : 1;

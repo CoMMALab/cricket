@@ -290,15 +290,23 @@ namespace cricket
             info, language, method, task_dim * (relative ? 1 : info.end_effector_indexes.size()));
     }
 
+    auto trace_solve_spline(const RobotInfo &info, const std::string &language, ProjMethod method) -> Traced
+    {
+        // err is the 3-vector position error, and the unknowns are the joints plus the curve parameter t
+        return trace_solve_jacobian(info, language, method, 3, 1);
+    }
+
     auto trace_solve_jacobian(
         const RobotInfo &info,
         const std::string &language,
         ProjMethod method,
-        std::size_t err_size) -> Traced
+        std::size_t err_size,
+        std::size_t extra_vars) -> Traced
     {
         constexpr double damp = 1e-6;
 
-        const auto nq = static_cast<std::size_t>(info.model.nq);
+        // The unknowns: the joints, and any extra variables the constraint adds (the spline's curve parameter)
+        const auto n_vars = static_cast<std::size_t>(info.model.nq) + extra_vars;
 
         const bool bounded = method == ProjMethod::BoundedLS;
         if (bounded and language == "rust")
@@ -307,13 +315,17 @@ namespace cricket
             throw std::runtime_error("ProjMethod::BoundedLS is not supported for the rust language");
         }
 
-        // The SIMD blends the conditionals compile to come from the block language
-        const std::string lang = (bounded and language == "c++") ? "c++_block" : language;
+        // The SIMD blends the conditionals compile to come from the block language; "c++_scalar" is plain
+        // scalar C++ (conditionals as if/else) that runs on doubles, for tests
+        const std::string lang = language == "c++_scalar"           ? "c++"
+                                 : (bounded and language == "c++") ? "c++_block"
+                                                                   : language;
 
         // Input layout (must match vamp's JacobianProjectInp::operator[]):
-        // J (err_size x nq, row-major), then err (err_size), then, for BoundedLS only, the allowed step
-        // to the lower joint limit (lower - q, nq) and to the upper limit (upper - q, nq)
-        const std::size_t num_inp = err_size * nq + err_size + (bounded ? 2 * nq : 0);
+        // J (err_size x n_vars, row-major), then err (err_size), then, for BoundedLS only, the allowed step
+        // to the lower bound (lower - x, n_vars) and to the upper bound (upper - x, n_vars), where x is the
+        // joints followed by any extra variables
+        const std::size_t num_inp = err_size * n_vars + err_size + (bounded ? 2 * n_vars : 0);
 
         ADVectorXs ad_inp(num_inp);
         for (auto i = 0U; i < num_inp; ++i)
@@ -323,22 +335,22 @@ namespace cricket
 
         Independent(ad_inp);
 
-        ADMatrixXs J(err_size, nq);
+        ADMatrixXs J(err_size, n_vars);
         for (auto i = 0U; i < err_size; ++i)
         {
-            for (auto j = 0U; j < nq; ++j)
+            for (auto j = 0U; j < n_vars; ++j)
             {
-                J(i, j) = ad_inp[i * nq + j];
+                J(i, j) = ad_inp[i * n_vars + j];
             }
         }
 
         ADVectorXs err(err_size);
         for (auto i = 0U; i < err_size; ++i)
         {
-            err[i] = ad_inp[err_size * nq + i];
+            err[i] = ad_inp[err_size * n_vars + i];
         }
 
-        ADVectorXs grad(nq);
+        ADVectorXs grad(n_vars);
         switch (method)
         {
             case ProjMethod::InnerLM:
@@ -351,7 +363,7 @@ namespace cricket
             }
             case ProjMethod::OuterLM:
             {
-                ADMatrixXs identity = ADMatrixXs::Identity(nq, nq);
+                ADMatrixXs identity = ADMatrixXs::Identity(n_vars, n_vars);
                 const auto factor =
                     cholesky_factor<ADMatrixXs, ADCG>(J.transpose() * J + identity * damp);
                 grad = cholesky_solve<ADMatrixXs, ADVectorXs, ADCG>(factor, J.transpose() * err);
@@ -364,16 +376,16 @@ namespace cricket
             }
             case ProjMethod::BoundedLS:
             {
-                ADVectorXs lower(nq);
-                ADVectorXs upper(nq);
-                for (auto i = 0U; i < nq; ++i)
+                ADVectorXs lower(n_vars);
+                ADVectorXs upper(n_vars);
+                for (auto i = 0U; i < n_vars; ++i)
                 {
-                    lower[i] = ad_inp[err_size * nq + err_size + i];
-                    upper[i] = ad_inp[err_size * nq + err_size + nq + i];
+                    lower[i] = ad_inp[err_size * n_vars + err_size + i];
+                    upper[i] = ad_inp[err_size * n_vars + err_size + n_vars + i];
                 }
 
                 // Every iteration either fixes a joint at a bound, frees one, or finishes the solve
-                const std::size_t iterations = std::min<std::size_t>(nq + 2, 10);
+                const std::size_t iterations = std::min<std::size_t>(n_vars + 2, 10);
                 grad = bounded_ls_step<ADMatrixXs, ADVectorXs, ADCG>(J, err, lower, upper, damp, iterations);
                 break;
             }

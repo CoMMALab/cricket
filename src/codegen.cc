@@ -247,6 +247,8 @@ namespace cricket
             data["spline_knots"] = spline_control_points + 4;
 
             set_trace(trace_spline_error<spline_control_points>(robot, language), "spline_error");
+            // The bound on t needs the bounded solver; the others would leave t unbounded
+            set_trace(trace_solve_spline(robot, language, ProjMethod::BoundedLS), "solve_spline_error_bounded_ls");
         }
 
         // Center-of-mass kinematics. "com": true is the world-frame CoM. An object selects the frame:
