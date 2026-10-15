@@ -496,6 +496,56 @@ struct {{name}}
     {% endif %}
     {% endif %}
 
+    {% if has_spline_constraint %}
+    //
+    // Spline constraint: the first end-effector's position lies on a cubic B-spline curve. The curve
+    // parameter t in [0, 1] is an extra unknown next to the joints, so the projection works on
+    // (q, t) and the error is the 3-vector  FK(q).translation - P(t).
+    //
+
+    // The spline has this many control points and knots (fixed when the kernel is generated)
+    static constexpr std::size_t spline_control_points = {{spline_control_points}};
+    static constexpr std::size_t spline_knots = {{spline_knots}};
+
+    // Unknowns of the spline projection: the joints, then t
+    static constexpr std::size_t spline_variables = dimension + 1;
+
+    // Input: q (dimension), then t, then the control points (3 * spline_control_points, x y z per point), then the
+    // knots (spline_knots). Output: d(err)/d(q, t) (3 * spline_variables, row-major, t the last column), then
+    // the raw error (3).
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto spline_error(const InputVector &x, OutputVector &out) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the span selection's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{spline_error_code_vars}}> v;
+        std::array<V, {{spline_error_code_output}}> y;
+
+        {{spline_error_code}}
+
+        for (auto i = 0U; i < {{spline_error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Bounded least-squares projection step for the spline error.
+    // Input: the outputs of spline_error (J then err), then lower - x (spline_variables entries) and upper - x
+    // (spline_variables entries): the allowed step to each bound, where x is q followed by t. The joints' entries
+    // are their limits minus q; the last entry of each is 0 - t and 1 - t, which keeps t in [0, 1].
+    // Output: the gradient (spline_variables entries, so one more than a ConfigurationBlock holds), applied as
+    // x <- x - gradient; its last entry is the step in t.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_spline_error_bounded_ls(const InputVector &x, OutputVector &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{solve_spline_error_bounded_ls_code_vars}}> v;
+
+        {{solve_spline_error_bounded_ls_code}}
+    }
+    {% endif %}
+
     {% if has_com %}
     //
     // Center-of-mass kinematics

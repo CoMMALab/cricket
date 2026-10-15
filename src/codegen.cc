@@ -475,6 +475,7 @@ namespace cricket
             "closed_loops",
             "lead_screw",
             "twist",
+            "spline_constraint",
         };
         static const std::vector<std::string_view> bounds_keys = {"lower", "upper"};
         static const std::vector<std::string_view> com_keys = {"frame", "reference_frames"};

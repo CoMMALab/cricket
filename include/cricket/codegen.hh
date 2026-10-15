@@ -159,8 +159,8 @@ namespace cricket
     auto trace_twist_jacobians(const RobotInfo &info, const std::string &language) -> Traced;
 
     // Derive every JSON-gated constraint kernel (TSR, bimanual TSR, center-of-mass,
-    // closed loops, lead screw, twist Jacobians) from the recipe keys already present in
-    // `data` ("constraints", "com", "closed_loops", "lead_screw", "twist"), tracing the
+    // closed loops, lead screw, twist Jacobians, the spline constraint) from the recipe keys already present in
+    // `data` ("constraints", "com", "closed_loops", "lead_screw", "twist", "spline_constraint"), tracing the
     // kernels and setting the has_* template gates. Shared by the offline generator
     // (fkcc_gen) and the JIT path (generate_robot_source) so both accept the same keys.
     auto derive_constraint_traces(const RobotInfo &robot, nlohmann::json &data, const std::string &language)
