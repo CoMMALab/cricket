@@ -1,0 +1,10 @@
+{
+    "name": "RidgebackDualPanda",
+    "urdf": "ridgebackdualpanda/ridgebackdualpanda_spherized.urdf",
+    "srdf": "ridgebackdualpanda/ridgebackdualpanda.srdf",
+    "end_effector": "gripper0_right_eef",
+    "resolution": 64,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "ridgebackdualpanda_fk.hh"
+}
