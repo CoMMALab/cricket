@@ -634,7 +634,7 @@ int main(int argc, char **argv)
 
         // The waypoints come from the first trajectory in this file (its first N end-effector positions), unless
         // waypoints= is given or the file does not exist (then the helix above is used)
-        std::string trajectory_path = std::string(CRICKET_SOURCE_DIR) + "/tests/eef_bookshelf_small.json";
+        std::string trajectory_path = "/tmp/eef_bookshelf_small.json";
         bool waypoints_given = false;
         std::vector<Eigen::VectorXd> waypoint_configurations;  // the configurations at the first N points
 
@@ -795,42 +795,44 @@ int main(int argc, char **argv)
 
         std::printf("largest difference between the two: %.3e\n\n", worst);
 
-        // The closest-t kernel: the closest point of the spline to FK(q), t* and the squared distance, against a dense
-        // scan and Newton in double on the host
+        // The closest-t kernel (the distance to the spline): t* and the squared distance of a configuration. Built
+        // here so the checks below, and the check after the projection, share it.
+        using ClosestLayout = cricket::SplineClosestLayout<N>;
+
+        const auto closest_traced = cricket::trace_spline_closest_t<N>(info, "c++_scalar");
+        const LoadedKernel closest_kernel(closest_traced, "closest_t", keep);
+
+        const auto traced_closest = [&](const Eigen::VectorXd &configuration) -> std::pair<double, double>
         {
-            using ClosestLayout = cricket::SplineClosestLayout<N>;
-
-            const auto closest_traced = cricket::trace_spline_closest_t<N>(info, "c++_scalar");
-            const LoadedKernel closest_kernel(closest_traced, "closest_t", keep);
-
-            const auto traced_closest = [&](const Eigen::VectorXd &configuration) -> std::pair<double, double>
+            std::vector<double> x(ClosestLayout::total(nq), 0.0);
+            for (std::size_t joint = 0; joint < nq; ++joint)
             {
-                std::vector<double> x(ClosestLayout::total(nq), 0.0);
-                for (std::size_t joint = 0; joint < nq; ++joint)
+                x[joint] = configuration[joint];
+            }
+
+            for (std::size_t point = 0; point < N; ++point)
+            {
+                for (std::size_t axis = 0; axis < 3; ++axis)
                 {
-                    x[joint] = configuration[joint];
+                    x[ClosestLayout::control_point_idx(nq, point, axis)] = spline.control_points[point][axis];
+                    x[ClosestLayout::waypoint_idx(nq, point, axis)] = waypoints[point][axis];
                 }
 
-                for (std::size_t point = 0; point < N; ++point)
-                {
-                    for (std::size_t axis = 0; axis < 3; ++axis)
-                    {
-                        x[ClosestLayout::control_point_idx(nq, point, axis)] = spline.control_points[point][axis];
-                        x[ClosestLayout::waypoint_idx(nq, point, axis)] = waypoints[point][axis];
-                    }
+                x[ClosestLayout::parameter_idx(nq, point)] = spline.parameters[point];
+            }
 
-                    x[ClosestLayout::parameter_idx(nq, point)] = spline.parameters[point];
-                }
+            for (std::size_t i = 0; i < ClosestLayout::knots; ++i)
+            {
+                x[ClosestLayout::knot_idx(nq, i)] = spline.knots[i];
+            }
 
-                for (std::size_t i = 0; i < ClosestLayout::knots; ++i)
-                {
-                    x[ClosestLayout::knot_idx(nq, i)] = spline.knots[i];
-                }
+            const auto out = closest_kernel(x);
+            return {out[0], out[1]};
+        };
 
-                const auto out = closest_kernel(x);
-                return {out[0], out[1]};
-            };
-
+        // The closest-t kernel against a dense scan and Newton in double on the host, for q as given and for the
+        // configurations that are on the curve by construction
+        {
             // q as given: usually off the curve, so this compares t* and the distance with the true closest point
             const auto [traced_t, traced_d2] = traced_closest(q);
             const auto [host_t, host_d2] = host_closest(spline, arm_positions(info, q).back());
@@ -988,6 +990,29 @@ int main(int argc, char **argv)
                     "has t free\n\n",
                     trail.front().t,
                     trail.back().t);
+            }
+
+            // The distance function on the projected configuration: its closest t should be the t the projection
+            // ended at (when t was free), and its distance the projection's remaining error
+            {
+                const Eigen::VectorXd &final_q = trail.back().q;
+                const double projected_t = trail.back().t;
+                const Eigen::Vector3d final_position = arm_positions(info, final_q).back();
+                const double projection_d2 = (final_position - spline.value(projected_t)).squaredNorm();
+                const auto [closest_final_t, closest_final_d2] = traced_closest(final_q);
+
+                std::printf(
+                    "after the projection, the distance function (closest-t kernel) at the final q:%s\n"
+                    "  t at the end of the projection %.6f, closest t* %.6f, |difference| %.2e\n"
+                    "  squared error at the projected t %.3e, squared distance to the spline %.3e\n"
+                    "(the distance cannot exceed the error, since t* is the closest point; they agree when the "
+                    "projection's t is the closest t)\n\n",
+                    pin_t ? "  [t was pinned, so it need not be the closest t]" : "",
+                    projected_t,
+                    closest_final_t,
+                    std::abs(projected_t - closest_final_t),
+                    projection_d2,
+                    closest_final_d2);
             }
 
             if (not dump.empty())
