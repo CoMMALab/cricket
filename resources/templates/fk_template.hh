@@ -529,6 +529,33 @@ struct {{name}}
         }
     }
 
+    // Projection steps for the spline error, as for the TSR error. Input: the outputs of spline_error (J, then
+    // err). Output: the gradient (spline_variables entries: the joints, then t), applied as x <- x - gradient. These
+    // do not bound t, so the caller clamps it to [0, 1]; the bounded variant below does.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_spline_error_lm_inner(const InputVector &x, OutputVector &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_spline_error_lm_inner_code_vars}}> v;
+
+        {{solve_spline_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_spline_error_lm_outer(const InputVector &x, OutputVector &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_spline_error_lm_outer_code_vars}}> v;
+
+        {{solve_spline_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_spline_error_gradient_descent(const InputVector &x, OutputVector &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_spline_error_gradient_descent_code_vars}}> v;
+
+        {{solve_spline_error_gradient_descent_code}}
+    }
+
     // Bounded least-squares projection step for the spline error.
     // Input: the outputs of spline_error (J then err), then lower - x (spline_variables entries) and upper - x
     // (spline_variables entries): the allowed step to each bound, where x is q followed by t. The joints' entries

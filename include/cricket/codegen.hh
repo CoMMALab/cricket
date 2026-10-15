@@ -125,6 +125,7 @@ namespace cricket
     // and the unknowns are the joints followed by the curve parameter t, so n_vars = nq + 1.
     // Input: J (3 x (nq + 1), row-major), then err (3); for ProjMethod::BoundedLS also lower - x (nq + 1) and
     // upper - x (nq + 1), where the last entry of each is 0 - t and 1 - t (this is what bounds t to [0, 1]).
+    // The other methods (InnerLM, OuterLM, GradDesc) take no bounds and leave t unbounded; callers clamp it.
     // These inputs are exactly the outputs of trace_spline_error, in the same order, followed by the bounds.
     // Output: step (nq + 1), the last entry being the step in t.
     auto trace_solve_spline(const RobotInfo &info, const std::string &language, ProjMethod method) -> Traced;

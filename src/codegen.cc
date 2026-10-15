@@ -248,7 +248,12 @@ namespace cricket
 
             set_trace(trace_spline_error<spline_control_points>(robot, language), "spline_error");
             set_trace(trace_spline_seed<spline_control_points>(robot, language), "spline_seed");
-            // The bound on t needs the bounded solver; the others would leave t unbounded
+            // All four projection methods, as for the TSR error. The unknowns are the joints and t; only the bounded
+            // solver enforces t in [0, 1], so the others leave t unbounded and the caller clamps it.
+            set_trace(trace_solve_spline(robot, language, ProjMethod::InnerLM), "solve_spline_error_lm_inner");
+            set_trace(trace_solve_spline(robot, language, ProjMethod::OuterLM), "solve_spline_error_lm_outer");
+            set_trace(
+                trace_solve_spline(robot, language, ProjMethod::GradDesc), "solve_spline_error_gradient_descent");
             set_trace(trace_solve_spline(robot, language, ProjMethod::BoundedLS), "solve_spline_error_bounded_ls");
         }
 
