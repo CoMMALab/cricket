@@ -8,7 +8,7 @@
 //
 // Both give  y = [ d(err)/d(q, t) (3 x (nq + 1), row-major, t last), err (3) ]  with  err = FK(q) - P(t).
 //
-//   spline_kernel_eval [t=0.4] [q=a,b,c,...] [waypoints=file.txt] [keep=1] [dump=out.json] [iterations=15]
+//   spline_kernel_eval [t=0.4] [q=a,b,c,...] [waypoints=file.txt] [keep=1] [dump=out.json] [iterations=15] [method=bounded] [pin_t=0]
 //
 //   t          curve parameter in [0, 1]
 //   q          joint values, one per joint of the robot
@@ -19,6 +19,8 @@
 //   dump       write a JSON file (spline, waypoints, arm, projection steps) that tests/view_spline.py shows in viser
 //   iterations projection steps from (q, t) onto the curve, run on the generated error kernel and the generated
 //              bounded least-squares solve (t kept in [0, 1]); the iterates are printed and go into the dump
+//   method     projection solve: bounded (default), inner, outer or gradient (the four generated solves)
+//   pin_t      1 = project with t held fixed (the t column of J is zeroed): point IK toward P(t); t must not move
 //
 // To plug in other numbers, change the arguments, or edit the `Inputs` section in main().
 
@@ -36,6 +38,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
@@ -43,9 +46,11 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -254,6 +259,41 @@ namespace
         return points;
     }
 
+    // The closest point of the host spline to x, by a dense scan and then Gauss-Newton steps on t (double precision):
+    // the reference for the closest-t kernel. Returns {t, squared distance}.
+    auto host_closest(const cricket::CubicBSpline &spline, const Eigen::Vector3d &x) -> std::pair<double, double>
+    {
+        constexpr int samples = 20001;
+
+        double best_t = 0.0;
+        double best_d2 = std::numeric_limits<double>::infinity();
+        for (int i = 0; i < samples; ++i)
+        {
+            const double t = i / static_cast<double>(samples - 1);
+            const double d2 = (x - spline.value(t)).squaredNorm();
+            if (d2 < best_d2)
+            {
+                best_d2 = d2;
+                best_t = t;
+            }
+        }
+
+        double t = best_t;
+        for (int iteration = 0; iteration < 30; ++iteration)
+        {
+            const Eigen::Vector3d velocity = spline.derivative(t);
+            const double denominator = velocity.squaredNorm();
+            if (denominator < 1e-18)
+            {
+                break;
+            }
+
+            t = std::clamp(t + (x - spline.value(t)).dot(velocity) / denominator, 0.0, 1.0);
+        }
+
+        return {t, (x - spline.value(t)).squaredNorm()};
+    }
+
     // Joint origins (base to last joint) and then the end-effector, in the world frame
     auto arm_positions(const cricket::RobotInfo &info, const Eigen::VectorXd &q) -> std::vector<Eigen::Vector3d>
     {
@@ -326,13 +366,19 @@ namespace
         const Eigen::VectorXd &q0,
         double t0,
         const cricket::CubicBSpline &spline,
-        std::size_t iterations) -> std::vector<Iterate>
+        std::size_t iterations,
+        const std::string &method_name,
+        bool bounded,
+        bool pin_t) -> std::vector<Iterate>
     {
         const auto nq = static_cast<std::size_t>(info.model.nq);
         const std::size_t n = nq + 1;  // the unknowns: the joints and t
 
-        std::printf("projection on the generated kernels (error kernel, then the bounded solve)\n");
-        std::printf("  step   |err| (m)          t   |gradient|\n");
+        std::printf(
+            "projection on the generated kernels (error kernel, then the %s solve%s)\n",
+            method_name.c_str(),
+            pin_t ? ", t pinned: its Jacobian column is zeroed, so t must not move" : "");
+        std::printf("  step   |err| (m)          t   |gradient|   gradient_t\n");
 
         std::vector<Iterate> trail{{q0, t0}};
         for (std::size_t iteration = 0; iteration <= iterations; ++iteration)
@@ -344,19 +390,35 @@ namespace
             const double error_norm =
                 Eigen::Vector3d(solve_input[3 * n], solve_input[3 * n + 1], solve_input[3 * n + 2]).norm();
 
-            // the allowed step to the lower bounds, then to the upper bounds
-            for (std::size_t joint = 0; joint < nq; ++joint)
+            // Pinning t is zeroing its column of J (what ConstraintSet::set_pinned does for a coordinate): the
+            // solve then has nothing to move t with, and the projection is point IK toward P(t)
+            if (pin_t)
             {
-                solve_input.push_back(info.model.lowerPositionLimit[static_cast<Eigen::Index>(joint)] - current.q[joint]);
+                for (std::size_t row = 0; row < 3; ++row)
+                {
+                    solve_input[row * n + nq] = 0.0;
+                }
             }
 
-            solve_input.push_back(0.0 - current.t);
-            for (std::size_t joint = 0; joint < nq; ++joint)
+            // the bounded solve also takes the allowed step to the lower bounds, then to the upper bounds; the
+            // other methods take only J and err
+            if (bounded)
             {
-                solve_input.push_back(info.model.upperPositionLimit[static_cast<Eigen::Index>(joint)] - current.q[joint]);
-            }
+                for (std::size_t joint = 0; joint < nq; ++joint)
+                {
+                    solve_input.push_back(
+                        info.model.lowerPositionLimit[static_cast<Eigen::Index>(joint)] - current.q[joint]);
+                }
 
-            solve_input.push_back(1.0 - current.t);
+                solve_input.push_back(0.0 - current.t);
+                for (std::size_t joint = 0; joint < nq; ++joint)
+                {
+                    solve_input.push_back(
+                        info.model.upperPositionLimit[static_cast<Eigen::Index>(joint)] - current.q[joint]);
+                }
+
+                solve_input.push_back(1.0 - current.t);
+            }
 
             // stage 2: the step (nq joints, then t)
             const auto gradient = solve_kernel(solve_input);
@@ -366,7 +428,13 @@ namespace
                 gradient_norm += g * g;
             }
 
-            std::printf("  %4zu   %.6f   %.5f   %.3e\n", iteration, error_norm, current.t, std::sqrt(gradient_norm));
+            std::printf(
+                "  %4zu   %.6f   %.5f   %.3e   %.3e\n",
+                iteration,
+                error_norm,
+                current.t,
+                std::sqrt(gradient_norm),
+                gradient[nq]);
             if (iteration == iterations)
             {
                 break;
@@ -568,8 +636,11 @@ int main(int argc, char **argv)
         // waypoints= is given or the file does not exist (then the helix above is used)
         std::string trajectory_path = std::string(CRICKET_SOURCE_DIR) + "/tests/eef_bookshelf_small.json";
         bool waypoints_given = false;
+        std::vector<Eigen::VectorXd> waypoint_configurations;  // the configurations at the first N points
 
         bool keep = false;
+        std::string method = "bounded";  // projection solve: bounded, inner, outer or gradient
+        bool pin_t = false;              // project with t held fixed
         std::string dump;                // write a JSON file for tests/view_spline.py
         std::size_t iterations = 15;     // projection steps in the dump
         // ---------------------------------------------------------
@@ -615,6 +686,14 @@ int main(int argc, char **argv)
             {
                 dump = value;
             }
+            else if (key == "method")
+            {
+                method = value;
+            }
+            else if (key == "pin_t")
+            {
+                pin_t = value != "0";
+            }
             else if (key == "iterations")
             {
                 iterations = static_cast<std::size_t>(std::stoul(value));
@@ -623,7 +702,7 @@ int main(int argc, char **argv)
             {
                 throw std::runtime_error(
                     "unknown argument `" + argument +
-                    "`; arguments are key=value, with keys t, q, waypoints, trajectory, keep, dump, iterations "
+                    "`; arguments are key=value, with keys t, q, waypoints, trajectory, keep, dump, iterations, method, pin_t "
                     "(for example: dump=spline.json t=0.4)");
             }
         }
@@ -637,6 +716,8 @@ int main(int argc, char **argv)
             }
 
             waypoints.assign(trajectory.positions.begin(), trajectory.positions.begin() + N);
+            waypoint_configurations.assign(
+                trajectory.configurations.begin(), trajectory.configurations.begin() + N);
             std::printf(
                 "waypoints: the first %zu of %zu end-effector points of %s #%d in %s\n",
                 N,
@@ -714,6 +795,78 @@ int main(int argc, char **argv)
 
         std::printf("largest difference between the two: %.3e\n\n", worst);
 
+        // The closest-t kernel: the closest point of the spline to FK(q), t* and the squared distance, against a dense
+        // scan and Newton in double on the host
+        {
+            using ClosestLayout = cricket::SplineClosestLayout<N>;
+
+            const auto closest_traced = cricket::trace_spline_closest_t<N>(info, "c++_scalar");
+            const LoadedKernel closest_kernel(closest_traced, "closest_t", keep);
+
+            const auto traced_closest = [&](const Eigen::VectorXd &configuration) -> std::pair<double, double>
+            {
+                std::vector<double> x(ClosestLayout::total(nq), 0.0);
+                for (std::size_t joint = 0; joint < nq; ++joint)
+                {
+                    x[joint] = configuration[joint];
+                }
+
+                for (std::size_t point = 0; point < N; ++point)
+                {
+                    for (std::size_t axis = 0; axis < 3; ++axis)
+                    {
+                        x[ClosestLayout::control_point_idx(nq, point, axis)] = spline.control_points[point][axis];
+                        x[ClosestLayout::waypoint_idx(nq, point, axis)] = waypoints[point][axis];
+                    }
+
+                    x[ClosestLayout::parameter_idx(nq, point)] = spline.parameters[point];
+                }
+
+                for (std::size_t i = 0; i < ClosestLayout::knots; ++i)
+                {
+                    x[ClosestLayout::knot_idx(nq, i)] = spline.knots[i];
+                }
+
+                const auto out = closest_kernel(x);
+                return {out[0], out[1]};
+            };
+
+            // q as given: usually off the curve, so this compares t* and the distance with the true closest point
+            const auto [traced_t, traced_d2] = traced_closest(q);
+            const auto [host_t, host_d2] = host_closest(spline, arm_positions(info, q).back());
+            std::printf(
+                "closest t for q (the kernel: seed + 3 Gauss-Newton steps on t; the host: dense scan + Newton):\n"
+                "  traced t* = %.6f, squared distance = %.6e\n"
+                "  host   t* = %.6f, squared distance = %.6e\n"
+                "  |dt| = %.2e, |d(squared distance)| = %.2e\n\n",
+                traced_t,
+                traced_d2,
+                host_t,
+                host_d2,
+                std::abs(traced_t - host_t),
+                std::abs(traced_d2 - host_d2));
+
+            // The configurations of the waypoints are on the curve by construction, at t = parameters[k]
+            if (not waypoint_configurations.empty())
+            {
+                double worst_t = 0.0;
+                double worst_d2 = 0.0;
+                for (std::size_t point = 0; point < N; ++point)
+                {
+                    const auto [t_star, d2] = traced_closest(waypoint_configurations[point]);
+                    worst_t = std::max(worst_t, std::abs(t_star - spline.parameters[point]));
+                    worst_d2 = std::max(worst_d2, d2);
+                }
+
+                std::printf(
+                    "on the curve: the %zu waypoint configurations (t = their fitted parameters, distance 0):\n"
+                    "  max |t* - parameter| = %.2e, max squared distance = %.2e\n\n",
+                    N,
+                    worst_t,
+                    worst_d2);
+            }
+        }
+
         // The seed kernel: the curve parameter of the fitted waypoint nearest to FK(q), against a plain search here
         {
             using SeedLayout = cricket::SplineSeedLayout<N>;
@@ -739,46 +892,103 @@ int main(int argc, char **argv)
 
             const double traced_seed = seed_kernel(x)[0];
 
+            // The same formula in double: the nearest waypoint k, its nearer neighbour nb in the sequence, and
+            // t = t_k + d_k / (d_k + d_nb) (t_nb - t_k)
             const Eigen::Vector3d position = arm_positions(info, q).back();
+            std::array<double, N> distance;
+            for (std::size_t point = 0; point < N; ++point)
+            {
+                distance[point] = (position - waypoints[point]).norm();
+            }
+
             std::size_t nearest = 0;
             for (std::size_t point = 1; point < N; ++point)
             {
-                if ((position - waypoints[point]).squaredNorm() < (position - waypoints[nearest]).squaredNorm())
+                if (distance[point] < distance[nearest])
                 {
                     nearest = point;
                 }
             }
 
+            std::size_t neighbour = nearest == 0 ? 1 : nearest - 1;
+            if (nearest > 0 and nearest + 1 < N and distance[nearest + 1] < distance[nearest - 1])
+            {
+                neighbour = nearest + 1;
+            }
+
+            const double weight = distance[nearest] / (distance[nearest] + distance[neighbour] + 1e-12);
+            const double host_seed =
+                spline.parameters[nearest] + weight * (spline.parameters[neighbour] - spline.parameters[nearest]);
+
+            // how good is it: against the true closest parameter, and against the plain nearest waypoint
+            const double true_t = host_closest(spline, position).first;
             std::printf(
-                "seed for t: traced kernel %.6f, nearest waypoint on the host %.6f (waypoint %zu of %zu), difference %.2e\n"
-                "(the seed is only as fine as the waypoint spacing; the projection below refines t)\n\n",
-                traced_seed,
-                spline.parameters[nearest],
+                "seed for t (nearest waypoint %zu, nearer neighbour %zu, weight %.3f):\n"
+                "  traced kernel %.6f, same formula on the host %.6f, difference %.2e\n"
+                "  error against the true closest t: weighted seed %.2e, plain nearest waypoint %.2e\n"
+                "(the seed is only a starting guess; the projection and the closest-t kernel refine it)\n\n",
                 nearest,
-                N,
-                std::abs(traced_seed - spline.parameters[nearest]));
+                neighbour,
+                weight,
+                traced_seed,
+                host_seed,
+                std::abs(traced_seed - host_seed),
+                std::abs(host_seed - true_t),
+                std::abs(spline.parameters[nearest] - true_t));
         }
 
         // The projection loop on the generated code: the error kernel and the bounded solve with t in [0, 1]
         if (iterations > 0)
         {
-            const auto solve = cricket::trace_solve_spline(info, "c++_scalar", cricket::ProjMethod::BoundedLS);
-            const LoadedKernel solve_kernel(solve, "solve", keep);
-            const auto trail = project_traced(info, error_kernel, solve_kernel, q, t, spline, iterations);
-
-            // ... against the stand-in (plain Gauss-Newton with pinocchio's Jacobian, no bounds)
-            const auto reference_trail = project(info, q, t, spline, iterations);
-            double dq = 0.0;
-            for (std::size_t joint = 0; joint < nq; ++joint)
+            cricket::ProjMethod projection_method = cricket::ProjMethod::BoundedLS;
+            if (method == "inner")
             {
-                dq = std::max(dq, std::abs(trail.back().q[joint] - reference_trail.back().q[joint]));
+                projection_method = cricket::ProjMethod::InnerLM;
+            }
+            else if (method == "outer")
+            {
+                projection_method = cricket::ProjMethod::OuterLM;
+            }
+            else if (method == "gradient")
+            {
+                projection_method = cricket::ProjMethod::GradDesc;
+            }
+            else if (method != "bounded")
+            {
+                throw std::runtime_error("method must be bounded, inner, outer or gradient");
             }
 
-            std::printf(
-                "final state, generated kernels vs the Gauss-Newton stand-in: max |dq| = %.2e, |dt| = %.2e\n"
-                "(they need not match exactly: the traced solve is damped and keeps q and t inside their bounds)\n\n",
-                dq,
-                std::abs(trail.back().t - reference_trail.back().t));
+            const bool bounded = projection_method == cricket::ProjMethod::BoundedLS;
+            const auto solve = cricket::trace_solve_spline(info, "c++_scalar", projection_method);
+            const LoadedKernel solve_kernel(solve, "solve", keep);
+            const auto trail =
+                project_traced(info, error_kernel, solve_kernel, q, t, spline, iterations, method, bounded, pin_t);
+
+            // ... against the stand-in (plain Gauss-Newton with pinocchio's Jacobian, no bounds, t free)
+            if (not pin_t)
+            {
+                const auto reference_trail = project(info, q, t, spline, iterations);
+                double dq = 0.0;
+                for (std::size_t joint = 0; joint < nq; ++joint)
+                {
+                    dq = std::max(dq, std::abs(trail.back().q[joint] - reference_trail.back().q[joint]));
+                }
+
+                std::printf(
+                    "final state, generated kernels vs the Gauss-Newton stand-in: max |dq| = %.2e, |dt| = %.2e\n"
+                    "(they need not match exactly: the traced solves are damped, and the bounded one keeps q and t "
+                    "inside their bounds)\n\n",
+                    dq,
+                    std::abs(trail.back().t - reference_trail.back().t));
+            }
+            else
+            {
+                std::printf(
+                    "t pinned: t went from %.6f to %.6f (it must be unchanged); no stand-in comparison, which "
+                    "has t free\n\n",
+                    trail.front().t,
+                    trail.back().t);
+            }
 
             if (not dump.empty())
             {

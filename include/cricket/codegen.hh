@@ -79,17 +79,28 @@ namespace cricket
     template <std::size_t N>
     auto trace_spline_error(const RobotInfo &info, const std::string &language) -> Traced;
 
-    // Starting guess for the spline constraint's curve parameter t: the parameter of the spline's fitted waypoint
-    // nearest to the first end-effector. Input: q (nq), then the N waypoints (3 N, x y z per waypoint), then
-    // their N parameters (fit_cubic_bspline's `parameters`); see SplineSeedLayout in tracing/spline.hh.
+    // Starting guess for the spline constraint's curve parameter t: the parameter between the spline's nearest fitted
+    // waypoint and that waypoint's nearer neighbour, weighted by the distances to the two (weighted_waypoint_seed in
+    // tracing/spline_trace.hh, also used by trace_spline_closest_t). Input: q (nq), then the N waypoints (3 N, x y z per
+    // waypoint), then their N parameters (fit_cubic_bspline's `parameters`); see SplineSeedLayout in tracing/spline.hh.
     // Output: t (1). Uses conditionals, so C++ only: SIMD blends for "c++", plain scalar C++ for "c++_scalar".
     // Instantiated for N = 20.
     //
-    // CALL-OUT: this is the simple seed, as coarse as the waypoint spacing. A better one, for faster convergence of
-    // the projection, would project the end-effector onto the two chords next to the nearest waypoint and
-    // interpolate t along the closer one. Left for later.
+    // CALL-OUT: still a simple seed, exact only on the segment between the two waypoints. A better one would project the
+    // end-effector onto the two chords next to the nearest waypoint and interpolate t along the closer one, for faster
+    // convergence of whatever refines it. Left for later.
     template <std::size_t N>
     auto trace_spline_seed(const RobotInfo &info, const std::string &language) -> Traced;
+
+    // The closest point of the spline to the first end-effector, as a function of q alone: the parameter t* and the
+    // squared "distance to the spline" |FK(q) - P(t*)|^2. Input: q (nq), then the control points (3 N), the knots
+    // (N + 4), the N fitted waypoints (3 N) and their N parameters; see SplineClosestLayout in tracing/spline.hh.
+    // Output: [t*, squared distance]. t* is the seed (weighted_waypoint_seed) refined by a
+    // fixed number of Gauss-Newton steps on t with q fixed; see the definition for what that does and does not
+    // guarantee. Uses conditionals, so C++ only ("c++" gives SIMD blends, "c++_scalar" plain scalar C++).
+    // Instantiated for N = 20.
+    template <std::size_t N>
+    auto trace_spline_closest_t(const RobotInfo &info, const std::string &language) -> Traced;
 
     // Relative-pose (bimanual) TSR error between two end-effectors.
     // Input: q (nq), then the reference relative transform lTr (7), lb (6), ub (6).

@@ -202,6 +202,48 @@ namespace cricket
         }
     };
 
+    // Order of the inputs of the traced closest-t kernel, for a spline with N control points fitted through N waypoints
+    // (N is fixed when the kernel is traced); `nq` is the robot's number of joints.
+    //
+    //   [ q (nq) | control points (3 N) | knots (N + 4) | waypoints (3 N) | waypoint parameters (N) ]
+    //
+    // Everything after q is the spline's data: the curve itself (control points and knots) and the waypoints it was
+    // fitted through with the parameters at which it passes through each, used only to seed t.
+    template <std::size_t N>
+    struct SplineClosestLayout
+    {
+        static constexpr std::size_t control_points = N;
+        static constexpr std::size_t knots = N + CubicBSpline::degree + 1;
+        static constexpr std::size_t waypoints = N;
+
+        static constexpr std::size_t spline_inputs = 3 * control_points + knots + 3 * waypoints + waypoints;
+
+        static constexpr auto control_point_idx(std::size_t nq, std::size_t point, std::size_t axis) -> std::size_t
+        {
+            return nq + 3 * point + axis;
+        }
+
+        static constexpr auto knot_idx(std::size_t nq, std::size_t index) -> std::size_t
+        {
+            return nq + 3 * control_points + index;
+        }
+
+        static constexpr auto waypoint_idx(std::size_t nq, std::size_t point, std::size_t axis) -> std::size_t
+        {
+            return nq + 3 * control_points + knots + 3 * point + axis;
+        }
+
+        static constexpr auto parameter_idx(std::size_t nq, std::size_t index) -> std::size_t
+        {
+            return nq + 3 * control_points + knots + 3 * waypoints + index;
+        }
+
+        static constexpr auto total(std::size_t nq) -> std::size_t
+        {
+            return nq + spline_inputs;
+        }
+    };
+
     // Cubic B-spline that passes through `points` (at least four, R^3), by global interpolation in three
     // stages:
     //   1. parameters: point k gets t_k = (distance along the polyline up to k) / (total length), so t_0 = 0

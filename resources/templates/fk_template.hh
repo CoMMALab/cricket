@@ -46,6 +46,17 @@ struct {{name}}
     template <std::size_t rake>
     using ConfigurationBlock = FloatVector<rake, dimension>;
 
+    // The robot is its own Space for the planners: a Space names its points State, and here they are Configurations
+    // (and its own ambient robot). Planners and constraints templated on <Robot, Space = Robot> use these names, so
+    // spaces with another State (e.g. a configuration with extra coordinates) plug in without the planners
+    // assuming a Configuration. Nothing is generated for such spaces: they are header-only templates in vamp.
+    using Ambient = {{name}};
+    using State = Configuration;
+    using StateArray = ConfigurationArray;
+    using StateBuffer = ConfigurationBuffer;
+    template <std::size_t rake>
+    using StateBlock = ConfigurationBlock<rake>;
+
     template <std::size_t rake>
     struct Spheres
     {
@@ -572,13 +583,14 @@ struct {{name}}
         {{solve_spline_error_bounded_ls_code}}
     }
 
-    // Starting guess for t: the curve parameter of the waypoint nearest to the end-effector at q.
+    // Starting guess for t: the curve parameter between the waypoint nearest to the end-effector at q and that waypoint's
+    // nearer neighbour, weighted by the distances to the two.
     // Input: q (dimension), then the waypoints the spline was fitted through (3 * spline_control_points, x y z per
     // waypoint), then their curve parameters (spline_control_points). Output: t (1).
     //
-    // NOTE: this simple seed is only as fine as the waypoint spacing. A better one, for faster convergence of the
-    // projection, would project the end-effector onto the two chords next to the nearest waypoint and interpolate t
-    // along the closer one.
+    // NOTE: still a simple seed, exact only on the segment between the two waypoints. A better one, for faster
+    // convergence of whatever refines it, would project the end-effector onto the two chords next to the nearest
+    // waypoint and interpolate t along the closer one.
     template <std::size_t rake, typename InputVector, typename OutputVector>
     static inline auto spline_seed(const InputVector &x, OutputVector &out) noexcept
     {
@@ -590,6 +602,30 @@ struct {{name}}
         {{spline_seed_code}}
 
         for (auto i = 0U; i < {{spline_seed_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // The closest point of the spline to the end-effector, as a function of q alone.
+    // Input: q (dimension), then the control points (3 * spline_control_points, x y z per point), the knots
+    // (spline_knots), the waypoints the spline was fitted through (3 * spline_control_points) and their curve
+    // parameters (spline_control_points). Output: [t*, squared distance |FK(q) - P(t*)|^2] (2).
+    //
+    // t* is the seed (the distance-weighted parameter between the nearest waypoint and its nearer neighbour) refined by a fixed number of
+    // Gauss-Newton steps on t with q fixed. A squared distance near zero proves q is on the curve; a larger one only
+    // says no nearby point was found (a seed on the wrong branch gives the distance to that branch).
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto spline_closest_t(const InputVector &x, OutputVector &out) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the seed search and the step limits
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{spline_closest_t_code_vars}}> v;
+        std::array<V, {{spline_closest_t_code_output}}> y;
+
+        {{spline_closest_t_code}}
+
+        for (auto i = 0U; i < {{spline_closest_t_code_output}}; ++i)
         {
             out[i] = y[i];
         }

@@ -115,6 +115,12 @@ int main()
         const auto in = cricket::read_spline<double, N>(x, nq);
         const Eigen::Vector3d point = cricket::spline_point<double, N>(in);
         CHECK_NEAR((point - spline.value(t)).norm(), 0.0, 1e-10);
+
+        // point and velocity from one window selection (the hodograph in window terms)
+        const auto evaluated = cricket::spline_point_and_velocity<double, N>(in);
+        const Eigen::Vector3d expected_velocity = spline.derivative(t);
+        CHECK_NEAR((evaluated.point - spline.value(t)).norm(), 0.0, 1e-10);
+        CHECK_NEAR((evaluated.velocity - expected_velocity).norm(), 0.0, 1e-9 * (1.0 + expected_velocity.norm()));
     }
 
     // 2. AD<double>: record the tape once at t = 0.5, replay it at every t
@@ -168,6 +174,39 @@ int main()
             for (std::size_t joint = 0; joint < nq; ++joint)
             {
                 CHECK(jacobian[axis * n + joint] == 0.0);
+            }
+        }
+    }
+
+    // 2b. the velocity function on the tape: replayed at every t, against the host derivative
+    {
+        std::vector<AD> ax_velocity(Layout::total(nq));
+        const auto x0 = make_inputs(spline, 0.5);
+        for (std::size_t i = 0; i < ax_velocity.size(); ++i)
+        {
+            ax_velocity[i] = x0[i];
+        }
+
+        CppAD::Independent(ax_velocity);
+        const auto in_velocity = cricket::read_spline<AD, N>(ax_velocity, nq);
+        const auto evaluated_velocity = cricket::spline_point_and_velocity<AD, N>(in_velocity);
+        std::vector<AD> ay_velocity(6);
+        for (std::size_t i = 0; i < 3; ++i)
+        {
+            ay_velocity[i] = evaluated_velocity.point[i];
+            ay_velocity[3 + i] = evaluated_velocity.velocity[i];
+        }
+
+        CppAD::ADFun<double> g(ax_velocity, ay_velocity);
+        for (const double t : ts)
+        {
+            const std::vector<double> y = g.Forward(0, make_inputs(spline, t));
+            const Eigen::Vector3d expected_value = spline.value(t);
+            const Eigen::Vector3d expected_velocity = spline.derivative(t);
+            for (std::size_t i = 0; i < 3; ++i)
+            {
+                CHECK_NEAR(y[i], expected_value[i], 1e-10);
+                CHECK_NEAR(y[3 + i], expected_velocity[i], 1e-9 * (1.0 + expected_velocity.norm()));
             }
         }
     }

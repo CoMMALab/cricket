@@ -230,15 +230,16 @@ namespace cricket
 
     template auto trace_spline_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
 
-    // Starting guess for the spline's curve parameter t: the parameter of the fitted waypoint nearest to the
-    // end-effector. The waypoints and their parameters are inputs (see SplineSeedLayout), so one kernel serves any
-    // spline with N waypoints.
+    // Starting guess for the spline's curve parameter t, from the end-effector position alone: weighted_waypoint_seed
+    // (see spline_trace.hh), the parameter between the nearest fitted waypoint and its nearer neighbour, weighted by the
+    // distances to the two. The waypoints and their parameters are inputs (see SplineSeedLayout), so one kernel serves
+    // any spline with N waypoints; the closest-t kernel uses the same function for its own seed.
     //
-    // CALL-OUT: this is the simple version. The seed is only as fine as the waypoint spacing (up to about half a
-    // spacing off in t). A better seed, left for later, takes the nearest waypoint k and then projects the
-    // end-effector onto the two chords W_{k-1} -> W_k and W_k -> W_{k+1}, interpolating t along the closer one. That
-    // costs a few more operations and cuts the seed error a lot, because the curve is nearly straight between
-    // waypoints, so the projection then needs fewer iterations to converge from it.
+    // CALL-OUT: this is still a simple seed. It is exact for a point on the segment between the two waypoints and an
+    // approximation off it, and it ignores that the curve bends between waypoints. A better seed, left for later,
+    // projects the end-effector onto the two chords W_{k-1} -> W_k and W_k -> W_{k+1} and interpolates t along the
+    // closer one, which also handles points off the segment. A projection or a Newton refinement then needs fewer
+    // iterations from it.
     template <std::size_t N>
     auto trace_spline_seed(const RobotInfo &info, const std::string &language) -> Traced
     {
@@ -283,28 +284,22 @@ namespace cricket
         updateFramePlacements(ad_model, ad_data);
         const Eigen::Vector3<ADCG> eef_position = ad_data.oMf[info.end_effector_indexes[0]].translation();
 
-        // Running minimum of the squared distance to each waypoint, and the parameter of the waypoint that gave it.
-        // The seed is updated before the minimum, so both compare against the previous best.
-        ADCG best = ADCG(0.0);
-        ADCG seed = ad_inp[Layout::parameter_idx(nq, 0)];
+        // squared distance from the end-effector to every waypoint, and the waypoints' parameters
+        std::array<ADCG, Layout::waypoints> distance2;
+        std::array<ADCG, Layout::waypoints> parameters;
         for (std::size_t point = 0; point < Layout::waypoints; ++point)
         {
-            ADCG distance2 = ADCG(0.0);
+            distance2[point] = ADCG(0.0);
             for (std::size_t axis = 0; axis < 3; ++axis)
             {
                 const ADCG diff = eef_position[axis] - ad_inp[Layout::waypoint_idx(nq, point, axis)];
-                distance2 += diff * diff;
+                distance2[point] += diff * diff;
             }
 
-            if (point == 0)
-            {
-                best = distance2;
-                continue;
-            }
-
-            seed = CppAD::CondExpLt(distance2, best, ad_inp[Layout::parameter_idx(nq, point)], seed);
-            best = CppAD::CondExpLt(distance2, best, distance2, best);
+            parameters[point] = ad_inp[Layout::parameter_idx(nq, point)];
         }
+
+        const ADCG seed = weighted_waypoint_seed<ADCG, Layout::waypoints>(distance2, parameters);
 
         ADVectorXs data(1);
         data[0] = seed;
@@ -320,6 +315,159 @@ namespace cricket
     }
 
     template auto trace_spline_seed<20>(const RobotInfo &info, const std::string &language) -> Traced;
+
+    // The closest point of the spline to the end-effector, as a function of q alone: the parameter t* and the squared
+    // distance |FK(q) - P(t*)|^2 (the "distance to the spline"). Inputs: see SplineClosestLayout; outputs: [t*, squared
+    // distance].
+    //
+    //   1. x = FK(q).translation, computed once.
+    //   2. Seed: weighted_waypoint_seed, the parameter between the nearest waypoint and its nearer neighbour (in the
+    //      fitted sequence), weighted by the distances to the two.
+    //   3. `iterations` Gauss-Newton steps on t alone, with q fixed. With r = x - P(t), minimising |r|^2 over t gives
+    //      t <- t + (r . P'(t)) / (P'(t) . P'(t)). Each step is limited to one waypoint spacing and t is clamped to
+    //      [0, 1]. At a point of the curve the residual vanishes at the answer, so the step is Newton's method for a
+    //      zero-residual problem there and converges quadratically from a seed within half a waypoint spacing.
+    //   4. The squared distance at the final t.
+    //
+    // This does not certify anything: it finds the closest point on the branch the seed lands on. A residual below
+    // tolerance proves the point is on the curve; a larger one only says that no nearby point was found.
+    // The Newton steps are not accepted conditionally (no check that the residual dropped): left for later.
+    template <std::size_t N>
+    auto trace_spline_closest_t(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        using Layout = SplineClosestLayout<N>;
+        constexpr std::size_t iterations = 3;
+
+        if (info.end_effector_indexes.empty())
+        {
+            throw std::runtime_error("trace_spline_closest_t requires an end-effector");
+        }
+
+        if (language == "rust")
+        {
+            throw std::runtime_error("trace_spline_closest_t uses conditionals, which the rust language cannot emit");
+        }
+
+        const std::string lang = language == "c++_scalar" ? "c++" : language == "c++" ? "c++_block" : language;
+
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+
+        ADModel ad_model = info.model.cast<ADCG>();
+        ADData ad_data(ad_model);
+
+        const std::size_t num_inp = Layout::total(nq);
+
+        ADVectorXs ad_inp(num_inp);
+        for (auto i = 0U; i < num_inp; ++i)
+        {
+            ad_inp[i] = ADCG(0.0);
+        }
+
+        // The tape is recorded at these values, so the knots must be valid (the basis divides by knot differences):
+        // clamped uniform knots, as for the error kernel
+        for (std::size_t i = 0; i < Layout::knots; ++i)
+        {
+            const double knot = i < CubicBSpline::degree + 1 ? 0.0
+                                : i >= N                      ? 1.0
+                                                              : static_cast<double>(i - CubicBSpline::degree) /
+                                                                    static_cast<double>(N - CubicBSpline::degree);
+            ad_inp[Layout::knot_idx(nq, i)] = ADCG(knot);
+        }
+
+        Independent(ad_inp);
+
+        ADVectorXs ad_q(nq);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            ad_q[i] = ad_inp[i];
+        }
+
+        forwardKinematics(ad_model, ad_data, ad_q);
+        updateFramePlacements(ad_model, ad_data);
+        const Eigen::Vector3<ADCG> x = ad_data.oMf[info.end_effector_indexes[0]].translation();
+
+        // The spline as a SplineInputs: its data from the input tape, t to be set per evaluation
+        SplineInputs<ADCG, N> spline;
+        for (std::size_t point = 0; point < N; ++point)
+        {
+            for (std::size_t axis = 0; axis < 3; ++axis)
+            {
+                spline.control_points[point][axis] = ad_inp[Layout::control_point_idx(nq, point, axis)];
+            }
+        }
+
+        for (std::size_t i = 0; i < Layout::knots; ++i)
+        {
+            spline.knots[i] = ad_inp[Layout::knot_idx(nq, i)];
+        }
+
+        // 2. seed, the same function the seed kernel uses: squared distances to the waypoints, then the distance-weighted
+        // parameter between the nearest waypoint and its nearer neighbour
+        std::array<ADCG, N> distance2;
+        std::array<ADCG, N> parameters;
+        for (std::size_t point = 0; point < N; ++point)
+        {
+            distance2[point] = ADCG(0.0);
+            for (std::size_t axis = 0; axis < 3; ++axis)
+            {
+                const ADCG diff = x[axis] - ad_inp[Layout::waypoint_idx(nq, point, axis)];
+                distance2[point] += diff * diff;
+            }
+
+            parameters[point] = ad_inp[Layout::parameter_idx(nq, point)];
+        }
+
+        ADCG t = weighted_waypoint_seed<ADCG, N>(distance2, parameters);
+
+        // 3. Gauss-Newton on t alone, q fixed
+        const ADCG max_step = ADCG(1.0 / static_cast<double>(N - 1));
+        for (std::size_t iteration = 0; iteration < iterations; ++iteration)
+        {
+            spline.t = t;
+            const auto evaluated = spline_point_and_velocity<ADCG, N>(spline);
+
+            ADCG numerator = ADCG(0.0);
+            ADCG denominator = ADCG(1e-12);  // keeps the step finite at a stationary curve point
+            for (std::size_t axis = 0; axis < 3; ++axis)
+            {
+                numerator += (x[axis] - evaluated.point[axis]) * evaluated.velocity[axis];
+                denominator += evaluated.velocity[axis] * evaluated.velocity[axis];
+            }
+
+            ADCG step = numerator / denominator;
+            step = CppAD::CondExpGt(step, max_step, max_step, step);
+            step = CppAD::CondExpLt(step, ADCG(0.0) - max_step, ADCG(0.0) - max_step, step);
+
+            t = t + step;
+            t = CppAD::CondExpLt(t, ADCG(0.0), ADCG(0.0), t);
+            t = CppAD::CondExpGt(t, ADCG(1.0), ADCG(1.0), t);
+        }
+
+        // 4. the squared distance at the final t
+        spline.t = t;
+        const Eigen::Vector3<ADCG> closest = spline_point<ADCG, N>(spline);
+        ADCG squared_distance = ADCG(0.0);
+        for (std::size_t axis = 0; axis < 3; ++axis)
+        {
+            const ADCG diff = x[axis] - closest[axis];
+            squared_distance += diff * diff;
+        }
+
+        ADVectorXs data(2);
+        data[0] = t;
+        data[1] = squared_distance;
+        ADFun<CGD> closest_func(ad_inp, data);
+
+        // Only the values are needed: the closest point is not differentiated here
+        CodeHandler<double> handler;
+        CppAD::vector<CGD> ind_vars(num_inp);
+        handler.makeVariables(ind_vars);
+        CppAD::vector<CGD> result = closest_func.Forward(0, ind_vars);
+
+        return Traced{generate_code(handler, result, lang), handler.getTemporaryVariableCount(), result.size()};
+    }
+
+    template auto trace_spline_closest_t<20>(const RobotInfo &info, const std::string &language) -> Traced;
 
     auto trace_tsr_bimanual_error(
         const RobotInfo &info,
