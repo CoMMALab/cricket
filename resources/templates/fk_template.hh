@@ -544,6 +544,29 @@ struct {{name}}
 
         {{solve_spline_error_bounded_ls_code}}
     }
+
+    // Starting guess for t: the curve parameter of the waypoint nearest to the end-effector at q.
+    // Input: q (dimension), then the waypoints the spline was fitted through (3 * spline_control_points, x y z per
+    // waypoint), then their curve parameters (spline_control_points). Output: t (1).
+    //
+    // NOTE: this simple seed is only as fine as the waypoint spacing. A better one, for faster convergence of the
+    // projection, would project the end-effector onto the two chords next to the nearest waypoint and interpolate t
+    // along the closer one.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto spline_seed(const InputVector &x, OutputVector &out) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the nearest-waypoint search
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{spline_seed_code_vars}}> v;
+        std::array<V, {{spline_seed_code_output}}> y;
+
+        {{spline_seed_code}}
+
+        for (auto i = 0U; i < {{spline_seed_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
     {% endif %}
 
     {% if has_com %}

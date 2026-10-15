@@ -553,7 +553,7 @@ int main(int argc, char **argv)
         double t = 1.0;
 
         Eigen::VectorXd q(nq);
-        q << 1.489049, -0.146671, -2.884975, -2.174557, 2.709923, 2.35321, 1.061964;  // default joint values
+        q << 1.489049, -0.146671, -2.0884975, -2.174557, 0.709923, 2.35321, 1.061964;  // default joint values
 
         // N waypoints; the spline is fitted through them (a helix with uneven spacing)
         std::vector<Eigen::Vector3d> waypoints;
@@ -713,6 +713,51 @@ int main(int argc, char **argv)
         }
 
         std::printf("largest difference between the two: %.3e\n\n", worst);
+
+        // The seed kernel: the curve parameter of the fitted waypoint nearest to FK(q), against a plain search here
+        {
+            using SeedLayout = cricket::SplineSeedLayout<N>;
+
+            const auto seed_traced = cricket::trace_spline_seed<N>(info, "c++_scalar");
+            const LoadedKernel seed_kernel(seed_traced, "seed", keep);
+
+            std::vector<double> x(SeedLayout::total(nq), 0.0);
+            for (std::size_t joint = 0; joint < nq; ++joint)
+            {
+                x[joint] = q[joint];
+            }
+
+            for (std::size_t point = 0; point < N; ++point)
+            {
+                for (std::size_t axis = 0; axis < 3; ++axis)
+                {
+                    x[SeedLayout::waypoint_idx(nq, point, axis)] = waypoints[point][axis];
+                }
+
+                x[SeedLayout::parameter_idx(nq, point)] = spline.parameters[point];
+            }
+
+            const double traced_seed = seed_kernel(x)[0];
+
+            const Eigen::Vector3d position = arm_positions(info, q).back();
+            std::size_t nearest = 0;
+            for (std::size_t point = 1; point < N; ++point)
+            {
+                if ((position - waypoints[point]).squaredNorm() < (position - waypoints[nearest]).squaredNorm())
+                {
+                    nearest = point;
+                }
+            }
+
+            std::printf(
+                "seed for t: traced kernel %.6f, nearest waypoint on the host %.6f (waypoint %zu of %zu), difference %.2e\n"
+                "(the seed is only as fine as the waypoint spacing; the projection below refines t)\n\n",
+                traced_seed,
+                spline.parameters[nearest],
+                nearest,
+                N,
+                std::abs(traced_seed - spline.parameters[nearest]));
+        }
 
         // The projection loop on the generated code: the error kernel and the bounded solve with t in [0, 1]
         if (iterations > 0)

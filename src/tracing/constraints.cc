@@ -230,6 +230,97 @@ namespace cricket
 
     template auto trace_spline_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
 
+    // Starting guess for the spline's curve parameter t: the parameter of the fitted waypoint nearest to the
+    // end-effector. The waypoints and their parameters are inputs (see SplineSeedLayout), so one kernel serves any
+    // spline with N waypoints.
+    //
+    // CALL-OUT: this is the simple version. The seed is only as fine as the waypoint spacing (up to about half a
+    // spacing off in t). A better seed, left for later, takes the nearest waypoint k and then projects the
+    // end-effector onto the two chords W_{k-1} -> W_k and W_k -> W_{k+1}, interpolating t along the closer one. That
+    // costs a few more operations and cuts the seed error a lot, because the curve is nearly straight between
+    // waypoints, so the projection then needs fewer iterations to converge from it.
+    template <std::size_t N>
+    auto trace_spline_seed(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        using Layout = SplineSeedLayout<N>;
+
+        if (info.end_effector_indexes.empty())
+        {
+            throw std::runtime_error("trace_spline_seed requires an end-effector");
+        }
+
+        // The nearest-waypoint search is made of conditionals: SIMD blends from the block language for C++, plain
+        // if/else for "c++_scalar", and the Rust backend cannot emit them
+        if (language == "rust")
+        {
+            throw std::runtime_error("trace_spline_seed uses conditionals, which the rust language cannot emit");
+        }
+
+        const std::string lang = language == "c++_scalar" ? "c++" : language == "c++" ? "c++_block" : language;
+
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+
+        ADModel ad_model = info.model.cast<ADCG>();
+        ADData ad_data(ad_model);
+
+        const std::size_t num_inp = Layout::total(nq);
+
+        ADVectorXs ad_inp(num_inp);
+        for (auto i = 0U; i < num_inp; ++i)
+        {
+            ad_inp[i] = ADCG(0.0);
+        }
+
+        Independent(ad_inp);
+
+        ADVectorXs ad_q(nq);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            ad_q[i] = ad_inp[i];
+        }
+
+        forwardKinematics(ad_model, ad_data, ad_q);
+        updateFramePlacements(ad_model, ad_data);
+        const Eigen::Vector3<ADCG> eef_position = ad_data.oMf[info.end_effector_indexes[0]].translation();
+
+        // Running minimum of the squared distance to each waypoint, and the parameter of the waypoint that gave it.
+        // The seed is updated before the minimum, so both compare against the previous best.
+        ADCG best = ADCG(0.0);
+        ADCG seed = ad_inp[Layout::parameter_idx(nq, 0)];
+        for (std::size_t point = 0; point < Layout::waypoints; ++point)
+        {
+            ADCG distance2 = ADCG(0.0);
+            for (std::size_t axis = 0; axis < 3; ++axis)
+            {
+                const ADCG diff = eef_position[axis] - ad_inp[Layout::waypoint_idx(nq, point, axis)];
+                distance2 += diff * diff;
+            }
+
+            if (point == 0)
+            {
+                best = distance2;
+                continue;
+            }
+
+            seed = CppAD::CondExpLt(distance2, best, ad_inp[Layout::parameter_idx(nq, point)], seed);
+            best = CppAD::CondExpLt(distance2, best, distance2, best);
+        }
+
+        ADVectorXs data(1);
+        data[0] = seed;
+        ADFun<CGD> seed_func(ad_inp, data);
+
+        // Only the value is needed (no derivative: the argmin is not differentiated)
+        CodeHandler<double> handler;
+        CppAD::vector<CGD> ind_vars(num_inp);
+        handler.makeVariables(ind_vars);
+        CppAD::vector<CGD> result = seed_func.Forward(0, ind_vars);
+
+        return Traced{generate_code(handler, result, lang), handler.getTemporaryVariableCount(), result.size()};
+    }
+
+    template auto trace_spline_seed<20>(const RobotInfo &info, const std::string &language) -> Traced;
+
     auto trace_tsr_bimanual_error(
         const RobotInfo &info,
         const std::string &language,

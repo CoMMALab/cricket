@@ -171,6 +171,37 @@ namespace cricket
         }
     };
 
+    // Order of the inputs of the traced spline seed kernel, for a spline fitted through N waypoints (N is fixed when
+    // the kernel is traced); `nq` is the robot's number of joints.
+    //
+    //   [ q (nq) | waypoints (3 N, point-major: x y z of waypoint 0, then waypoint 1, ...) | parameters (N) ]
+    //
+    // The parameters are the t values at which the fitted curve passes through each waypoint (fit_cubic_bspline's
+    // `parameters`). Like the spline's control points and knots, they are data the runtime fills in per spline.
+    template <std::size_t N>
+    struct SplineSeedLayout
+    {
+        static constexpr std::size_t waypoints = N;
+
+        // the waypoint coordinates, then their parameters
+        static constexpr std::size_t seed_inputs = 3 * waypoints + waypoints;
+
+        static constexpr auto waypoint_idx(std::size_t nq, std::size_t point, std::size_t axis) -> std::size_t
+        {
+            return nq + 3 * point + axis;
+        }
+
+        static constexpr auto parameter_idx(std::size_t nq, std::size_t index) -> std::size_t
+        {
+            return nq + 3 * waypoints + index;
+        }
+
+        static constexpr auto total(std::size_t nq) -> std::size_t
+        {
+            return nq + seed_inputs;
+        }
+    };
+
     // Cubic B-spline that passes through `points` (at least four, R^3), by global interpolation in three
     // stages:
     //   1. parameters: point k gets t_k = (distance along the polyline up to k) / (total length), so t_0 = 0

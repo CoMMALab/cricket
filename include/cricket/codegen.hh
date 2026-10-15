@@ -79,6 +79,18 @@ namespace cricket
     template <std::size_t N>
     auto trace_spline_error(const RobotInfo &info, const std::string &language) -> Traced;
 
+    // Starting guess for the spline constraint's curve parameter t: the parameter of the spline's fitted waypoint
+    // nearest to the first end-effector. Input: q (nq), then the N waypoints (3 N, x y z per waypoint), then
+    // their N parameters (fit_cubic_bspline's `parameters`); see SplineSeedLayout in tracing/spline.hh.
+    // Output: t (1). Uses conditionals, so C++ only: SIMD blends for "c++", plain scalar C++ for "c++_scalar".
+    // Instantiated for N = 20.
+    //
+    // CALL-OUT: this is the simple seed, as coarse as the waypoint spacing. A better one, for faster convergence of
+    // the projection, would project the end-effector onto the two chords next to the nearest waypoint and
+    // interpolate t along the closer one. Left for later.
+    template <std::size_t N>
+    auto trace_spline_seed(const RobotInfo &info, const std::string &language) -> Traced;
+
     // Relative-pose (bimanual) TSR error between two end-effectors.
     // Input: q (nq), then the reference relative transform lTr (7), lb (6), ub (6).
     // Output: d(err)/dq (6 x nq, row-major), then the raw error (6).
