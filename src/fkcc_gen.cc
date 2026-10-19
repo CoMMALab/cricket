@@ -7,10 +7,12 @@
 #include <nlohmann/json.hpp>
 #include <cxxopts.hpp>
 
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -24,7 +26,9 @@ int main(int argc, char **argv)
     options.add_options()                                                                       //
         ("f,configuration_file", "JSON configuration filename", cxxopts::value<std::string>())  //
         ("o,output_filename", "Output JSON filename", cxxopts::value<std::string>())            //
-        ("t,output_template", "Output template filename (override configuration file)", cxxopts::value<std::string>())  //
+        ("t,output_template",
+         "Output template filename (override configuration file)",
+         cxxopts::value<std::string>())  //
         ("h,help", "Print usage")        //
         ;
 
@@ -63,16 +67,25 @@ int main(int argc, char **argv)
         throw std::runtime_error(fmt::format("Failed to parse JSON file! Error: \n{}", e.what()));
     }
 
+    cricket::validate_recipe(data);
+
     std::optional<std::filesystem::path> srdf_path = {};
     if (data.contains("srdf"))
     {
         srdf_path = parent_path / data["srdf"];
     }
 
-    std::optional<std::string> end_effector_name = {};
+    std::vector<std::string> end_effector_names;
     if (data.contains("end_effector"))
     {
-        end_effector_name = data["end_effector"];
+        if (data["end_effector"].is_array())
+        {
+            end_effector_names = data["end_effector"].get<std::vector<std::string>>();
+        }
+        else
+        {
+            end_effector_names.push_back(data["end_effector"].get<std::string>());
+        }
     }
 
     std::string language = "c++";
@@ -102,13 +115,26 @@ int main(int argc, char **argv)
     }
 
     cricket::GenOptions gen_options;
-    gen_options.urdf = parent_path / data["urdf"];
+    if (data.contains("urdf"))
+    {
+        gen_options.urdf = parent_path / data["urdf"].get<std::string>();
+    }
+    else if (data.contains("parts"))
+    {
+        // Composite recipe: part paths resolve against gen_options.urdf's parent directory,
+        // so use a placeholder (never read) inside the recipe directory.
+        gen_options.urdf = parent_path / "composite.urdf";
+    }
+    else
+    {
+        throw std::runtime_error("Recipe must contain either `urdf` or `parts`!");
+    }
     if (data.contains("dynamics_urdf"))
     {
         gen_options.dynamics_urdf = parent_path / data["dynamics_urdf"].get<std::string>();
     }
     gen_options.srdf = srdf_path;
-    gen_options.end_effector = end_effector_name;
+    gen_options.end_effectors = end_effector_names;
     gen_options.template_path = parent_path / data["template"];
     gen_options.language = language;
     gen_options.bounds = bounds;

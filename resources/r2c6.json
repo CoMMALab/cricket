@@ -1,0 +1,10 @@
+{
+    "name": "R2c6",
+    "urdf": "r2c6/r2c6_spherized.urdf",
+    "srdf": "r2c6/r2c6.srdf",
+    "resolution": 32,
+    "compact_collisions": true,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "r2c6_fk.hh"
+}
