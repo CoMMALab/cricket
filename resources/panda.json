@@ -5,6 +5,7 @@
     "end_effector": "panda_grasptarget",
     "constraints": true,
     "spline_constraint": true,
+    "catmull_rom_constraint": true,
     "lead_screw": true,
     "twist": true,
     "resolution": 32,

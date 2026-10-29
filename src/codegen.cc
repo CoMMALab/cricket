@@ -256,6 +256,45 @@ namespace cricket
             set_trace(
                 trace_solve_spline(robot, language, ProjMethod::GradDesc), "solve_spline_error_gradient_descent");
             set_trace(trace_solve_spline(robot, language, ProjMethod::BoundedLS), "solve_spline_error_bounded_ls");
+
+            // The same error and projection steps with t given (planning in (q, t), SplineSpace): the Jacobian is
+            // d(err)/dq (3 x nq) and the unknowns are the joints alone, so no dead t column goes through the solve.
+            set_trace(trace_spline_error<spline_control_points>(robot, language, true), "spline_error_fixed_t");
+            set_trace(
+                trace_solve_spline(robot, language, ProjMethod::InnerLM, true), "solve_spline_fixed_t_lm_inner");
+            set_trace(
+                trace_solve_spline(robot, language, ProjMethod::OuterLM, true), "solve_spline_fixed_t_lm_outer");
+            set_trace(
+                trace_solve_spline(robot, language, ProjMethod::GradDesc, true),
+                "solve_spline_fixed_t_gradient_descent");
+            set_trace(
+                trace_solve_spline(robot, language, ProjMethod::BoundedLS, true), "solve_spline_fixed_t_bounded_ls");
+        }
+
+        // Position constraint against a Catmull-Rom curve at a given curve parameter ("catmull_rom_constraint": true),
+        // for planning in SplineSpace. The error kernel only; the projection solvers and the space are the spline
+        // constraint's fixed-parameter ones, which this therefore needs. Conditionals again: C++ only.
+        const bool catmull_rom_constraint = data.value("catmull_rom_constraint", false);
+        if (catmull_rom_constraint and not spline_constraint)
+        {
+            throw std::runtime_error(
+                "\"catmull_rom_constraint\" needs \"spline_constraint\": true: it uses that constraint's "
+                "fixed-parameter projection solvers and SplineSpace");
+        }
+
+        if (catmull_rom_constraint and language == "rust")
+        {
+            throw std::runtime_error(
+                "\"catmull_rom_constraint\" needs conditionals, which the rust language cannot emit");
+        }
+
+        data["has_catmull_rom_constraint"] = catmull_rom_constraint;
+        if (catmull_rom_constraint)
+        {
+            constexpr std::size_t catmull_rom_points = 20;
+            data["catmull_rom_points"] = catmull_rom_points;
+
+            set_trace(trace_catmull_rom_error<catmull_rom_points>(robot, language), "catmull_rom_error");
         }
 
         // Center-of-mass kinematics. "com": true is the world-frame CoM. An object selects the frame:
@@ -483,6 +522,7 @@ namespace cricket
             "lead_screw",
             "twist",
             "spline_constraint",
+            "catmull_rom_constraint",
         };
         static const std::vector<std::string_view> bounds_keys = {"lower", "upper"};
         static const std::vector<std::string_view> com_keys = {"frame", "reference_frames"};

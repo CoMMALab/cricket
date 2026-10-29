@@ -76,8 +76,22 @@ namespace cricket
     // tracing/spline.hh. Output: d(err)/d(q, t) (3 x (nq + 1), row-major, t last), then the error (3).
     // Uses conditionals, so it is generated only for the C++ language (as SIMD blends); "c++_scalar" gives
     // plain scalar C++ (conditionals as if/else) that runs on doubles, for tests. Instantiated for N = 20.
+    //
+    // With `fixed_parameter` the curve parameter t is an input that is not differentiated, for projections that hold
+    // t at a given value (planning in (q, t), where t is part of the state): same inputs and error, and the
+    // Jacobian is d(err)/dq only (3 x nq, row-major), then the error (3).
     template <std::size_t N>
-    auto trace_spline_error(const RobotInfo &info, const std::string &language) -> Traced;
+    auto trace_spline_error(const RobotInfo &info, const std::string &language, bool fixed_parameter = false) -> Traced;
+
+    // Position error of the first end-effector against a Catmull-Rom curve through N points at a given curve
+    // parameter t, which is not differentiated: err = FK(q).translation - P(t) (3 rows).
+    // Input: q (nq), t, the N + 2 extended points (3 (N + 2), x y z per point), the N + 2 extended knots; see
+    // CatmullRomInputLayout in tracing/catmull_rom.hh. Output: d(err)/dq (3 x nq, row-major), then the error (3), the
+    // layout of trace_spline_error with a fixed parameter, so the fixed-parameter solvers (trace_solve_spline) apply.
+    // Uses conditionals, so it is generated only for the C++ language (as SIMD blends); "c++_scalar" gives plain
+    // scalar C++ that runs on doubles, for tests. Instantiated for N = 20.
+    template <std::size_t N>
+    auto trace_catmull_rom_error(const RobotInfo &info, const std::string &language) -> Traced;
 
     // Starting guess for the spline constraint's curve parameter t: the parameter between the spline's nearest fitted
     // waypoint and that waypoint's nearer neighbour, weighted by the distances to the two (weighted_waypoint_seed in
@@ -139,7 +153,14 @@ namespace cricket
     // The other methods (InnerLM, OuterLM, GradDesc) take no bounds and leave t unbounded; callers clamp it.
     // These inputs are exactly the outputs of trace_spline_error, in the same order, followed by the bounds.
     // Output: step (nq + 1), the last entry being the step in t.
-    auto trace_solve_spline(const RobotInfo &info, const std::string &language, ProjMethod method) -> Traced;
+    //
+    // With `fixed_parameter` the unknowns are the joints alone, matching trace_spline_error's fixed-parameter
+    // Jacobian (3 x nq): the gradient has nq entries and, for BoundedLS, the bounds are nq entries each.
+    auto trace_solve_spline(
+        const RobotInfo &info,
+        const std::string &language,
+        ProjMethod method,
+        bool fixed_parameter = false) -> Traced;
 
     // Center-of-mass position and Jacobian, optionally expressed relative to the mean
     // position of a set of reference (body) frames, e.g. the feet of a standing humanoid so

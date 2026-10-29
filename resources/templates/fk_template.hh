@@ -630,6 +630,193 @@ struct {{name}}
             out[i] = y[i];
         }
     }
+
+    //
+    // The same error and projection steps with t given, for planning in SplineSpace below, where t is part of the
+    // state and a projection solves for the joints alone.
+    //
+
+    // Input: as spline_error (q, t, control points, knots). Output: d(err)/dq (3 * dimension, row-major, no t
+    // column), then the raw error (3).
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto spline_error_fixed_t(const InputVector &x, OutputVector &out) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the span selection's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{spline_error_fixed_t_code_vars}}> v;
+        std::array<V, {{spline_error_fixed_t_code_output}}> y;
+
+        {{spline_error_fixed_t_code}}
+
+        for (auto i = 0U; i < {{spline_error_fixed_t_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Projection steps for spline_error_fixed_t. Input: its outputs (J, then err), and for the bounded variant then
+    // lower - q and upper - q (dimension entries each). Output: the gradient (dimension entries), applied as
+    // q <- q - gradient.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_spline_fixed_t_lm_inner(const InputVector &x, OutputVector &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_spline_fixed_t_lm_inner_code_vars}}> v;
+
+        {{solve_spline_fixed_t_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_spline_fixed_t_lm_outer(const InputVector &x, OutputVector &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_spline_fixed_t_lm_outer_code_vars}}> v;
+
+        {{solve_spline_fixed_t_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_spline_fixed_t_gradient_descent(const InputVector &x, OutputVector &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_spline_fixed_t_gradient_descent_code_vars}}> v;
+
+        {{solve_spline_fixed_t_gradient_descent_code}}
+    }
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_spline_fixed_t_bounded_ls(const InputVector &x, OutputVector &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{solve_spline_fixed_t_bounded_ls_code_vars}}> v;
+
+        {{solve_spline_fixed_t_bounded_ls_code}}
+    }
+
+    //
+    // SplineSpace: the space (q, t) of this robot's configurations extended with the spline parameter t in [0, 1],
+    // to plan over instead of the robot's own Configuration when the end-effector has to follow a curve. A state is
+    // the joints followed by t; on the manifold the end-effector sits at P(t), so t says where on the curve a state
+    // is. Collision checking and kinematics see the ambient configuration (to_ambient); the distance, which the
+    // nearest-neighbor tree shares by reading the first `dimension` scalars of a state buffer, ignores t. Exposes the
+    // same State/StateArray/StateBlock<rake>/StateBuffer family as the outer struct, so vamp's planners are templated
+    // on either.
+    //
+    struct SplineSpace
+    {
+        static constexpr const char *name = "spline_space";
+
+        // The robot this space sits over: what collision checking and the spline kernels above work on
+        using Ambient = {{name}};
+
+        // The state is the joints, then t
+        static constexpr std::size_t t_index = {{name}}::dimension;
+        static constexpr std::size_t dimension = {{name}}::dimension + 1;
+        static constexpr std::size_t sample_dimension = {{name}}::sample_dimension;
+
+        using State = FloatVector<dimension>;
+
+        struct alignas(FloatVectorAlignment) StateArray
+            : std::array<FloatT, dimension>
+        {
+        };
+
+        struct alignas(FloatVectorAlignment) StateBuffer
+            : std::array<float, State::num_scalars_rounded>
+        {
+        };
+
+        template <std::size_t rake>
+        using StateBlock = FloatVector<rake, dimension>;
+
+        static inline auto make_state(const Configuration &q, float t) noexcept -> State
+        {
+            std::array<float, dimension> state;
+            const auto array = q.to_array();
+            for (auto j = 0U; j < {{name}}::dimension; ++j)
+            {
+                state[j] = array[j];
+            }
+
+            state[t_index] = t;
+            return State(state);
+        }
+
+        static inline auto to_ambient(const State &s) noexcept -> Configuration
+        {
+            std::array<float, {{name}}::dimension> q;
+            const auto array = s.to_array();
+            for (auto j = 0U; j < {{name}}::dimension; ++j)
+            {
+                q[j] = array[j];
+            }
+
+            return Configuration(q);
+        }
+
+        static inline auto parameter(const State &s) noexcept -> float
+        {
+            return s.to_array()[t_index];
+        }
+
+        static inline auto with_ambient(const State &s, const Configuration &q) noexcept -> State
+        {
+            return make_state(q, parameter(s));
+        }
+
+        // Where a goal-directed step takes t: `step` further along the curve, up to its end
+        static inline auto advance_parameter(float t, float step) noexcept -> float
+        {
+            return (t + step < 1.0f) ? t + step : 1.0f;
+        }
+
+        // The metric ignores t
+        static inline auto distance(const State &a, const State &b) noexcept -> float
+        {
+            return {{name}}::distance(to_ambient(a), to_ambient(b));
+        }
+
+        static inline auto interpolate(const State &a, const State &b, float f) noexcept -> State
+        {
+            const auto ta = parameter(a);
+            const auto tb = parameter(b);
+            return make_state({{name}}::interpolate(to_ambient(a), to_ambient(b), f), ta + (tb - ta) * f);
+        }
+
+        static inline auto in_bounds(const State &s) noexcept -> bool
+        {
+            const auto t = parameter(s);
+            return {{name}}::in_bounds(to_ambient(s)) and t >= 0.0f and t <= 1.0f;
+        }
+    };
+    {% endif %}
+
+    {% if has_catmull_rom_constraint %}
+    //
+    // Catmull-Rom constraint: the first end-effector's position lies on a Catmull-Rom curve through
+    // catmull_rom_points points, at a given curve parameter t in [0, 1] (planning in SplineSpace). The projection
+    // solves for the joints alone, with the fixed-parameter solvers solve_spline_fixed_t_* of the spline constraint.
+    //
+
+    // The curve passes through this many points; its data is extended by a phantom point on each side
+    static constexpr std::size_t catmull_rom_points = {{catmull_rom_points}};
+
+    // Input: q (dimension), then t, then the extended points (3 * (catmull_rom_points + 2), x y z per point), then the
+    // extended knots (catmull_rom_points + 2). Output: d(err)/dq (3 * dimension, row-major), then the raw error (3):
+    // the layout of spline_error_fixed_t.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto catmull_rom_error(const InputVector &x, OutputVector &out) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the segment selection's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{catmull_rom_error_code_vars}}> v;
+        std::array<V, {{catmull_rom_error_code_output}}> y;
+
+        {{catmull_rom_error_code}}
+
+        for (auto i = 0U; i < {{catmull_rom_error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
     {% endif %}
 
     {% if has_com %}

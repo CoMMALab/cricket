@@ -5,6 +5,7 @@
 #include "cholesky.hh"
 #include "bounded_ls.hh"
 #include "spline_trace.hh"
+#include "catmull_rom.hh"
 
 #include <pinocchio/algorithm/center-of-mass.hpp>
 #include <pinocchio/algorithm/frames.hpp>
@@ -165,7 +166,7 @@ namespace cricket
     }
 
     template <std::size_t N>
-    auto trace_spline_error(const RobotInfo &info, const std::string &language) -> Traced
+    auto trace_spline_error(const RobotInfo &info, const std::string &language, bool fixed_parameter) -> Traced
     {
         using Layout = SplineInputLayout<N>;
 
@@ -224,11 +225,74 @@ namespace cricket
 
         ADFun<CGD> error_func(ad_inp, data);
 
-        // d(err)/d(q, t): the curve parameter is the input right after q, so it is the last column
-        return emit_error_and_jacobian(error_func, num_inp, nq + 1, n_out, language, true);
+        // d(err)/d(q, t): the curve parameter is the input right after q, so it is the last column. With a fixed
+        // parameter t stays on the tape as an input but only the first nq inputs are differentiated.
+        return emit_error_and_jacobian(error_func, num_inp, fixed_parameter ? nq : nq + 1, n_out, language, true);
     }
 
-    template auto trace_spline_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
+    template auto trace_spline_error<20>(const RobotInfo &info, const std::string &language, bool fixed_parameter)
+        -> Traced;
+
+    template <std::size_t N>
+    auto trace_catmull_rom_error(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        using Layout = CatmullRomInputLayout<N>;
+
+        if (info.end_effector_indexes.empty())
+        {
+            throw std::runtime_error("trace_catmull_rom_error requires an end-effector");
+        }
+
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+
+        ADModel ad_model = info.model.cast<ADCG>();
+        ADData ad_data(ad_model);
+
+        // Input layout (see CatmullRomInputLayout): q (nq), t, extended points (3 (N + 2)), extended knots (N + 2)
+        const std::size_t num_inp = Layout::total(nq);
+
+        ADVectorXs ad_inp(num_inp);
+        for (auto i = 0U; i < num_inp; ++i)
+        {
+            ad_inp[i] = ADCG(0.0);
+        }
+
+        // The tape is recorded at these values, so they must be a valid curve: the blends divide by knot differences,
+        // and all-zero knots would give 0 / 0 = NaN on the tape (which CppAD rejects). Strictly increasing knots, t in
+        // the middle; the recorded operations (including each CondExp) do not depend on the values.
+        ad_inp[Layout::t_idx(nq)] = ADCG(0.5);
+        for (std::size_t i = 0; i < Layout::knots; ++i)
+        {
+            ad_inp[Layout::knot_idx(nq, i)] = ADCG((static_cast<double>(i) - 1.0) / static_cast<double>(N - 1));
+        }
+
+        Independent(ad_inp);
+
+        ADVectorXs ad_q(nq);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            ad_q[i] = ad_inp[i];
+        }
+
+        forwardKinematics(ad_model, ad_data, ad_q);
+        updateFramePlacements(ad_model, ad_data);
+
+        // position error of the first end-effector against the curve point at t
+        const auto curve = read_catmull_rom<ADCG, N>(ad_inp, nq);
+        const Eigen::Vector3<ADCG> curve_point = catmull_rom_point<ADCG, N>(curve);
+        const Eigen::Vector3<ADCG> eef_position = ad_data.oMf[info.end_effector_indexes[0]].translation();
+
+        constexpr std::size_t n_out = 3;
+        ADVectorXs data(n_out);
+        data = eef_position - curve_point;
+
+        ADFun<CGD> error_func(ad_inp, data);
+
+        // d(err)/dq only: t and the curve data stay on the tape as inputs
+        return emit_error_and_jacobian(error_func, num_inp, nq, n_out, language, true);
+    }
+
+    template auto trace_catmull_rom_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
 
     // Starting guess for the spline's curve parameter t, from the end-effector position alone: weighted_waypoint_seed
     // (see spline_trace.hh), the parameter between the nearest fitted waypoint and its nearer neighbour, weighted by the
@@ -529,10 +593,15 @@ namespace cricket
             info, language, method, task_dim * (relative ? 1 : info.end_effector_indexes.size()));
     }
 
-    auto trace_solve_spline(const RobotInfo &info, const std::string &language, ProjMethod method) -> Traced
+    auto trace_solve_spline(
+        const RobotInfo &info,
+        const std::string &language,
+        ProjMethod method,
+        bool fixed_parameter) -> Traced
     {
-        // err is the 3-vector position error, and the unknowns are the joints plus the curve parameter t
-        return trace_solve_jacobian(info, language, method, 3, 1);
+        // err is the 3-vector position error, and the unknowns are the joints plus the curve parameter t (the joints
+        // alone when t is given)
+        return trace_solve_jacobian(info, language, method, 3, fixed_parameter ? 0 : 1);
     }
 
     auto trace_solve_jacobian(
