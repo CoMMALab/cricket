@@ -83,6 +83,13 @@ namespace cricket
     template <std::size_t N>
     auto trace_spline_error(const RobotInfo &info, const std::string &language, bool fixed_parameter = false) -> Traced;
 
+    // Position error of the first end-effector against a given target point: err = FK(q).translation - target (3 rows).
+    // Input: q (nq), then the target (3). Output: d(err)/dq (3 x nq, row-major), then the error (3): the layout of
+    // trace_spline_error with a fixed parameter, so the fixed-parameter solvers (trace_solve_spline) apply. For
+    // planning along a curve in (q, t) where the runtime evaluates the curve at t itself and hands over the point, so
+    // the curve can be of any kind and any size. No conditionals: also for rust.
+    auto trace_position_target_error(const RobotInfo &info, const std::string &language) -> Traced;
+
     // Position error of the first end-effector against a Catmull-Rom curve through N points at a given curve
     // parameter t, which is not differentiated: err = FK(q).translation - P(t) (3 rows).
     // Input: q (nq), t, the N + 2 extended points (3 (N + 2), x y z per point), the N + 2 extended knots; see

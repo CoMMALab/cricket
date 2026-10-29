@@ -789,6 +789,33 @@ struct {{name}}
     };
     {% endif %}
 
+    {% if has_position_target_constraint %}
+    //
+    // Position target constraint: the first end-effector's position equals a target point that the caller supplies, for
+    // planning along a curve in SplineSpace where the runtime evaluates the curve at the parameter t itself. The
+    // projection solves for the joints alone, with the fixed-parameter solvers solve_spline_fixed_t_* of the spline
+    // constraint.
+    //
+
+    static constexpr bool has_position_target = true;
+
+    // Input: q (dimension), then the target point (3). Output: d(err)/dq (3 * dimension, row-major), then the raw error
+    // (3): the layout of spline_error_fixed_t.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto position_target_error(const InputVector &x, OutputVector &out) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{position_target_error_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{position_target_error_code_output}}> y;
+
+        {{position_target_error_code}}
+
+        for (auto i = 0U; i < {{position_target_error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+    {% endif %}
+
     {% if has_catmull_rom_constraint %}
     //
     // Catmull-Rom constraint: the first end-effector's position lies on a Catmull-Rom curve through

@@ -233,6 +233,56 @@ namespace cricket
     template auto trace_spline_error<20>(const RobotInfo &info, const std::string &language, bool fixed_parameter)
         -> Traced;
 
+    auto trace_position_target_error(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        if (info.end_effector_indexes.empty())
+        {
+            throw std::runtime_error("trace_position_target_error requires an end-effector");
+        }
+
+        const auto nq = static_cast<std::size_t>(info.model.nq);
+
+        ADModel ad_model = info.model.cast<ADCG>();
+        ADData ad_data(ad_model);
+
+        // Input layout: q (nq), then the target point (3)
+        const std::size_t num_inp = nq + 3;
+
+        ADVectorXs ad_inp(num_inp);
+        for (auto i = 0U; i < num_inp; ++i)
+        {
+            ad_inp[i] = ADCG(0.0);
+        }
+
+        Independent(ad_inp);
+
+        ADVectorXs ad_q(nq);
+        for (auto i = 0U; i < nq; ++i)
+        {
+            ad_q[i] = ad_inp[i];
+        }
+
+        forwardKinematics(ad_model, ad_data, ad_q);
+        updateFramePlacements(ad_model, ad_data);
+
+        Eigen::Vector3<ADCG> target;
+        for (auto axis = 0U; axis < 3; ++axis)
+        {
+            target[axis] = ad_inp[nq + axis];
+        }
+
+        const Eigen::Vector3<ADCG> eef_position = ad_data.oMf[info.end_effector_indexes[0]].translation();
+
+        constexpr std::size_t n_out = 3;
+        ADVectorXs data(n_out);
+        data = eef_position - target;
+
+        ADFun<CGD> error_func(ad_inp, data);
+
+        // d(err)/dq only: the target stays on the tape as an input
+        return emit_error_and_jacobian(error_func, num_inp, nq, n_out, language);
+    }
+
     template <std::size_t N>
     auto trace_catmull_rom_error(const RobotInfo &info, const std::string &language) -> Traced
     {

@@ -297,6 +297,24 @@ namespace cricket
             set_trace(trace_catmull_rom_error<catmull_rom_points>(robot, language), "catmull_rom_error");
         }
 
+        // Position constraint against a target point that the runtime hands over ("position_target_constraint": true),
+        // for planning along a curve in SplineSpace with the curve evaluated at t by the runtime (any kind of curve,
+        // any number of points). The error kernel only; the projection solvers and the space are the spline
+        // constraint's fixed-parameter ones, which this therefore needs. No conditionals: also for rust.
+        const bool position_target_constraint = data.value("position_target_constraint", false);
+        if (position_target_constraint and not spline_constraint)
+        {
+            throw std::runtime_error(
+                "\"position_target_constraint\" needs \"spline_constraint\": true: it uses that constraint's "
+                "fixed-parameter projection solvers and SplineSpace");
+        }
+
+        data["has_position_target_constraint"] = position_target_constraint;
+        if (position_target_constraint)
+        {
+            set_trace(trace_position_target_error(robot, language), "position_target_error");
+        }
+
         // Center-of-mass kinematics. "com": true is the world-frame CoM. An object selects the frame:
         //   {"frame": "world"}                                 world-frame CoM (the default frame)
         //   {"frame": "feet", "reference_frames": [f1, f2]}    CoM minus the mean position of the reference
@@ -523,6 +541,7 @@ namespace cricket
             "twist",
             "spline_constraint",
             "catmull_rom_constraint",
+            "position_target_constraint",
         };
         static const std::vector<std::string_view> bounds_keys = {"lower", "upper"};
         static const std::vector<std::string_view> com_keys = {"frame", "reference_frames"};

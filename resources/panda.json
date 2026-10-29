@@ -6,6 +6,7 @@
     "constraints": true,
     "spline_constraint": true,
     "catmull_rom_constraint": true,
+    "position_target_constraint": true,
     "lead_screw": true,
     "twist": true,
     "resolution": 32,
