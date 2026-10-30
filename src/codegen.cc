@@ -229,6 +229,48 @@ namespace cricket
             }
         }
 
+        // Straight-line (lerp) curve constraints, for planning along a curve with the curve evaluated at t inside the
+        // error kernel and t held fixed in the projection ("lerp_r3_constraint": the first end-effector's position on a
+        // polyline in R^3; "lerp_so3r3_constraint": its pose on a polyline of poses in SO(3) x R^3, the rotations
+        // slerped, with the weight of the rotation error a runtime input). The curve has lerp_points points, a
+        // constant of the generated header; the points and their parameters are inputs. Each kernel comes with the
+        // projection solvers for its error (3 rows, 6 rows). The segment of t is picked by conditionals, so these are
+        // for C++ only.
+        constexpr std::size_t lerp_points = 20;
+        const bool lerp_r3_constraint = data.value("lerp_r3_constraint", false);
+        const bool lerp_so3r3_constraint = data.value("lerp_so3r3_constraint", false);
+        if ((lerp_r3_constraint or lerp_so3r3_constraint) and language == "rust")
+        {
+            throw std::runtime_error(
+                "\"lerp_r3_constraint\" and \"lerp_so3r3_constraint\" need conditionals, which the rust language cannot emit");
+        }
+
+        data["lerp_points"] = lerp_points;
+        data["has_lerp_r3_constraint"] = lerp_r3_constraint;
+        if (lerp_r3_constraint)
+        {
+            set_trace(trace_lerp_r3_error<lerp_points>(robot, language), "lerp_r3_error");
+            set_trace(trace_solve_jacobian(robot, language, ProjMethod::InnerLM, 3), "solve_lerp_r3_error_lm_inner");
+            set_trace(trace_solve_jacobian(robot, language, ProjMethod::OuterLM, 3), "solve_lerp_r3_error_lm_outer");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::GradDesc, 3), "solve_lerp_r3_error_gradient_descent");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::BoundedLS, 3), "solve_lerp_r3_error_bounded_ls");
+        }
+
+        data["has_lerp_so3r3_constraint"] = lerp_so3r3_constraint;
+        if (lerp_so3r3_constraint)
+        {
+            set_trace(trace_lerp_so3r3_error<lerp_points>(robot, language), "lerp_so3r3_error");
+            set_trace(trace_solve_jacobian(robot, language, ProjMethod::InnerLM, 6), "solve_lerp_so3r3_error_lm_inner");
+            set_trace(trace_solve_jacobian(robot, language, ProjMethod::OuterLM, 6), "solve_lerp_so3r3_error_lm_outer");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::GradDesc, 6),
+                "solve_lerp_so3r3_error_gradient_descent");
+            set_trace(
+                trace_solve_jacobian(robot, language, ProjMethod::BoundedLS, 6), "solve_lerp_so3r3_error_bounded_ls");
+        }
+
         // Center-of-mass kinematics. "com": true is the world-frame CoM. An object selects the frame:
         //   {"frame": "world"}                                 world-frame CoM (the default frame)
         //   {"frame": "feet", "reference_frames": [f1, f2]}    CoM minus the mean position of the reference
@@ -453,6 +495,8 @@ namespace cricket
             "closed_loops",
             "lead_screw",
             "twist",
+            "lerp_r3_constraint",
+            "lerp_so3r3_constraint",
         };
         static const std::vector<std::string_view> bounds_keys = {"lower", "upper"};
         static const std::vector<std::string_view> com_keys = {"frame", "reference_frames"};

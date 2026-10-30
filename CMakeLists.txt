@@ -179,6 +179,15 @@ if(BUILD_TESTING)
   target_compile_definitions(tracing_test PRIVATE
       CRICKET_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
   add_test(NAME tracing_test COMMAND tracing_test)
+
+  # Not a test: evaluates the lerp constraint kernels without tracing and through the traced code, projects on the
+  # generated kernels, and writes a dump for tests/view_lerp.py
+  add_executable(lerp_kernel_eval tests/lerp_kernel_eval.cc)
+  target_include_directories(lerp_kernel_eval PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_link_libraries(lerp_kernel_eval PRIVATE cricket::cricket ${CMAKE_DL_LIBS})
+  target_compile_definitions(lerp_kernel_eval PRIVATE
+      CRICKET_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+      CRICKET_CXX="${CMAKE_CXX_COMPILER}")
 endif()
 
 add_executable(fkcc_gen src/fkcc_gen.cc)

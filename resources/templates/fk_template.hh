@@ -627,6 +627,143 @@ struct {{name}}
     {% endif %}
     {% endif %}
 
+    {% if has_lerp_r3_constraint or has_lerp_so3r3_constraint %}
+    // The lerp curves have this many points (fixed when the kernels are generated)
+    static constexpr std::size_t lerp_points = {{lerp_points}};
+    {% endif %}
+
+    {% if has_lerp_r3_constraint %}
+    //
+    // Lerp constraint in R^3: the first end-effector's position lies on the polyline through lerp_points points, held
+    // at the curve parameter t given, so the error is the 3-vector  FK(q).translation - P(t)  and a projection solves
+    // for the joints alone.
+    //
+
+    // Input: q (dimension), then t, then the points (3 * lerp_points, x y z per point), then their parameters
+    // tau (lerp_points: tau_0 = 0 < ... < tau_{lerp_points - 1} = 1). Output: d(err)/dq (3 * dimension, row-major),
+    // then the raw error (3).
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto lerp_r3_error(const InputVector &x, OutputVector &out) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the segment selection's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{lerp_r3_error_code_vars}}> v;
+        std::array<V, {{lerp_r3_error_code_output}}> y;
+
+        {{lerp_r3_error_code}}
+
+        for (auto i = 0U; i < {{lerp_r3_error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Projection steps for lerp_r3_error. Input: its outputs (J, then err), and for the bounded variant then
+    // lower - q and upper - q (dimension entries each). Output: the gradient (dimension entries), applied as
+    // q <- q - gradient.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_lerp_r3_error_lm_inner(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_lerp_r3_error_lm_inner_code_vars}}> v;
+
+        {{solve_lerp_r3_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_lerp_r3_error_lm_outer(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_lerp_r3_error_lm_outer_code_vars}}> v;
+
+        {{solve_lerp_r3_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_lerp_r3_error_gradient_descent(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_lerp_r3_error_gradient_descent_code_vars}}> v;
+
+        {{solve_lerp_r3_error_gradient_descent_code}}
+    }
+
+    {% if has_bounded_ls %}
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_lerp_r3_error_bounded_ls(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{solve_lerp_r3_error_bounded_ls_code_vars}}> v;
+
+        {{solve_lerp_r3_error_bounded_ls_code}}
+    }
+    {% endif %}
+    {% endif %}
+
+    {% if has_lerp_so3r3_constraint %}
+    //
+    // Lerp constraint in SO(3) x R^3: the first end-effector's pose lies on the curve through lerp_points poses (the
+    // position lerped, the rotation slerped), held at the curve parameter t given. The error is the TSR error against
+    // the pose P(t), [R_t^T (p - p_t); weight * log(R_t^T R)], 6 rows, and a projection solves for the joints alone.
+    //
+
+    // Input: q (dimension), then t, then the weight (m / rad), then the positions (3 * lerp_points, x y z per keyframe),
+    // the quaternions (4 * lerp_points, wxyz per keyframe), and the parameters tau (lerp_points: tau_0 = 0 < ... <
+    // tau_{lerp_points - 1} = 1). Output: d(err)/dq (6 * dimension, row-major), then the raw error (6).
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto lerp_so3r3_error(const InputVector &x, OutputVector &out) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the segment selection's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{lerp_so3r3_error_code_vars}}> v;
+        std::array<V, {{lerp_so3r3_error_code_output}}> y;
+
+        {{lerp_so3r3_error_code}}
+
+        for (auto i = 0U; i < {{lerp_so3r3_error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Projection steps for lerp_so3r3_error. Input: its outputs (J, then err), and for the bounded variant then
+    // lower - q and upper - q (dimension entries each). Output: the gradient (dimension entries), applied as
+    // q <- q - gradient.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_lerp_so3r3_error_lm_inner(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_lerp_so3r3_error_lm_inner_code_vars}}> v;
+
+        {{solve_lerp_so3r3_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_lerp_so3r3_error_lm_outer(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_lerp_so3r3_error_lm_outer_code_vars}}> v;
+
+        {{solve_lerp_so3r3_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_lerp_so3r3_error_gradient_descent(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_lerp_so3r3_error_gradient_descent_code_vars}}> v;
+
+        {{solve_lerp_so3r3_error_gradient_descent_code}}
+    }
+
+    {% if has_bounded_ls %}
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_lerp_so3r3_error_bounded_ls(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{solve_lerp_so3r3_error_bounded_ls_code_vars}}> v;
+
+        {{solve_lerp_so3r3_error_bounded_ls_code}}
+    }
+    {% endif %}
+    {% endif %}
+
     {% if has_lead_screw %}
     //
     // Lead-screw coupling constraint functions

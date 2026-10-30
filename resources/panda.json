@@ -6,6 +6,8 @@
     "constraints": true,
     "lead_screw": true,
     "twist": true,
+    "lerp_r3_constraint": true,
+    "lerp_so3r3_constraint": true,
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],

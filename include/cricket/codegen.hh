@@ -70,6 +70,20 @@ namespace cricket
     // the raw error (6 n_eef); bounds are hinged at runtime, not on the tape.
     auto trace_tsr_error(const RobotInfo &info, const std::string &language) -> Traced;
 
+    // Position error of the first end-effector against the straight-line (lerp) curve through N points, with the
+    // curve evaluated at the parameter t in the kernel (the segment picked by conditionals, so the language must be
+    // C++). Input: q (nq), t, the N points (3 N, x y z per point), their parameters tau (N); see LerpR3InputLayout in
+    // tracing/lerp.hh. Output: d(err)/dq (3 x nq, row-major, t is not differentiated), then the raw error (3).
+    template <std::size_t N>
+    auto trace_lerp_r3_error(const RobotInfo &info, const std::string &language) -> Traced;
+
+    // Pose error of the first end-effector against the SO(3) x R^3 lerp curve through N keyframes (positions lerped,
+    // rotations slerped), as the TSR error [R_t^T (p - p_t); log(R_t^T R)] with the rotation rows scaled by a weight
+    // input. Input: q (nq), t, weight, the N positions (3 N), the N quaternions (4 N, wxyz), the parameters tau (N);
+    // see LerpPoseInputLayout. Output: d(err)/dq (6 x nq, row-major), then the raw error (6).
+    template <std::size_t N>
+    auto trace_lerp_so3r3_error(const RobotInfo &info, const std::string &language) -> Traced;
+
     // Relative-pose (bimanual) TSR error between two end-effectors.
     // Input: q (nq), then the reference relative transform lTr (7), lb (6), ub (6).
     // Output: d(err)/dq (6 x nq, row-major), then the raw error (6).
