@@ -4,8 +4,6 @@
 #include "se3_ops.hh"
 #include "cholesky.hh"
 #include "bounded_ls.hh"
-#include "spline_trace.hh"
-#include "catmull_rom.hh"
 
 #include <pinocchio/algorithm/center-of-mass.hpp>
 #include <pinocchio/algorithm/frames.hpp>
@@ -17,7 +15,6 @@
 #include <fmt/format.h>
 
 #include <algorithm>
-#include <array>
 #include <iterator>
 #include <stdexcept>
 
@@ -58,10 +55,8 @@ namespace cricket
             return displacement;
         }
 
-        // Emit code computing [d(err)/d(first n_vars inputs) (row-major), err] for an error function whose
-        // first n_vars inputs are the variables to differentiate: the configuration (n_vars = nq), or for
-        // the spline constraint the configuration and the curve parameter (n_vars = nq + 1).
-        // The bound inputs are part of the tape but do not
+        // Emit code computing [d(err)/dq (row-major), err] for an error function whose first
+        // nq inputs are the configuration. The bound inputs are part of the tape but do not
         // affect the emitted error: hinging the error against the bounds during tracing would
         // wrongly zero gradients, so the hinge is applied at runtime in vamp instead.
         //
@@ -72,7 +67,7 @@ namespace cricket
         auto emit_error_and_jacobian(
             ADFun<CGD> &error_func,
             std::size_t num_inp,
-            std::size_t n_vars,
+            std::size_t nq,
             std::size_t n_out,
             const std::string &language_in,
             bool conditionals = false) -> Traced
@@ -82,11 +77,7 @@ namespace cricket
                 throw std::runtime_error("TSR-style errors use the se(3) log map, which needs conditionals the rust language cannot emit");
             }
 
-            // "c++_scalar" is plain scalar C++, where each conditional prints as if/else: it runs on doubles,
-            // for tests and for reading the code. The vamp kernels use the block language.
-            const std::string language = language_in == "c++_scalar"           ? "c++"
-                                         : (conditionals and language_in == "c++") ? "c++_block"
-                                                                                   : language_in;
+            const std::string language = (conditionals and language_in == "c++") ? "c++_block" : language_in;
 
             CodeHandler<double> handler;
             CppAD::vector<CGD> ind_vars(num_inp);
@@ -95,13 +86,13 @@ namespace cricket
             CppAD::vector<CGD> error_vec = error_func.Forward(0, ind_vars);
             CppAD::vector<CGD> jac = error_func.Jacobian(ind_vars);
 
-            // Jacobian with respect to the first n_vars inputs only
-            CppAD::vector<CGD> jac_e_q(n_out * n_vars);
+            // Jacobian with respect to the configuration only
+            CppAD::vector<CGD> jac_e_q(n_out * nq);
             for (auto i = 0U; i < n_out; ++i)
             {
-                for (auto j = 0U; j < n_vars; ++j)
+                for (auto j = 0U; j < nq; ++j)
                 {
-                    jac_e_q[i * n_vars + j] = jac[i * num_inp + j];
+                    jac_e_q[i * nq + j] = jac[i * num_inp + j];
                 }
             }
 
@@ -165,424 +156,6 @@ namespace cricket
         return emit_error_and_jacobian(error_func, num_inp, nq, n_out, language, true);
     }
 
-    template <std::size_t N>
-    auto trace_spline_error(const RobotInfo &info, const std::string &language, bool fixed_parameter) -> Traced
-    {
-        using Layout = SplineInputLayout<N>;
-
-        if (info.end_effector_indexes.empty())
-        {
-            throw std::runtime_error("trace_spline_error requires an end-effector");
-        }
-
-        const auto nq = static_cast<std::size_t>(info.model.nq);
-
-        ADModel ad_model = info.model.cast<ADCG>();
-        ADData ad_data(ad_model);
-
-        // Input layout (see SplineInputLayout): q (nq), t, control points (3 N), knots (N + 4)
-        const std::size_t num_inp = Layout::total(nq);
-
-        ADVectorXs ad_inp(num_inp);
-        for (auto i = 0U; i < num_inp; ++i)
-        {
-            ad_inp[i] = ADCG(0.0);
-        }
-
-        // The tape is recorded at these values, so they must be a valid spline: the basis recursion divides by
-        // knot differences, and all-zero knots would give 0 / 0 = NaN on the tape (which CppAD rejects). The
-        // recorded operations (including each CondExp) do not depend on the values, only the check does.
-        // Clamped uniform knots, t in the middle.
-        ad_inp[Layout::t_idx(nq)] = ADCG(0.5);
-        for (std::size_t i = 0; i < Layout::knots; ++i)
-        {
-            const double knot = i < CubicBSpline::degree + 1 ? 0.0
-                                : i >= N                      ? 1.0
-                                                              : static_cast<double>(i - CubicBSpline::degree) /
-                                                                    static_cast<double>(N - CubicBSpline::degree);
-            ad_inp[Layout::knot_idx(nq, i)] = ADCG(knot);
-        }
-
-        Independent(ad_inp);
-
-        ADVectorXs ad_q(nq);
-        for (auto i = 0U; i < nq; ++i)
-        {
-            ad_q[i] = ad_inp[i];
-        }
-
-        forwardKinematics(ad_model, ad_data, ad_q);
-        updateFramePlacements(ad_model, ad_data);
-
-        // position error of the first end-effector against the curve point at t
-        const auto spline = read_spline<ADCG, N>(ad_inp, nq);
-        const Eigen::Vector3<ADCG> curve_point = spline_point<ADCG, N>(spline);
-        const Eigen::Vector3<ADCG> eef_position = ad_data.oMf[info.end_effector_indexes[0]].translation();
-
-        constexpr std::size_t n_out = 3;
-        ADVectorXs data(n_out);
-        data = eef_position - curve_point;
-
-        ADFun<CGD> error_func(ad_inp, data);
-
-        // d(err)/d(q, t): the curve parameter is the input right after q, so it is the last column. With a fixed
-        // parameter t stays on the tape as an input but only the first nq inputs are differentiated.
-        return emit_error_and_jacobian(error_func, num_inp, fixed_parameter ? nq : nq + 1, n_out, language, true);
-    }
-
-    template auto trace_spline_error<20>(const RobotInfo &info, const std::string &language, bool fixed_parameter)
-        -> Traced;
-
-    auto trace_position_target_error(const RobotInfo &info, const std::string &language) -> Traced
-    {
-        if (info.end_effector_indexes.empty())
-        {
-            throw std::runtime_error("trace_position_target_error requires an end-effector");
-        }
-
-        const auto nq = static_cast<std::size_t>(info.model.nq);
-
-        ADModel ad_model = info.model.cast<ADCG>();
-        ADData ad_data(ad_model);
-
-        // Input layout: q (nq), then the target point (3)
-        const std::size_t num_inp = nq + 3;
-
-        ADVectorXs ad_inp(num_inp);
-        for (auto i = 0U; i < num_inp; ++i)
-        {
-            ad_inp[i] = ADCG(0.0);
-        }
-
-        Independent(ad_inp);
-
-        ADVectorXs ad_q(nq);
-        for (auto i = 0U; i < nq; ++i)
-        {
-            ad_q[i] = ad_inp[i];
-        }
-
-        forwardKinematics(ad_model, ad_data, ad_q);
-        updateFramePlacements(ad_model, ad_data);
-
-        Eigen::Vector3<ADCG> target;
-        for (auto axis = 0U; axis < 3; ++axis)
-        {
-            target[axis] = ad_inp[nq + axis];
-        }
-
-        const Eigen::Vector3<ADCG> eef_position = ad_data.oMf[info.end_effector_indexes[0]].translation();
-
-        constexpr std::size_t n_out = 3;
-        ADVectorXs data(n_out);
-        data = eef_position - target;
-
-        ADFun<CGD> error_func(ad_inp, data);
-
-        // d(err)/dq only: the target stays on the tape as an input
-        return emit_error_and_jacobian(error_func, num_inp, nq, n_out, language);
-    }
-
-    template <std::size_t N>
-    auto trace_catmull_rom_error(const RobotInfo &info, const std::string &language) -> Traced
-    {
-        using Layout = CatmullRomInputLayout<N>;
-
-        if (info.end_effector_indexes.empty())
-        {
-            throw std::runtime_error("trace_catmull_rom_error requires an end-effector");
-        }
-
-        const auto nq = static_cast<std::size_t>(info.model.nq);
-
-        ADModel ad_model = info.model.cast<ADCG>();
-        ADData ad_data(ad_model);
-
-        // Input layout (see CatmullRomInputLayout): q (nq), t, extended points (3 (N + 2)), extended knots (N + 2)
-        const std::size_t num_inp = Layout::total(nq);
-
-        ADVectorXs ad_inp(num_inp);
-        for (auto i = 0U; i < num_inp; ++i)
-        {
-            ad_inp[i] = ADCG(0.0);
-        }
-
-        // The tape is recorded at these values, so they must be a valid curve: the blends divide by knot differences,
-        // and all-zero knots would give 0 / 0 = NaN on the tape (which CppAD rejects). Strictly increasing knots, t in
-        // the middle; the recorded operations (including each CondExp) do not depend on the values.
-        ad_inp[Layout::t_idx(nq)] = ADCG(0.5);
-        for (std::size_t i = 0; i < Layout::knots; ++i)
-        {
-            ad_inp[Layout::knot_idx(nq, i)] = ADCG((static_cast<double>(i) - 1.0) / static_cast<double>(N - 1));
-        }
-
-        Independent(ad_inp);
-
-        ADVectorXs ad_q(nq);
-        for (auto i = 0U; i < nq; ++i)
-        {
-            ad_q[i] = ad_inp[i];
-        }
-
-        forwardKinematics(ad_model, ad_data, ad_q);
-        updateFramePlacements(ad_model, ad_data);
-
-        // position error of the first end-effector against the curve point at t
-        const auto curve = read_catmull_rom<ADCG, N>(ad_inp, nq);
-        const Eigen::Vector3<ADCG> curve_point = catmull_rom_point<ADCG, N>(curve);
-        const Eigen::Vector3<ADCG> eef_position = ad_data.oMf[info.end_effector_indexes[0]].translation();
-
-        constexpr std::size_t n_out = 3;
-        ADVectorXs data(n_out);
-        data = eef_position - curve_point;
-
-        ADFun<CGD> error_func(ad_inp, data);
-
-        // d(err)/dq only: t and the curve data stay on the tape as inputs
-        return emit_error_and_jacobian(error_func, num_inp, nq, n_out, language, true);
-    }
-
-    template auto trace_catmull_rom_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
-
-    // Starting guess for the spline's curve parameter t, from the end-effector position alone: weighted_waypoint_seed
-    // (see spline_trace.hh), the parameter between the nearest fitted waypoint and its nearer neighbour, weighted by the
-    // distances to the two. The waypoints and their parameters are inputs (see SplineSeedLayout), so one kernel serves
-    // any spline with N waypoints; the closest-t kernel uses the same function for its own seed.
-    //
-    // CALL-OUT: this is still a simple seed. It is exact for a point on the segment between the two waypoints and an
-    // approximation off it, and it ignores that the curve bends between waypoints. A better seed, left for later,
-    // projects the end-effector onto the two chords W_{k-1} -> W_k and W_k -> W_{k+1} and interpolates t along the
-    // closer one, which also handles points off the segment. A projection or a Newton refinement then needs fewer
-    // iterations from it.
-    template <std::size_t N>
-    auto trace_spline_seed(const RobotInfo &info, const std::string &language) -> Traced
-    {
-        using Layout = SplineSeedLayout<N>;
-
-        if (info.end_effector_indexes.empty())
-        {
-            throw std::runtime_error("trace_spline_seed requires an end-effector");
-        }
-
-        // The nearest-waypoint search is made of conditionals: SIMD blends from the block language for C++, plain
-        // if/else for "c++_scalar", and the Rust backend cannot emit them
-        if (language == "rust")
-        {
-            throw std::runtime_error("trace_spline_seed uses conditionals, which the rust language cannot emit");
-        }
-
-        const std::string lang = language == "c++_scalar" ? "c++" : language == "c++" ? "c++_block" : language;
-
-        const auto nq = static_cast<std::size_t>(info.model.nq);
-
-        ADModel ad_model = info.model.cast<ADCG>();
-        ADData ad_data(ad_model);
-
-        const std::size_t num_inp = Layout::total(nq);
-
-        ADVectorXs ad_inp(num_inp);
-        for (auto i = 0U; i < num_inp; ++i)
-        {
-            ad_inp[i] = ADCG(0.0);
-        }
-
-        Independent(ad_inp);
-
-        ADVectorXs ad_q(nq);
-        for (auto i = 0U; i < nq; ++i)
-        {
-            ad_q[i] = ad_inp[i];
-        }
-
-        forwardKinematics(ad_model, ad_data, ad_q);
-        updateFramePlacements(ad_model, ad_data);
-        const Eigen::Vector3<ADCG> eef_position = ad_data.oMf[info.end_effector_indexes[0]].translation();
-
-        // squared distance from the end-effector to every waypoint, and the waypoints' parameters
-        std::array<ADCG, Layout::waypoints> distance2;
-        std::array<ADCG, Layout::waypoints> parameters;
-        for (std::size_t point = 0; point < Layout::waypoints; ++point)
-        {
-            distance2[point] = ADCG(0.0);
-            for (std::size_t axis = 0; axis < 3; ++axis)
-            {
-                const ADCG diff = eef_position[axis] - ad_inp[Layout::waypoint_idx(nq, point, axis)];
-                distance2[point] += diff * diff;
-            }
-
-            parameters[point] = ad_inp[Layout::parameter_idx(nq, point)];
-        }
-
-        const ADCG seed = weighted_waypoint_seed<ADCG, Layout::waypoints>(distance2, parameters);
-
-        ADVectorXs data(1);
-        data[0] = seed;
-        ADFun<CGD> seed_func(ad_inp, data);
-
-        // Only the value is needed (no derivative: the argmin is not differentiated)
-        CodeHandler<double> handler;
-        CppAD::vector<CGD> ind_vars(num_inp);
-        handler.makeVariables(ind_vars);
-        CppAD::vector<CGD> result = seed_func.Forward(0, ind_vars);
-
-        return Traced{generate_code(handler, result, lang), handler.getTemporaryVariableCount(), result.size()};
-    }
-
-    template auto trace_spline_seed<20>(const RobotInfo &info, const std::string &language) -> Traced;
-
-    // The closest point of the spline to the end-effector, as a function of q alone: the parameter t* and the squared
-    // distance |FK(q) - P(t*)|^2 (the "distance to the spline"). Inputs: see SplineClosestLayout; outputs: [t*, squared
-    // distance].
-    //
-    //   1. x = FK(q).translation, computed once.
-    //   2. Seed: weighted_waypoint_seed, the parameter between the nearest waypoint and its nearer neighbour (in the
-    //      fitted sequence), weighted by the distances to the two.
-    //   3. `iterations` Gauss-Newton steps on t alone, with q fixed. With r = x - P(t), minimising |r|^2 over t gives
-    //      t <- t + (r . P'(t)) / (P'(t) . P'(t)). Each step is limited to one waypoint spacing and t is clamped to
-    //      [0, 1]. At a point of the curve the residual vanishes at the answer, so the step is Newton's method for a
-    //      zero-residual problem there and converges quadratically from a seed within half a waypoint spacing.
-    //   4. The squared distance at the final t.
-    //
-    // This does not certify anything: it finds the closest point on the branch the seed lands on. A residual below
-    // tolerance proves the point is on the curve; a larger one only says that no nearby point was found.
-    // The Newton steps are not accepted conditionally (no check that the residual dropped): left for later.
-    template <std::size_t N>
-    auto trace_spline_closest_t(const RobotInfo &info, const std::string &language) -> Traced
-    {
-        using Layout = SplineClosestLayout<N>;
-        constexpr std::size_t iterations = 3;
-
-        if (info.end_effector_indexes.empty())
-        {
-            throw std::runtime_error("trace_spline_closest_t requires an end-effector");
-        }
-
-        if (language == "rust")
-        {
-            throw std::runtime_error("trace_spline_closest_t uses conditionals, which the rust language cannot emit");
-        }
-
-        const std::string lang = language == "c++_scalar" ? "c++" : language == "c++" ? "c++_block" : language;
-
-        const auto nq = static_cast<std::size_t>(info.model.nq);
-
-        ADModel ad_model = info.model.cast<ADCG>();
-        ADData ad_data(ad_model);
-
-        const std::size_t num_inp = Layout::total(nq);
-
-        ADVectorXs ad_inp(num_inp);
-        for (auto i = 0U; i < num_inp; ++i)
-        {
-            ad_inp[i] = ADCG(0.0);
-        }
-
-        // The tape is recorded at these values, so the knots must be valid (the basis divides by knot differences):
-        // clamped uniform knots, as for the error kernel
-        for (std::size_t i = 0; i < Layout::knots; ++i)
-        {
-            const double knot = i < CubicBSpline::degree + 1 ? 0.0
-                                : i >= N                      ? 1.0
-                                                              : static_cast<double>(i - CubicBSpline::degree) /
-                                                                    static_cast<double>(N - CubicBSpline::degree);
-            ad_inp[Layout::knot_idx(nq, i)] = ADCG(knot);
-        }
-
-        Independent(ad_inp);
-
-        ADVectorXs ad_q(nq);
-        for (auto i = 0U; i < nq; ++i)
-        {
-            ad_q[i] = ad_inp[i];
-        }
-
-        forwardKinematics(ad_model, ad_data, ad_q);
-        updateFramePlacements(ad_model, ad_data);
-        const Eigen::Vector3<ADCG> x = ad_data.oMf[info.end_effector_indexes[0]].translation();
-
-        // The spline as a SplineInputs: its data from the input tape, t to be set per evaluation
-        SplineInputs<ADCG, N> spline;
-        for (std::size_t point = 0; point < N; ++point)
-        {
-            for (std::size_t axis = 0; axis < 3; ++axis)
-            {
-                spline.control_points[point][axis] = ad_inp[Layout::control_point_idx(nq, point, axis)];
-            }
-        }
-
-        for (std::size_t i = 0; i < Layout::knots; ++i)
-        {
-            spline.knots[i] = ad_inp[Layout::knot_idx(nq, i)];
-        }
-
-        // 2. seed, the same function the seed kernel uses: squared distances to the waypoints, then the distance-weighted
-        // parameter between the nearest waypoint and its nearer neighbour
-        std::array<ADCG, N> distance2;
-        std::array<ADCG, N> parameters;
-        for (std::size_t point = 0; point < N; ++point)
-        {
-            distance2[point] = ADCG(0.0);
-            for (std::size_t axis = 0; axis < 3; ++axis)
-            {
-                const ADCG diff = x[axis] - ad_inp[Layout::waypoint_idx(nq, point, axis)];
-                distance2[point] += diff * diff;
-            }
-
-            parameters[point] = ad_inp[Layout::parameter_idx(nq, point)];
-        }
-
-        ADCG t = weighted_waypoint_seed<ADCG, N>(distance2, parameters);
-
-        // 3. Gauss-Newton on t alone, q fixed
-        const ADCG max_step = ADCG(1.0 / static_cast<double>(N - 1));
-        for (std::size_t iteration = 0; iteration < iterations; ++iteration)
-        {
-            spline.t = t;
-            const auto evaluated = spline_point_and_velocity<ADCG, N>(spline);
-
-            ADCG numerator = ADCG(0.0);
-            ADCG denominator = ADCG(1e-12);  // keeps the step finite at a stationary curve point
-            for (std::size_t axis = 0; axis < 3; ++axis)
-            {
-                numerator += (x[axis] - evaluated.point[axis]) * evaluated.velocity[axis];
-                denominator += evaluated.velocity[axis] * evaluated.velocity[axis];
-            }
-
-            ADCG step = numerator / denominator;
-            step = CppAD::CondExpGt(step, max_step, max_step, step);
-            step = CppAD::CondExpLt(step, ADCG(0.0) - max_step, ADCG(0.0) - max_step, step);
-
-            t = t + step;
-            t = CppAD::CondExpLt(t, ADCG(0.0), ADCG(0.0), t);
-            t = CppAD::CondExpGt(t, ADCG(1.0), ADCG(1.0), t);
-        }
-
-        // 4. the squared distance at the final t
-        spline.t = t;
-        const Eigen::Vector3<ADCG> closest = spline_point<ADCG, N>(spline);
-        ADCG squared_distance = ADCG(0.0);
-        for (std::size_t axis = 0; axis < 3; ++axis)
-        {
-            const ADCG diff = x[axis] - closest[axis];
-            squared_distance += diff * diff;
-        }
-
-        ADVectorXs data(2);
-        data[0] = t;
-        data[1] = squared_distance;
-        ADFun<CGD> closest_func(ad_inp, data);
-
-        // Only the values are needed: the closest point is not differentiated here
-        CodeHandler<double> handler;
-        CppAD::vector<CGD> ind_vars(num_inp);
-        handler.makeVariables(ind_vars);
-        CppAD::vector<CGD> result = closest_func.Forward(0, ind_vars);
-
-        return Traced{generate_code(handler, result, lang), handler.getTemporaryVariableCount(), result.size()};
-    }
-
-    template auto trace_spline_closest_t<20>(const RobotInfo &info, const std::string &language) -> Traced;
-
     auto trace_tsr_bimanual_error(
         const RobotInfo &info,
         const std::string &language,
@@ -643,34 +216,15 @@ namespace cricket
             info, language, method, task_dim * (relative ? 1 : info.end_effector_indexes.size()));
     }
 
-    auto trace_solve_spline(
-        const RobotInfo &info,
-        const std::string &language,
-        ProjMethod method,
-        bool fixed_parameter) -> Traced
-    {
-        // err is the 3-vector position error, and the unknowns are the joints plus the curve parameter t (the joints
-        // alone when t is given)
-        return trace_solve_jacobian(info, language, method, 3, fixed_parameter ? 0 : 1);
-    }
-
-    auto trace_solve_pose_slide(const RobotInfo &info, const std::string &language, ProjMethod method) -> Traced
-    {
-        // err is the 6-vector pose error, and the unknowns are the joints plus the curve parameter t
-        return trace_solve_jacobian(info, language, method, task_dim, 1);
-    }
-
     auto trace_solve_jacobian(
         const RobotInfo &info,
         const std::string &language,
         ProjMethod method,
-        std::size_t err_size,
-        std::size_t extra_vars) -> Traced
+        std::size_t err_size) -> Traced
     {
         constexpr double damp = 1e-6;
 
-        // The unknowns: the joints, and any extra variables the constraint adds (the spline's curve parameter)
-        const auto n_vars = static_cast<std::size_t>(info.model.nq) + extra_vars;
+        const auto nq = static_cast<std::size_t>(info.model.nq);
 
         const bool bounded = method == ProjMethod::BoundedLS;
         if (bounded and language == "rust")
@@ -679,17 +233,13 @@ namespace cricket
             throw std::runtime_error("ProjMethod::BoundedLS is not supported for the rust language");
         }
 
-        // The SIMD blends the conditionals compile to come from the block language; "c++_scalar" is plain
-        // scalar C++ (conditionals as if/else) that runs on doubles, for tests
-        const std::string lang = language == "c++_scalar"           ? "c++"
-                                 : (bounded and language == "c++") ? "c++_block"
-                                                                   : language;
+        // The SIMD blends the conditionals compile to come from the block language
+        const std::string lang = (bounded and language == "c++") ? "c++_block" : language;
 
         // Input layout (must match vamp's JacobianProjectInp::operator[]):
-        // J (err_size x n_vars, row-major), then err (err_size), then, for BoundedLS only, the allowed step
-        // to the lower bound (lower - x, n_vars) and to the upper bound (upper - x, n_vars), where x is the
-        // joints followed by any extra variables
-        const std::size_t num_inp = err_size * n_vars + err_size + (bounded ? 2 * n_vars : 0);
+        // J (err_size x nq, row-major), then err (err_size), then, for BoundedLS only, the allowed step
+        // to the lower joint limit (lower - q, nq) and to the upper limit (upper - q, nq)
+        const std::size_t num_inp = err_size * nq + err_size + (bounded ? 2 * nq : 0);
 
         ADVectorXs ad_inp(num_inp);
         for (auto i = 0U; i < num_inp; ++i)
@@ -699,22 +249,22 @@ namespace cricket
 
         Independent(ad_inp);
 
-        ADMatrixXs J(err_size, n_vars);
+        ADMatrixXs J(err_size, nq);
         for (auto i = 0U; i < err_size; ++i)
         {
-            for (auto j = 0U; j < n_vars; ++j)
+            for (auto j = 0U; j < nq; ++j)
             {
-                J(i, j) = ad_inp[i * n_vars + j];
+                J(i, j) = ad_inp[i * nq + j];
             }
         }
 
         ADVectorXs err(err_size);
         for (auto i = 0U; i < err_size; ++i)
         {
-            err[i] = ad_inp[err_size * n_vars + i];
+            err[i] = ad_inp[err_size * nq + i];
         }
 
-        ADVectorXs grad(n_vars);
+        ADVectorXs grad(nq);
         switch (method)
         {
             case ProjMethod::InnerLM:
@@ -727,7 +277,7 @@ namespace cricket
             }
             case ProjMethod::OuterLM:
             {
-                ADMatrixXs identity = ADMatrixXs::Identity(n_vars, n_vars);
+                ADMatrixXs identity = ADMatrixXs::Identity(nq, nq);
                 const auto factor =
                     cholesky_factor<ADMatrixXs, ADCG>(J.transpose() * J + identity * damp);
                 grad = cholesky_solve<ADMatrixXs, ADVectorXs, ADCG>(factor, J.transpose() * err);
@@ -740,16 +290,16 @@ namespace cricket
             }
             case ProjMethod::BoundedLS:
             {
-                ADVectorXs lower(n_vars);
-                ADVectorXs upper(n_vars);
-                for (auto i = 0U; i < n_vars; ++i)
+                ADVectorXs lower(nq);
+                ADVectorXs upper(nq);
+                for (auto i = 0U; i < nq; ++i)
                 {
-                    lower[i] = ad_inp[err_size * n_vars + err_size + i];
-                    upper[i] = ad_inp[err_size * n_vars + err_size + n_vars + i];
+                    lower[i] = ad_inp[err_size * nq + err_size + i];
+                    upper[i] = ad_inp[err_size * nq + err_size + nq + i];
                 }
 
                 // Every iteration either fixes a joint at a bound, frees one, or finishes the solve
-                const std::size_t iterations = std::min<std::size_t>(n_vars + 2, 10);
+                const std::size_t iterations = std::min<std::size_t>(nq + 2, 10);
                 grad = bounded_ls_step<ADMatrixXs, ADVectorXs, ADCG>(J, err, lower, upper, damp, iterations);
                 break;
             }

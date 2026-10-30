@@ -70,59 +70,6 @@ namespace cricket
     // the raw error (6 n_eef); bounds are hinged at runtime, not on the tape.
     auto trace_tsr_error(const RobotInfo &info, const std::string &language) -> Traced;
 
-    // Position error of the first end-effector against a cubic B-spline curve with N control points, with the
-    // curve parameter t as an extra variable: err = FK(q).translation - P(t) (3 rows).
-    // Input: q (nq), t, control points (3 N, x y z per point), knots (N + 4); see SplineInputLayout in
-    // tracing/spline.hh. Output: d(err)/d(q, t) (3 x (nq + 1), row-major, t last), then the error (3).
-    // Uses conditionals, so it is generated only for the C++ language (as SIMD blends); "c++_scalar" gives
-    // plain scalar C++ (conditionals as if/else) that runs on doubles, for tests. Instantiated for N = 20.
-    //
-    // With `fixed_parameter` the curve parameter t is an input that is not differentiated, for projections that hold
-    // t at a given value (planning in (q, t), where t is part of the state): same inputs and error, and the
-    // Jacobian is d(err)/dq only (3 x nq, row-major), then the error (3).
-    template <std::size_t N>
-    auto trace_spline_error(const RobotInfo &info, const std::string &language, bool fixed_parameter = false) -> Traced;
-
-    // Position error of the first end-effector against a given target point: err = FK(q).translation - target (3 rows).
-    // Input: q (nq), then the target (3). Output: d(err)/dq (3 x nq, row-major), then the error (3): the layout of
-    // trace_spline_error with a fixed parameter, so the fixed-parameter solvers (trace_solve_spline) apply. For
-    // planning along a curve in (q, t) where the runtime evaluates the curve at t itself and hands over the point, so
-    // the curve can be of any kind and any size. No conditionals: also for rust.
-    auto trace_position_target_error(const RobotInfo &info, const std::string &language) -> Traced;
-
-    // Position error of the first end-effector against a Catmull-Rom curve through N points at a given curve
-    // parameter t, which is not differentiated: err = FK(q).translation - P(t) (3 rows).
-    // Input: q (nq), t, the N + 2 extended points (3 (N + 2), x y z per point), the N + 2 extended knots; see
-    // CatmullRomInputLayout in tracing/catmull_rom.hh. Output: d(err)/dq (3 x nq, row-major), then the error (3), the
-    // layout of trace_spline_error with a fixed parameter, so the fixed-parameter solvers (trace_solve_spline) apply.
-    // Uses conditionals, so it is generated only for the C++ language (as SIMD blends); "c++_scalar" gives plain
-    // scalar C++ that runs on doubles, for tests. Instantiated for N = 20.
-    template <std::size_t N>
-    auto trace_catmull_rom_error(const RobotInfo &info, const std::string &language) -> Traced;
-
-    // Starting guess for the spline constraint's curve parameter t: the parameter between the spline's nearest fitted
-    // waypoint and that waypoint's nearer neighbour, weighted by the distances to the two (weighted_waypoint_seed in
-    // tracing/spline_trace.hh, also used by trace_spline_closest_t). Input: q (nq), then the N waypoints (3 N, x y z per
-    // waypoint), then their N parameters (fit_cubic_bspline's `parameters`); see SplineSeedLayout in tracing/spline.hh.
-    // Output: t (1). Uses conditionals, so C++ only: SIMD blends for "c++", plain scalar C++ for "c++_scalar".
-    // Instantiated for N = 20.
-    //
-    // CALL-OUT: still a simple seed, exact only on the segment between the two waypoints. A better one would project the
-    // end-effector onto the two chords next to the nearest waypoint and interpolate t along the closer one, for faster
-    // convergence of whatever refines it. Left for later.
-    template <std::size_t N>
-    auto trace_spline_seed(const RobotInfo &info, const std::string &language) -> Traced;
-
-    // The closest point of the spline to the first end-effector, as a function of q alone: the parameter t* and the
-    // squared "distance to the spline" |FK(q) - P(t*)|^2. Input: q (nq), then the control points (3 N), the knots
-    // (N + 4), the N fitted waypoints (3 N) and their N parameters; see SplineClosestLayout in tracing/spline.hh.
-    // Output: [t*, squared distance]. t* is the seed (weighted_waypoint_seed) refined by a
-    // fixed number of Gauss-Newton steps on t with q fixed; see the definition for what that does and does not
-    // guarantee. Uses conditionals, so C++ only ("c++" gives SIMD blends, "c++_scalar" plain scalar C++).
-    // Instantiated for N = 20.
-    template <std::size_t N>
-    auto trace_spline_closest_t(const RobotInfo &info, const std::string &language) -> Traced;
-
     // Relative-pose (bimanual) TSR error between two end-effectors.
     // Input: q (nq), then the reference relative transform lTr (7), lb (6), ub (6).
     // Output: d(err)/dq (6 x nq, row-major), then the raw error (6).
@@ -143,40 +90,13 @@ namespace cricket
         bool relative = false) -> Traced;
 
     // Projection step from an arbitrary stacked error and Jacobian with err_size rows.
-    // Input: J (err_size x n_vars, row-major), then err (err_size); for ProjMethod::BoundedLS also
-    // lower - x (n_vars) and upper - x (n_vars). Output: gradient (n_vars).
-    // The unknowns x are the nq joints followed by `extra_vars` more variables (0 for the TSR constraints).
+    // Input: J (err_size x nq, row-major), then err (err_size); for ProjMethod::BoundedLS also
+    // lower - q (nq) and upper - q (nq). Output: gradient (nq).
     auto trace_solve_jacobian(
         const RobotInfo &info,
         const std::string &language,
         ProjMethod method,
-        std::size_t err_size,
-        std::size_t extra_vars = 0) -> Traced;
-
-    // Projection step for the spline constraint (see trace_spline_error): err is the 3-vector position error
-    // and the unknowns are the joints followed by the curve parameter t, so n_vars = nq + 1.
-    // Input: J (3 x (nq + 1), row-major), then err (3); for ProjMethod::BoundedLS also lower - x (nq + 1) and
-    // upper - x (nq + 1), where the last entry of each is 0 - t and 1 - t (this is what bounds t to [0, 1]).
-    // The other methods (InnerLM, OuterLM, GradDesc) take no bounds and leave t unbounded; callers clamp it.
-    // These inputs are exactly the outputs of trace_spline_error, in the same order, followed by the bounds.
-    // Output: step (nq + 1), the last entry being the step in t.
-    //
-    // With `fixed_parameter` the unknowns are the joints alone, matching trace_spline_error's fixed-parameter
-    // Jacobian (3 x nq): the gradient has nq entries and, for BoundedLS, the bounds are nq entries each.
-    auto trace_solve_spline(
-        const RobotInfo &info,
-        const std::string &language,
-        ProjMethod method,
-        bool fixed_parameter = false) -> Traced;
-
-    // Projection step for a pose curve whose parameter is a variable of the projection (planning in (q, t) with the end-
-    // effector sliding along its segment): err is the 6-vector pose error of the TSR kernel (trace_tsr_error) and the
-    // unknowns are the joints followed by the curve parameter t, so n_vars = nq + 1.
-    // Input: J (6 x (nq + 1), row-major: the TSR Jacobian d(err)/dq with a column d(err)/dt appended by the caller),
-    // then err (6); for ProjMethod::BoundedLS also lower - x (nq + 1) and upper - x (nq + 1), where the last entry of
-    // each is the step allowed to the segment's ends. The other methods take no bounds and leave t unbounded.
-    // Output: step (nq + 1), the last entry being the step in t. Uses conditionals for BoundedLS (C++ only).
-    auto trace_solve_pose_slide(const RobotInfo &info, const std::string &language, ProjMethod method) -> Traced;
+        std::size_t err_size) -> Traced;
 
     // Center-of-mass position and Jacobian, optionally expressed relative to the mean
     // position of a set of reference (body) frames, e.g. the feet of a standing humanoid so
@@ -220,8 +140,8 @@ namespace cricket
     auto trace_twist_jacobians(const RobotInfo &info, const std::string &language) -> Traced;
 
     // Derive every JSON-gated constraint kernel (TSR, bimanual TSR, center-of-mass,
-    // closed loops, lead screw, twist Jacobians, the spline constraint) from the recipe keys already present in
-    // `data` ("constraints", "com", "closed_loops", "lead_screw", "twist", "spline_constraint"), tracing the
+    // closed loops, lead screw, twist Jacobians) from the recipe keys already present in
+    // `data` ("constraints", "com", "closed_loops", "lead_screw", "twist"), tracing the
     // kernels and setting the has_* template gates. Shared by the offline generator
     // (fkcc_gen) and the JIT path (generate_robot_source) so both accept the same keys.
     auto derive_constraint_traces(const RobotInfo &robot, nlohmann::json &data, const std::string &language)

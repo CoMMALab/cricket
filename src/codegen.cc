@@ -229,128 +229,6 @@ namespace cricket
             }
         }
 
-        // Position constraint against a cubic B-spline curve with the curve parameter as an extra variable
-        // ("spline_constraint": true). The kernel selects the spline span with conditionals (SIMD blends), so
-        // it is C++ only (requesting it for rust is an error), and generated only on request: it is large.
-        // The number of control points is fixed in the kernel (see spline_control_points).
-        const bool spline_constraint = data.value("spline_constraint", false);
-        if (spline_constraint and language == "rust")
-        {
-            throw std::runtime_error("\"spline_constraint\" needs conditionals, which the rust language cannot emit");
-        }
-
-        data["has_spline_constraint"] = spline_constraint;
-        if (spline_constraint)
-        {
-            constexpr std::size_t spline_control_points = 20;
-            data["spline_control_points"] = spline_control_points;
-            data["spline_knots"] = spline_control_points + 4;
-
-            set_trace(trace_spline_error<spline_control_points>(robot, language), "spline_error");
-            set_trace(trace_spline_seed<spline_control_points>(robot, language), "spline_seed");
-            set_trace(trace_spline_closest_t<spline_control_points>(robot, language), "spline_closest_t");
-            // All four projection methods, as for the TSR error. The unknowns are the joints and t; only the bounded
-            // solver enforces t in [0, 1], so the others leave t unbounded and the caller clamps it.
-            set_trace(trace_solve_spline(robot, language, ProjMethod::InnerLM), "solve_spline_error_lm_inner");
-            set_trace(trace_solve_spline(robot, language, ProjMethod::OuterLM), "solve_spline_error_lm_outer");
-            set_trace(
-                trace_solve_spline(robot, language, ProjMethod::GradDesc), "solve_spline_error_gradient_descent");
-            set_trace(trace_solve_spline(robot, language, ProjMethod::BoundedLS), "solve_spline_error_bounded_ls");
-
-            // The same error and projection steps with t given (planning in (q, t), SplineSpace): the Jacobian is
-            // d(err)/dq (3 x nq) and the unknowns are the joints alone, so no dead t column goes through the solve.
-            set_trace(trace_spline_error<spline_control_points>(robot, language, true), "spline_error_fixed_t");
-            set_trace(
-                trace_solve_spline(robot, language, ProjMethod::InnerLM, true), "solve_spline_fixed_t_lm_inner");
-            set_trace(
-                trace_solve_spline(robot, language, ProjMethod::OuterLM, true), "solve_spline_fixed_t_lm_outer");
-            set_trace(
-                trace_solve_spline(robot, language, ProjMethod::GradDesc, true),
-                "solve_spline_fixed_t_gradient_descent");
-            set_trace(
-                trace_solve_spline(robot, language, ProjMethod::BoundedLS, true), "solve_spline_fixed_t_bounded_ls");
-        }
-
-        // Position constraint against a Catmull-Rom curve at a given curve parameter ("catmull_rom_constraint": true),
-        // for planning in SplineSpace. The error kernel only; the projection solvers and the space are the spline
-        // constraint's fixed-parameter ones, which this therefore needs. Conditionals again: C++ only.
-        const bool catmull_rom_constraint = data.value("catmull_rom_constraint", false);
-        if (catmull_rom_constraint and not spline_constraint)
-        {
-            throw std::runtime_error(
-                "\"catmull_rom_constraint\" needs \"spline_constraint\": true: it uses that constraint's "
-                "fixed-parameter projection solvers and SplineSpace");
-        }
-
-        if (catmull_rom_constraint and language == "rust")
-        {
-            throw std::runtime_error(
-                "\"catmull_rom_constraint\" needs conditionals, which the rust language cannot emit");
-        }
-
-        data["has_catmull_rom_constraint"] = catmull_rom_constraint;
-        if (catmull_rom_constraint)
-        {
-            constexpr std::size_t catmull_rom_points = 20;
-            data["catmull_rom_points"] = catmull_rom_points;
-
-            set_trace(trace_catmull_rom_error<catmull_rom_points>(robot, language), "catmull_rom_error");
-        }
-
-        // Position constraint against a target point that the runtime hands over ("position_target_constraint": true),
-        // for planning along a curve in SplineSpace with the curve evaluated at t by the runtime (any kind of curve,
-        // any number of points). The error kernel only; the projection solvers and the space are the spline
-        // constraint's fixed-parameter ones, which this therefore needs. No conditionals: also for rust.
-        const bool position_target_constraint = data.value("position_target_constraint", false);
-        if (position_target_constraint and not spline_constraint)
-        {
-            throw std::runtime_error(
-                "\"position_target_constraint\" needs \"spline_constraint\": true: it uses that constraint's "
-                "fixed-parameter projection solvers and SplineSpace");
-        }
-
-        data["has_position_target_constraint"] = position_target_constraint;
-        if (position_target_constraint)
-        {
-            set_trace(trace_position_target_error(robot, language), "position_target_error");
-        }
-
-        // Projection solvers for a pose curve whose parameter is a variable of the projection ("pose_slide_constraint":
-        // true): the pose error of the TSR kernel (6 rows) with a column for the curve parameter appended by the
-        // runtime, so the unknowns are the joints and t. Needs the TSR constraint ("constraints": true) of a robot with
-        // one end-effector and SplineSpace ("spline_constraint": true). The error kernel is the TSR one; only the four
-        // solvers are generated. BoundedLS needs conditionals: C++ only.
-        const bool pose_slide_constraint = data.value("pose_slide_constraint", false);
-        if (pose_slide_constraint and not(constraints and spline_constraint))
-        {
-            throw std::runtime_error(
-                "\"pose_slide_constraint\" needs \"constraints\": true (the TSR error kernel) and "
-                "\"spline_constraint\": true (SplineSpace)");
-        }
-
-        if (pose_slide_constraint and robot.end_effector_indexes.size() != 1)
-        {
-            throw std::runtime_error("\"pose_slide_constraint\" needs a robot with exactly one end-effector");
-        }
-
-        if (pose_slide_constraint and language == "rust")
-        {
-            throw std::runtime_error(
-                "\"pose_slide_constraint\" needs conditionals, which the rust language cannot emit");
-        }
-
-        data["has_pose_slide_constraint"] = pose_slide_constraint;
-        if (pose_slide_constraint)
-        {
-            set_trace(trace_solve_pose_slide(robot, language, ProjMethod::InnerLM), "solve_pose_slide_error_lm_inner");
-            set_trace(trace_solve_pose_slide(robot, language, ProjMethod::OuterLM), "solve_pose_slide_error_lm_outer");
-            set_trace(
-                trace_solve_pose_slide(robot, language, ProjMethod::GradDesc),
-                "solve_pose_slide_error_gradient_descent");
-            set_trace(
-                trace_solve_pose_slide(robot, language, ProjMethod::BoundedLS), "solve_pose_slide_error_bounded_ls");
-        }
-
         // Center-of-mass kinematics. "com": true is the world-frame CoM. An object selects the frame:
         //   {"frame": "world"}                                 world-frame CoM (the default frame)
         //   {"frame": "feet", "reference_frames": [f1, f2]}    CoM minus the mean position of the reference
@@ -575,10 +453,6 @@ namespace cricket
             "closed_loops",
             "lead_screw",
             "twist",
-            "spline_constraint",
-            "catmull_rom_constraint",
-            "position_target_constraint",
-            "pose_slide_constraint",
         };
         static const std::vector<std::string_view> bounds_keys = {"lower", "upper"};
         static const std::vector<std::string_view> com_keys = {"frame", "reference_frames"};
