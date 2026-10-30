@@ -654,6 +654,12 @@ namespace cricket
         return trace_solve_jacobian(info, language, method, 3, fixed_parameter ? 0 : 1);
     }
 
+    auto trace_solve_pose_slide(const RobotInfo &info, const std::string &language, ProjMethod method) -> Traced
+    {
+        // err is the 6-vector pose error, and the unknowns are the joints plus the curve parameter t
+        return trace_solve_jacobian(info, language, method, task_dim, 1);
+    }
+
     auto trace_solve_jacobian(
         const RobotInfo &info,
         const std::string &language,

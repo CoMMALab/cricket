@@ -169,6 +169,15 @@ namespace cricket
         ProjMethod method,
         bool fixed_parameter = false) -> Traced;
 
+    // Projection step for a pose curve whose parameter is a variable of the projection (planning in (q, t) with the end-
+    // effector sliding along its segment): err is the 6-vector pose error of the TSR kernel (trace_tsr_error) and the
+    // unknowns are the joints followed by the curve parameter t, so n_vars = nq + 1.
+    // Input: J (6 x (nq + 1), row-major: the TSR Jacobian d(err)/dq with a column d(err)/dt appended by the caller),
+    // then err (6); for ProjMethod::BoundedLS also lower - x (nq + 1) and upper - x (nq + 1), where the last entry of
+    // each is the step allowed to the segment's ends. The other methods take no bounds and leave t unbounded.
+    // Output: step (nq + 1), the last entry being the step in t. Uses conditionals for BoundedLS (C++ only).
+    auto trace_solve_pose_slide(const RobotInfo &info, const std::string &language, ProjMethod method) -> Traced;
+
     // Center-of-mass position and Jacobian, optionally expressed relative to the mean
     // position of a set of reference (body) frames, e.g. the feet of a standing humanoid so
     // that a support polygon can be stated in the stance frame.

@@ -315,6 +315,42 @@ namespace cricket
             set_trace(trace_position_target_error(robot, language), "position_target_error");
         }
 
+        // Projection solvers for a pose curve whose parameter is a variable of the projection ("pose_slide_constraint":
+        // true): the pose error of the TSR kernel (6 rows) with a column for the curve parameter appended by the
+        // runtime, so the unknowns are the joints and t. Needs the TSR constraint ("constraints": true) of a robot with
+        // one end-effector and SplineSpace ("spline_constraint": true). The error kernel is the TSR one; only the four
+        // solvers are generated. BoundedLS needs conditionals: C++ only.
+        const bool pose_slide_constraint = data.value("pose_slide_constraint", false);
+        if (pose_slide_constraint and not(constraints and spline_constraint))
+        {
+            throw std::runtime_error(
+                "\"pose_slide_constraint\" needs \"constraints\": true (the TSR error kernel) and "
+                "\"spline_constraint\": true (SplineSpace)");
+        }
+
+        if (pose_slide_constraint and robot.end_effector_indexes.size() != 1)
+        {
+            throw std::runtime_error("\"pose_slide_constraint\" needs a robot with exactly one end-effector");
+        }
+
+        if (pose_slide_constraint and language == "rust")
+        {
+            throw std::runtime_error(
+                "\"pose_slide_constraint\" needs conditionals, which the rust language cannot emit");
+        }
+
+        data["has_pose_slide_constraint"] = pose_slide_constraint;
+        if (pose_slide_constraint)
+        {
+            set_trace(trace_solve_pose_slide(robot, language, ProjMethod::InnerLM), "solve_pose_slide_error_lm_inner");
+            set_trace(trace_solve_pose_slide(robot, language, ProjMethod::OuterLM), "solve_pose_slide_error_lm_outer");
+            set_trace(
+                trace_solve_pose_slide(robot, language, ProjMethod::GradDesc),
+                "solve_pose_slide_error_gradient_descent");
+            set_trace(
+                trace_solve_pose_slide(robot, language, ProjMethod::BoundedLS), "solve_pose_slide_error_bounded_ls");
+        }
+
         // Center-of-mass kinematics. "com": true is the world-frame CoM. An object selects the frame:
         //   {"frame": "world"}                                 world-frame CoM (the default frame)
         //   {"frame": "feet", "reference_frames": [f1, f2]}    CoM minus the mean position of the reference
@@ -542,6 +578,7 @@ namespace cricket
             "spline_constraint",
             "catmull_rom_constraint",
             "position_target_constraint",
+            "pose_slide_constraint",
         };
         static const std::vector<std::string_view> bounds_keys = {"lower", "upper"};
         static const std::vector<std::string_view> com_keys = {"frame", "reference_frames"};

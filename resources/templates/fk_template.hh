@@ -816,6 +816,55 @@ struct {{name}}
     }
     {% endif %}
 
+    {% if has_pose_slide_constraint %}
+    //
+    // Pose curve with a variable parameter: the projection steps for the TSR error (tsr_error, 6 rows) of a pose curve
+    // whose parameter t is an unknown of the projection next to the joints (planning in SplineSpace with the
+    // end-effector sliding along its segment).
+    //
+
+    static constexpr bool has_pose_slide = true;
+
+    // Input: J (6 * (dimension + 1), row-major: d(err)/dq from tsr_error with a column d(err)/dt appended by the
+    // caller), then err (6). Output: the gradient (dimension + 1 entries: the joints, then t), applied as
+    // x <- x - gradient. These do not bound t: the caller clamps it to its segment; the bounded variant enforces it.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_pose_slide_error_lm_inner(const InputVector &x, OutputVector &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_pose_slide_error_lm_inner_code_vars}}> v;
+
+        {{solve_pose_slide_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_pose_slide_error_lm_outer(const InputVector &x, OutputVector &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_pose_slide_error_lm_outer_code_vars}}> v;
+
+        {{solve_pose_slide_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_pose_slide_error_gradient_descent(const InputVector &x, OutputVector &y) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{solve_pose_slide_error_gradient_descent_code_vars}}> v;
+
+        {{solve_pose_slide_error_gradient_descent_code}}
+    }
+
+    // Input: as above, then lower - x and upper - x (dimension + 1 entries each): the allowed step to each bound,
+    // where x is q followed by t. The last entry of each is the step allowed to the segment's ends.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto solve_pose_slide_error_bounded_ls(const InputVector &x, OutputVector &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{solve_pose_slide_error_bounded_ls_code_vars}}> v;
+
+        {{solve_pose_slide_error_bounded_ls_code}}
+    }
+    {% endif %}
+
     {% if has_catmull_rom_constraint %}
     //
     // Catmull-Rom constraint: the first end-effector's position lies on a Catmull-Rom curve through

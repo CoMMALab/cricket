@@ -19,6 +19,10 @@ Drawn:
   end-effector      orange sphere; the curve point P(t) it is being matched to is the green sphere,
                     with the error between them in red and the tangent dP/dt as a short green line
   trails            where the end-effector and P(t) have been over the steps so far
+  segment           for a curve of segments (dumps whose steps have "segment", its two end points, with "segment_index"
+                    and "s", the fraction along it): the segment t is on, highlighted in yellow
+  frames            for a pose curve (dumps whose steps have "eef_quaternion" and "target_quaternion", w x y z): the
+                    end-effector's frame and the curve's frame at P(t), with the rotation and position errors
 
 The slider steps through the projection or the planned path, so both the arm and t move.
 """
@@ -139,6 +143,8 @@ def main():
 
     info_t = gui.add_text("t", initial_value="", disabled=True)
     info_error = gui.add_text("|FK(q) - P(t)|", initial_value="", disabled=True)
+    info_rotation = gui.add_text("rotation / position error", initial_value="", disabled=True)
+    info_segment = gui.add_text("segment, s", initial_value="", disabled=True)
     info_q = gui.add_text("q", initial_value="", disabled=True)
 
     with gui.add_folder("Problem"):
@@ -175,6 +181,8 @@ def main():
     # ---- the scene of the loaded dump ----
     nodes = []  # scene handles of the loaded dump, removed when another one is loaded
     current = {"iterations": [], "ee_trail": [], "curve_trail": []}
+    frames = []  # the end-effector's and the curve's frames of a pose curve
+    segment_handles = []  # the highlighted segment t is on
 
     def keep(handle, layer=None):
         nodes.append(handle)
@@ -202,6 +210,12 @@ def main():
         nodes.clear()
         for handles in layers.values():
             handles.clear()
+
+        for handle in frames + segment_handles:
+            handle.remove()
+
+        frames.clear()
+        segment_handles.clear()
 
         waypoints = np.array(d["waypoints"])
         control_points = np.array(d["control_points"])
@@ -346,6 +360,43 @@ def main():
 
         scene.add_line_segments("/ee_trail", points=segments(ee_points), colors=(255, 140, 0), thickness=0.004)
         scene.add_line_segments("/curve_trail", points=segments(curve_points), colors=(60, 220, 90), thickness=0.004)
+
+        if "eef_quaternion" in it and "target_quaternion" in it:
+            # a pose curve: the frames of the end-effector and of the curve's pose at t
+            for handle in frames:
+                handle.remove()
+
+            frames.clear()
+            for name, quaternion, position in (
+                ("/ee_frame", it["eef_quaternion"], ee),
+                ("/target_frame", it["target_quaternion"], point),
+            ):
+                frames.append(
+                    scene.add_frame(
+                        name, wxyz=tuple(quaternion), position=tuple(position), axes_length=0.09, axes_radius=0.004
+                    )
+                )
+
+            info_rotation.value = (
+                f"{np.degrees(it['rotation_error']):.3f} deg, {1000.0 * it['position_error']:.3f} mm"
+            )
+        else:
+            info_rotation.value = ""
+
+        for handle in segment_handles:
+            handle.remove()
+
+        segment_handles.clear()
+        if "segment" in it:
+            # the segment of the curve that t is on
+            segment_handles.append(
+                scene.add_line_segments(
+                    "/segment", points=np.array(it["segment"], dtype=float)[None], colors=(255, 230, 0), thickness=0.018
+                )
+            )
+            info_segment.value = f"segment {it['segment_index']}, s = {it['s']:.4f}"
+        else:
+            info_segment.value = ""
 
         info_t.value = f"{it['t']:.5f}"
         info_error.value = f"{it['error_norm']:.6f}"
