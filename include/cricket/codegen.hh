@@ -15,6 +15,10 @@
 
 namespace cricket
 {
+    // The number of points of the lerp curves. The kernels are traced for exactly this many (a template argument, so a
+    // compile-time constant), and it becomes Robot::lerp_points of the generated header: change it here only.
+    inline constexpr std::size_t lerp_points = 32;
+
     struct Traced
     {
         std::string code;

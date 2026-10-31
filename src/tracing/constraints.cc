@@ -381,10 +381,10 @@ namespace cricket
         return trace_lerp_so3r3_kernel<N, true>(info, language);
     }
 
-    template auto trace_lerp_r3_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
-    template auto trace_lerp_so3r3_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
-    template auto trace_lerp_r3_segment_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
-    template auto trace_lerp_so3r3_segment_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
+    template auto trace_lerp_r3_error<lerp_points>(const RobotInfo &info, const std::string &language) -> Traced;
+    template auto trace_lerp_so3r3_error<lerp_points>(const RobotInfo &info, const std::string &language) -> Traced;
+    template auto trace_lerp_r3_segment_error<lerp_points>(const RobotInfo &info, const std::string &language) -> Traced;
+    template auto trace_lerp_so3r3_segment_error<lerp_points>(const RobotInfo &info, const std::string &language) -> Traced;
 
     auto trace_tsr_bimanual_error(
         const RobotInfo &info,

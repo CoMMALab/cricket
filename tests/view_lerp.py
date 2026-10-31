@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Show dumps from lerp_kernel_eval in viser: a straight-line (lerp) curve through 20 keyframes, and a projection onto
-it: with t held fixed (mode qt: onto the point P(t)), or with t free along its segment (mode qs).
+"""Show dumps from lerp_kernel_eval in viser: a straight-line (lerp) curve through 32 keyframes, and a projection onto
+it: with t held fixed (mode qt: onto the point P(t)), or with t free along its segment (mode qs), or a path planned in
+(q, t) by the C++ test lerp_space_rrtc_test (mode path: every state is on the curve at its own t).
 
     python3 tests/view_lerp.py lerp_r3.json                       # one dump, then open http://localhost:8080
     python3 tests/view_lerp.py lerp_r3.json lerp_so3r3.json       # several: a "Problem" dropdown picks one
@@ -154,7 +155,7 @@ def main():
 
     # ---- the scene of the loaded dump ----
     nodes = []  # scene handles of the loaded dump, removed when another one is loaded
-    current = {"dump": None, "iterations": [], "ee_trail": [], "curve_trail": []}
+    current = {"dump": None, "keyframes": None, "iterations": [], "ee_trail": [], "curve_trail": []}
 
     def keep(handle, layer=None):
         nodes.append(handle)
@@ -210,18 +211,8 @@ def main():
             for handle in handles:
                 handle.visible = boxes[name].value
 
-        # the segment t is on (it is the same at every step: t is held fixed)
-        segment = d["iterations"][0]["segment"]
-        keep(
-            scene.add_line_segments(
-                "/segment",
-                points=np.stack([keyframes[segment], keyframes[segment + 1]])[None],
-                colors=(250, 220, 60),
-                thickness=0.016,
-            )
-        )
-
         current["dump"] = d
+        current["keyframes"] = keyframes
         current["iterations"] = d["iterations"]
         current["ee_trail"] = [np.array(it["arm"][-1]) for it in d["iterations"]]
         current["curve_trail"] = [np.array(it["curve_point"]) for it in d["iterations"]]
@@ -253,6 +244,15 @@ def main():
         cfg[: len(q)] = q  # any extra actuated joints (a gripper) stay at zero
         robot.update_cfg(cfg)
 
+        # the segment t is on, highlighted: the same at every step when t is held fixed, but along a planned path it moves
+        keyframes = current["keyframes"]
+        scene.add_line_segments(
+            "/segment",
+            points=np.stack([keyframes[it["segment"]], keyframes[it["segment"] + 1]])[None],
+            colors=(250, 220, 60),
+            thickness=0.016,
+        )
+
         scene.add_icosphere("/ee", radius=0.02, color=(255, 140, 0), position=tuple(ee))
         scene.add_icosphere("/curve_point", radius=0.016, color=(60, 220, 90), position=tuple(point))
         scene.add_line_segments("/error", points=np.stack([ee, point])[None], colors=(255, 50, 50), thickness=0.006)
@@ -268,7 +268,7 @@ def main():
 
         scene.add_line_segments("/ee_trail", points=segments(ee_points), colors=(255, 140, 0), thickness=0.004)
 
-        if d.get("mode") == "qs":
+        if d.get("mode") in ("qs", "path"):
             curve_points = current["curve_trail"][: step + 1]
             if len(curve_points) < 2:
                 curve_points = [point, point]

@@ -232,11 +232,10 @@ namespace cricket
         // Straight-line (lerp) curve constraints, for planning along a curve with the curve evaluated at t inside the
         // error kernel and t held fixed in the projection ("lerp_r3_constraint": the first end-effector's position on a
         // polyline in R^3; "lerp_so3r3_constraint": its pose on a polyline of poses in SO(3) x R^3, the rotations
-        // slerped, with the weight of the rotation error a runtime input). The curve has lerp_points points, a
+        // slerped, with the weight of the rotation error a runtime input). The curve has cricket::lerp_points points (codegen.hh), a
         // constant of the generated header; the points and their parameters are inputs. Each kernel comes with the
         // projection solvers for its error (3 rows, 6 rows). The segment of t is picked by conditionals, so these are
         // for C++ only.
-        constexpr std::size_t lerp_points = 20;
         const bool lerp_r3_constraint = data.value("lerp_r3_constraint", false);
         const bool lerp_so3r3_constraint = data.value("lerp_so3r3_constraint", false);
 

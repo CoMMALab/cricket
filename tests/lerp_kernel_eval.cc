@@ -1,5 +1,5 @@
 // Evaluates the lerp constraint kernels two ways on the same inputs, runs a fixed-t projection on the generated code,
-// and writes a dump that tests/view_lerp.py shows in viser. The curve is a straight-line interpolation through 20
+// and writes a dump that tests/view_lerp.py shows in viser. The curve is a straight-line interpolation through 32
 // keyframes: positions in R^3 (curve=r3), or poses in SO(3) x R^3 with the rotation slerped (curve=so3r3).
 //
 //   1. reference: forward kinematics from pinocchio, the curve point (and its slerped rotation) from plain host code
@@ -24,6 +24,8 @@
 //
 //   curve      r3 or so3r3
 //   t          curve parameter in [0, 1]: held fixed in the projection (qt), or where it starts (qs)
+//   scale      the size of the curve: the S that the keyframes follow has extents 20 x 12 x 8 cm at scale 1, and a larger
+//              scale makes its segments longer
 //   weight     so3r3: the weight of the rotation error against the translation error (m / rad); it also sets how the
 //              keyframes' parameters taus are spaced, since a segment's length is sqrt(|dp|^2 + weight^2 theta^2)
 //   turn       so3r3: the rotation about the world z axis (degrees) between the first and last keyframe
@@ -79,7 +81,7 @@
 
 namespace
 {
-    constexpr std::size_t N = 20;
+    constexpr std::size_t N = cricket::lerp_points;
     constexpr double pi = 3.14159265358979323846;
 
     // The lerp curve: N keyframes at the parameters taus
@@ -878,6 +880,7 @@ int main(int argc, char **argv)
         std::string mode = "qt";
         double t = 0.4;
         double weight = 1.0;
+        double curve_scale = 1.0;  // the size of the curve: its S has extents 20 x 12 x 8 cm at scale 1
         double turn = 60.0;  // degrees, between the first and last keyframe
 
         Eigen::VectorXd q(nq);
@@ -912,6 +915,10 @@ int main(int argc, char **argv)
             else if (key == "t")
             {
                 t = std::stod(value);
+            }
+            else if (key == "scale")
+            {
+                curve_scale = std::stod(value);
             }
             else if (key == "weight")
             {
@@ -974,7 +981,7 @@ int main(int argc, char **argv)
             {
                 throw std::runtime_error(
                     "unknown argument `" + argument +
-                    "`; arguments are key=value, with keys curve, mode, t, weight, turn, q, method, iterations, dump, sweep, repeat, tolerance, max_step, flags, keep "
+                    "`; arguments are key=value, with keys curve, mode, t, scale, weight, turn, q, method, iterations, dump, sweep, repeat, tolerance, max_step, flags, keep "
                     "(for example: curve=so3r3 t=0.4 dump=lerp.json)");
             }
         }
@@ -1001,7 +1008,7 @@ int main(int argc, char **argv)
         for (std::size_t i = 0; i < N; ++i)
         {
             const double s = static_cast<double>(i) / static_cast<double>(N - 1);
-            curve.positions.push_back(start.translation() + Eigen::Vector3d(0.20 * s, 0.12 * std::sin(2.0 * pi * s), 0.08 * s));
+            curve.positions.push_back(start.translation() + curve_scale * Eigen::Vector3d(0.20 * s, 0.12 * std::sin(2.0 * pi * s), 0.08 * s));
             if (curve.pose)
             {
                 const Eigen::Quaterniond about_z(Eigen::AngleAxisd(turn * pi / 180.0 * s, Eigen::Vector3d::UnitZ()));
