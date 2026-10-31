@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cstddef>
+#include <utility>
 
 // The straight-line (lerp) curves of the fixed-parameter constraints, written for any scalar type: the traced kernels
 // instantiate them with the CppAD code-generation scalar, and tests can use double.
@@ -21,6 +22,11 @@
 //   SO(3) x R^3  the same position, and the rotation R(t) = R_i exp(s log(R_i^T R_{i + 1})), the slerp
 //
 // The segment is picked by conditionals (SIMD blends in the block language), so every lane of a vector takes its own.
+//
+// In the fixed form the parameter t that picks the segment is the one the curve is evaluated at. In the segment
+// form they are two inputs: t_segment picks the segment, and t, an unknown of the projection, is the parameter within it,
+// s = (t - tau_i) / (tau_{i + 1} - tau_i) of the segment of t_segment. The kernel then also hands over the allowed step of t
+// to the two ends of the segment, so a solver can keep t inside it.
 namespace cricket
 {
     // Order of the inputs of the traced R^3 kernel, for a curve through N points (N is fixed when the kernel is traced).
@@ -28,27 +34,37 @@ namespace cricket
     //
     //   [ q (nq) | t (1) | points (3 N, x y z of point 0, then point 1, ...) | taus (N) ]
     //
-    // The parameter t is an input but never differentiated: the kernel is for projections that hold t fixed.
-    template <std::size_t N>
+    // The parameter t is an input but never differentiated: the kernel is for projections that hold t fixed. In the segment form,
+    // t_segment (1) follows t and t is differentiated (it is the column after the joints):
+    //
+    //   [ q (nq) | t (1) | t_segment (1) | points (3 N) | taus (N) ]
+    template <std::size_t N, bool Segment = false>
     struct LerpR3InputLayout
     {
         static_assert(N >= 2, "a lerp curve needs at least two points");
 
-        static constexpr std::size_t curve_inputs = 1 + 3 * N + N;
+        static constexpr std::size_t shift = Segment ? 1 : 0;
+        static constexpr std::size_t curve_inputs = 1 + shift + 3 * N + N;
 
         static constexpr auto t_idx(std::size_t nq) -> std::size_t
         {
             return nq;
         }
 
+        static constexpr auto segment_idx(std::size_t nq) -> std::size_t
+        {
+            static_assert(Segment, "only the segment form has a separate t_segment");
+            return nq + 1;
+        }
+
         static constexpr auto point_idx(std::size_t nq, std::size_t point, std::size_t axis) -> std::size_t
         {
-            return nq + 1 + 3 * point + axis;
+            return nq + 1 + shift + 3 * point + axis;
         }
 
         static constexpr auto tau_idx(std::size_t nq, std::size_t index) -> std::size_t
         {
-            return nq + 1 + 3 * N + index;
+            return nq + 1 + shift + 3 * N + index;
         }
 
         static constexpr auto total(std::size_t nq) -> std::size_t
@@ -62,37 +78,46 @@ namespace cricket
     //   [ q (nq) | t (1) | weight (1) | positions (3 N) | quaternions (4 N, w x y z of keyframe 0, then 1, ...) | taus (N) ]
     //
     // The weight (m / rad) scales the rotation part of the error against the translation part. t and the curve data are
-    // inputs but never differentiated.
-    template <std::size_t N>
+    // inputs but never differentiated. In the segment form, t_segment follows t, and t is differentiated:
+    //
+    //   [ q (nq) | t (1) | t_segment (1) | weight (1) | positions (3 N) | quaternions (4 N) | taus (N) ]
+    template <std::size_t N, bool Segment = false>
     struct LerpPoseInputLayout
     {
         static_assert(N >= 2, "a lerp curve needs at least two keyframes");
 
-        static constexpr std::size_t curve_inputs = 2 + 3 * N + 4 * N + N;
+        static constexpr std::size_t shift = Segment ? 1 : 0;
+        static constexpr std::size_t curve_inputs = 2 + shift + 3 * N + 4 * N + N;
 
         static constexpr auto t_idx(std::size_t nq) -> std::size_t
         {
             return nq;
         }
 
+        static constexpr auto segment_idx(std::size_t nq) -> std::size_t
+        {
+            static_assert(Segment, "only the segment form has a separate t_segment");
+            return nq + 1;
+        }
+
         static constexpr auto weight_idx(std::size_t nq) -> std::size_t
         {
-            return nq + 1;
+            return nq + 1 + shift;
         }
 
         static constexpr auto position_idx(std::size_t nq, std::size_t keyframe, std::size_t axis) -> std::size_t
         {
-            return nq + 2 + 3 * keyframe + axis;
+            return nq + 2 + shift + 3 * keyframe + axis;
         }
 
         static constexpr auto quaternion_idx(std::size_t nq, std::size_t keyframe, std::size_t component) -> std::size_t
         {
-            return nq + 2 + 3 * N + 4 * keyframe + component;
+            return nq + 2 + shift + 3 * N + 4 * keyframe + component;
         }
 
         static constexpr auto tau_idx(std::size_t nq, std::size_t index) -> std::size_t
         {
-            return nq + 2 + 7 * N + index;
+            return nq + 2 + shift + 7 * N + index;
         }
 
         static constexpr auto total(std::size_t nq) -> std::size_t
@@ -101,39 +126,49 @@ namespace cricket
         }
     };
 
-    // The value at(segment) of the segment that contains t, by conditionals: from the last segment to the first, each
-    // CondExp takes that segment's value when t is before the segment's end tau_{segment + 1} and otherwise keeps the
-    // choice made for the later segments. The result is the first segment whose end is after t, and t = 1 stays in the
-    // last one. The values `at` returns do not depend on t.
+    // The value at(segment) of the segment that contains `selector` (the parameter t, or t_segment in the segment form), by
+    // conditionals: from the last segment to the first, each CondExp takes that segment's value when the selector is
+    // before the segment's end tau_{segment + 1} and otherwise keeps the choice made for the later segments. The result
+    // is the first segment whose end is after the selector, and 1 stays in the last one. The values `at` returns do not
+    // depend on the selector.
     template <typename Scalar, std::size_t N, typename At>
-    auto select_segment(const Scalar &t, const std::array<Scalar, N> &taus, At at) -> Scalar
+    auto select_segment(const Scalar &selector, const std::array<Scalar, N> &taus, At at) -> Scalar
     {
         Scalar selected = at(N - 2);
         for (std::size_t k = 1; k + 1 < N; ++k)
         {
             const std::size_t segment = N - 2 - k;
-            selected = CppAD::CondExpLt(t, taus[segment + 1], at(segment), selected);
+            selected = CppAD::CondExpLt(selector, taus[segment + 1], at(segment), selected);
         }
 
         return selected;
     }
 
-    // Point of the R^3 curve at t
+    // The parameters tau of the two ends of the segment `selector` is on
+    template <typename Scalar, std::size_t N>
+    auto segment_range(const Scalar &selector, const std::array<Scalar, N> &taus) -> std::pair<Scalar, Scalar>
+    {
+        return {
+            select_segment<Scalar, N>(selector, taus, [&](std::size_t i) { return taus[i]; }),
+            select_segment<Scalar, N>(selector, taus, [&](std::size_t i) { return taus[i + 1]; })};
+    }
+
+    // Point of the R^3 curve at t, on the segment `selector` is on (the same parameter, unless in the segment form)
     template <typename Scalar, std::size_t N>
     auto lerp_r3_point(
         const Scalar &t,
+        const Scalar &selector,
         const std::array<Eigen::Matrix<Scalar, 3, 1>, N> &points,
         const std::array<Scalar, N> &taus) -> Eigen::Matrix<Scalar, 3, 1>
     {
-        const Scalar start = select_segment<Scalar, N>(t, taus, [&](std::size_t i) { return taus[i]; });
-        const Scalar end = select_segment<Scalar, N>(t, taus, [&](std::size_t i) { return taus[i + 1]; });
+        const auto [start, end] = segment_range<Scalar, N>(selector, taus);
         const Scalar s = (t - start) / (end - start);
 
         Eigen::Matrix<Scalar, 3, 1> point;
         for (std::size_t axis = 0; axis < 3; ++axis)
         {
-            const Scalar from = select_segment<Scalar, N>(t, taus, [&](std::size_t i) { return points[i][axis]; });
-            const Scalar to = select_segment<Scalar, N>(t, taus, [&](std::size_t i) { return points[i + 1][axis]; });
+            const Scalar from = select_segment<Scalar, N>(selector, taus, [&](std::size_t i) { return points[i][axis]; });
+            const Scalar to = select_segment<Scalar, N>(selector, taus, [&](std::size_t i) { return points[i + 1][axis]; });
             point[axis] = from + s * (to - from);
         }
 
@@ -154,13 +189,14 @@ namespace cricket
         return Eigen::Quaternion<Scalar>(q[0], q[1], q[2], q[3]).toRotationMatrix();
     }
 
-    // Pose of the SO(3) x R^3 curve at t: the position is lerped and the rotation slerped, R_i exp(s log(R_i^T
+    // Pose of the SO(3) x R^3 curve at t, on the segment `selector` is on: the position is lerped and the rotation slerped, R_i exp(s log(R_i^T
     // R_{i + 1})), from the relative rotation (so the short way round, and no division by sin(theta)). The exponential
     // is Rodrigues' formula with the smooth sinc of se3_ops.hh, and the rotation angle carries a small floor, so the
     // derivative is finite through a zero relative rotation.
     template <typename Scalar, std::size_t N>
     auto lerp_pose(
         const Scalar &t,
+        const Scalar &selector,
         const std::array<Eigen::Matrix<Scalar, 3, 1>, N> &positions,
         const std::array<std::array<Scalar, 4>, N> &quaternions,
         const std::array<Scalar, N> &taus) -> LerpPose<Scalar>
@@ -169,15 +205,14 @@ namespace cricket
         using Matrix3 = Eigen::Matrix<Scalar, 3, 3>;
         using DynamicMatrix = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
 
-        const Scalar start = select_segment<Scalar, N>(t, taus, [&](std::size_t i) { return taus[i]; });
-        const Scalar end = select_segment<Scalar, N>(t, taus, [&](std::size_t i) { return taus[i + 1]; });
+        const auto [start, end] = segment_range<Scalar, N>(selector, taus);
         const Scalar s = (t - start) / (end - start);
 
         Vector3 position;
         for (std::size_t axis = 0; axis < 3; ++axis)
         {
-            const Scalar from = select_segment<Scalar, N>(t, taus, [&](std::size_t i) { return positions[i][axis]; });
-            const Scalar to = select_segment<Scalar, N>(t, taus, [&](std::size_t i) { return positions[i + 1][axis]; });
+            const Scalar from = select_segment<Scalar, N>(selector, taus, [&](std::size_t i) { return positions[i][axis]; });
+            const Scalar to = select_segment<Scalar, N>(selector, taus, [&](std::size_t i) { return positions[i + 1][axis]; });
             position[axis] = from + s * (to - from);
         }
 
@@ -185,8 +220,8 @@ namespace cricket
         std::array<Scalar, 4> to_quaternion;
         for (std::size_t c = 0; c < 4; ++c)
         {
-            from_quaternion[c] = select_segment<Scalar, N>(t, taus, [&](std::size_t i) { return quaternions[i][c]; });
-            to_quaternion[c] = select_segment<Scalar, N>(t, taus, [&](std::size_t i) { return quaternions[i + 1][c]; });
+            from_quaternion[c] = select_segment<Scalar, N>(selector, taus, [&](std::size_t i) { return quaternions[i][c]; });
+            to_quaternion[c] = select_segment<Scalar, N>(selector, taus, [&](std::size_t i) { return quaternions[i + 1][c]; });
         }
 
         const Matrix3 from_rotation = quaternion_matrix<Scalar>(from_quaternion);

@@ -161,10 +161,15 @@ namespace cricket
         return emit_error_and_jacobian(error_func, num_inp, nq, n_out, language, true);
     }
 
-    template <std::size_t N>
-    auto trace_lerp_r3_error(const RobotInfo &info, const std::string &language) -> Traced
+    // The lerp kernels, fixed-parameter or segment. Fixed: the unknowns of the projection are the joints, t is an input
+    // and the curve is evaluated on the segment t is on. Segment: t is an unknown next to the joints (the column after
+    // them), the segment is the one the input t_segment is on, and two more outputs follow the error: the allowed step of
+    // t to the start and to the end of that segment, tau_i - t and tau_{i + 1} - t, which a bounded solver uses to keep t
+    // in the segment.
+    template <std::size_t N, bool Segment>
+    auto trace_lerp_r3_kernel(const RobotInfo &info, const std::string &language) -> Traced
     {
-        using Layout = LerpR3InputLayout<N>;
+        using Layout = LerpR3InputLayout<N, Segment>;
 
         if (info.end_effector_indexes.empty())
         {
@@ -176,7 +181,7 @@ namespace cricket
         ADModel ad_model = info.model.cast<ADCG>();
         ADData ad_data(ad_model);
 
-        // Input layout (see LerpR3InputLayout): q (nq), t, points (3 N), taus (N)
+        // Input layout (see LerpR3InputLayout): q (nq), t, [t_segment], points (3 N), taus (N)
         const std::size_t num_inp = Layout::total(nq);
 
         ADVectorXs ad_inp(num_inp);
@@ -189,6 +194,11 @@ namespace cricket
         // difference of two taus, and all-zero taus would give 0 / 0 = NaN on the tape (which CppAD rejects). Strictly
         // increasing taus, t in the middle; the recorded operations (including each CondExp) do not depend on the values.
         ad_inp[Layout::t_idx(nq)] = ADCG(0.5);
+        if constexpr (Segment)
+        {
+            ad_inp[Layout::segment_idx(nq)] = ADCG(0.5);
+        }
+
         for (std::size_t i = 0; i < N; ++i)
         {
             ad_inp[Layout::tau_idx(nq, i)] = ADCG(static_cast<double>(i) / static_cast<double>(N - 1));
@@ -217,24 +227,37 @@ namespace cricket
             taus[i] = ad_inp[Layout::tau_idx(nq, i)];
         }
 
+        const ADCG t = ad_inp[Layout::t_idx(nq)];
+        ADCG selector = t;
+        if constexpr (Segment)
+        {
+            selector = ad_inp[Layout::segment_idx(nq)];
+        }
+
         // position error of the first end-effector against the curve point at t
-        const Eigen::Vector3<ADCG> curve_point = lerp_r3_point<ADCG, N>(ad_inp[Layout::t_idx(nq)], points, taus);
+        const Eigen::Vector3<ADCG> curve_point = lerp_r3_point<ADCG, N>(t, selector, points, taus);
         const Eigen::Vector3<ADCG> eef_position = ad_data.oMf[info.end_effector_indexes[0]].translation();
 
         constexpr std::size_t n_out = 3;
-        ADVectorXs data(n_out);
-        data = eef_position - curve_point;
+        ADVectorXs data(Segment ? n_out + 2 : n_out);
+        data.head(n_out) = eef_position - curve_point;
+        if constexpr (Segment)
+        {
+            const auto [start, end] = segment_range<ADCG, N>(selector, taus);
+            data[n_out] = start - t;
+            data[n_out + 1] = end - t;
+        }
 
         ADFun<CGD> error_func(ad_inp, data);
 
-        // d(err)/dq only: t and the curve data stay on the tape as inputs
-        return emit_error_and_jacobian(error_func, num_inp, nq, n_out, language, true);
+        // d(err)/dq (fixed) or d(err)/d(q, t) (segment): the rest stays on the tape as inputs
+        return emit_error_and_jacobian(error_func, num_inp, Segment ? nq + 1 : nq, n_out, language, true);
     }
 
-    template <std::size_t N>
-    auto trace_lerp_so3r3_error(const RobotInfo &info, const std::string &language) -> Traced
+    template <std::size_t N, bool Segment>
+    auto trace_lerp_so3r3_kernel(const RobotInfo &info, const std::string &language) -> Traced
     {
-        using Layout = LerpPoseInputLayout<N>;
+        using Layout = LerpPoseInputLayout<N, Segment>;
 
         if (info.end_effector_indexes.empty())
         {
@@ -246,7 +269,7 @@ namespace cricket
         ADModel ad_model = info.model.cast<ADCG>();
         ADData ad_data(ad_model);
 
-        // Input layout (see LerpPoseInputLayout): q (nq), t, weight, positions (3 N), quaternions (4 N), taus (N)
+        // Input layout (see LerpPoseInputLayout): q (nq), t, [t_segment], weight, positions (3 N), quaternions (4 N), taus (N)
         const std::size_t num_inp = Layout::total(nq);
 
         ADVectorXs ad_inp(num_inp);
@@ -255,9 +278,14 @@ namespace cricket
             ad_inp[i] = ADCG(0.0);
         }
 
-        // Recorded at a valid curve (see trace_lerp_r3_error): strictly increasing taus, t in the middle, identity
+        // Recorded at a valid curve (see trace_lerp_r3_kernel): strictly increasing taus, t in the middle, identity
         // quaternions, and a unit weight
         ad_inp[Layout::t_idx(nq)] = ADCG(0.5);
+        if constexpr (Segment)
+        {
+            ad_inp[Layout::segment_idx(nq)] = ADCG(0.5);
+        }
+
         ad_inp[Layout::weight_idx(nq)] = ADCG(1.0);
         for (std::size_t i = 0; i < N; ++i)
         {
@@ -294,27 +322,69 @@ namespace cricket
             taus[i] = ad_inp[Layout::tau_idx(nq, i)];
         }
 
+        const ADCG t = ad_inp[Layout::t_idx(nq)];
+        ADCG selector = t;
+        if constexpr (Segment)
+        {
+            selector = ad_inp[Layout::segment_idx(nq)];
+        }
+
         // pose error of the first end-effector in the frame of the curve's pose at t, as the TSR error, with the
         // rotation rows scaled by the weight
-        const auto pose = lerp_pose<ADCG, N>(ad_inp[Layout::t_idx(nq)], positions, quaternions, taus);
+        const auto pose = lerp_pose<ADCG, N>(t, selector, positions, quaternions, taus);
         const SE3Tpl<ADCG> wTr(pose.rotation, pose.position);
         const auto rTe = wTr.inverse() * ad_data.oMf[info.end_effector_indexes[0]];
 
-        ADVectorXs data = se3_displacement(rTe);
+        ADVectorXs displacement = se3_displacement(rTe);
         const ADCG weight = ad_inp[Layout::weight_idx(nq)];
-        for (auto i = 3U; i < task_dim; ++i)
+        ADVectorXs data(Segment ? task_dim + 2 : task_dim);
+        for (auto i = 0U; i < task_dim; ++i)
         {
-            data[i] = weight * data[i];
+            data[i] = (i < 3 ? ADCG(1.0) : weight) * displacement[i];
+        }
+
+        if constexpr (Segment)
+        {
+            const auto [start, end] = segment_range<ADCG, N>(selector, taus);
+            data[task_dim] = start - t;
+            data[task_dim + 1] = end - t;
         }
 
         ADFun<CGD> error_func(ad_inp, data);
 
-        // d(err)/dq only: t, the weight and the curve data stay on the tape as inputs
-        return emit_error_and_jacobian(error_func, num_inp, nq, task_dim, language, true);
+        // d(err)/dq (fixed) or d(err)/d(q, t) (segment): the weight, the rest of the curve data and (fixed) t stay on the
+        // tape as inputs
+        return emit_error_and_jacobian(error_func, num_inp, Segment ? nq + 1 : nq, task_dim, language, true);
+    }
+
+    template <std::size_t N>
+    auto trace_lerp_r3_error(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        return trace_lerp_r3_kernel<N, false>(info, language);
+    }
+
+    template <std::size_t N>
+    auto trace_lerp_so3r3_error(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        return trace_lerp_so3r3_kernel<N, false>(info, language);
+    }
+
+    template <std::size_t N>
+    auto trace_lerp_r3_segment_error(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        return trace_lerp_r3_kernel<N, true>(info, language);
+    }
+
+    template <std::size_t N>
+    auto trace_lerp_so3r3_segment_error(const RobotInfo &info, const std::string &language) -> Traced
+    {
+        return trace_lerp_so3r3_kernel<N, true>(info, language);
     }
 
     template auto trace_lerp_r3_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
     template auto trace_lerp_so3r3_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
+    template auto trace_lerp_r3_segment_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
+    template auto trace_lerp_so3r3_segment_error<20>(const RobotInfo &info, const std::string &language) -> Traced;
 
     auto trace_tsr_bimanual_error(
         const RobotInfo &info,
@@ -380,11 +450,13 @@ namespace cricket
         const RobotInfo &info,
         const std::string &language,
         ProjMethod method,
-        std::size_t err_size) -> Traced
+        std::size_t err_size,
+        std::size_t extra_vars) -> Traced
     {
         constexpr double damp = 1e-6;
 
-        const auto nq = static_cast<std::size_t>(info.model.nq);
+        // The unknowns: the joints, and any extra variables the constraint adds (the curve parameter of a segment projection)
+        const auto nq = static_cast<std::size_t>(info.model.nq) + extra_vars;
 
         const bool bounded = method == ProjMethod::BoundedLS;
         if (bounded and language == "rust")
@@ -400,8 +472,9 @@ namespace cricket
                                                                    : language;
 
         // Input layout (must match vamp's JacobianProjectInp::operator[]):
-        // J (err_size x nq, row-major), then err (err_size), then, for BoundedLS only, the allowed step
-        // to the lower joint limit (lower - q, nq) and to the upper limit (upper - q, nq)
+        // J (err_size x n, row-major), then err (err_size), then, for BoundedLS only, the allowed step to the lower
+        // bound (lower - x, n) and to the upper bound (upper - x, n), where n is the number of unknowns (nq, plus the
+        // extra variables) and x is the joints followed by the extra variables
         const std::size_t num_inp = err_size * nq + err_size + (bounded ? 2 * nq : 0);
 
         ADVectorXs ad_inp(num_inp);

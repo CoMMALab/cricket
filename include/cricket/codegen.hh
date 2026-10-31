@@ -84,6 +84,17 @@ namespace cricket
     template <std::size_t N>
     auto trace_lerp_so3r3_error(const RobotInfo &info, const std::string &language) -> Traced;
 
+    // The same lerp kernels with the curve parameter t an unknown of the projection next to the joints ("segment"): the segment
+    // is the one the extra input t_segment is on, and t is the parameter within it, so the end-effector may move along the
+    // segment. Input: as the fixed kernels, with t_segment after t (see the Segment layouts in tracing/lerp.hh).
+    // Output: d(err)/d(q, t) (m x (nq + 1), row-major, t the last column), then the raw error (m), then the allowed step of
+    // t to the start and to the end of the segment (tau_i - t, tau_{i + 1} - t).
+    template <std::size_t N>
+    auto trace_lerp_r3_segment_error(const RobotInfo &info, const std::string &language) -> Traced;
+
+    template <std::size_t N>
+    auto trace_lerp_so3r3_segment_error(const RobotInfo &info, const std::string &language) -> Traced;
+
     // Relative-pose (bimanual) TSR error between two end-effectors.
     // Input: q (nq), then the reference relative transform lTr (7), lb (6), ub (6).
     // Output: d(err)/dq (6 x nq, row-major), then the raw error (6).
@@ -103,14 +114,16 @@ namespace cricket
         ProjMethod method,
         bool relative = false) -> Traced;
 
-    // Projection step from an arbitrary stacked error and Jacobian with err_size rows.
-    // Input: J (err_size x nq, row-major), then err (err_size); for ProjMethod::BoundedLS also
-    // lower - q (nq) and upper - q (nq). Output: gradient (nq).
+    // Projection step from an arbitrary stacked error and Jacobian with err_size rows. The unknowns are the joints and
+    // `extra_vars` more (the curve parameter of a segment projection), n = nq + extra_vars in all.
+    // Input: J (err_size x n, row-major), then err (err_size); for ProjMethod::BoundedLS also
+    // lower - x (n) and upper - x (n), x the joints followed by the extra variables. Output: gradient (n).
     auto trace_solve_jacobian(
         const RobotInfo &info,
         const std::string &language,
         ProjMethod method,
-        std::size_t err_size) -> Traced;
+        std::size_t err_size,
+        std::size_t extra_vars = 0) -> Traced;
 
     // Center-of-mass position and Jacobian, optionally expressed relative to the mean
     // position of a set of reference (body) frames, e.g. the feet of a standing humanoid so

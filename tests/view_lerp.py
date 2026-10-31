@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Show dumps from lerp_kernel_eval in viser: a straight-line (lerp) curve through 20 keyframes, and a projection onto
-the point P(t) of it with t held fixed.
+it: with t held fixed (mode qt: onto the point P(t)), or with t free along its segment (mode qs).
 
     python3 tests/view_lerp.py lerp_r3.json                       # one dump, then open http://localhost:8080
     python3 tests/view_lerp.py lerp_r3.json lerp_so3r3.json       # several: a "Problem" dropdown picks one
 
-Made with  lerp_kernel_eval curve=r3 dump=lerp_r3.json  or  curve=so3r3 dump=lerp_so3r3.json.
+Made with  lerp_kernel_eval curve=r3 dump=lerp_r3.json  or  curve=so3r3 dump=lerp_so3r3.json, with mode=qs for the segment one.
 
 Drawn:
   curve             the polyline through the keyframes, coloured by t (blue at t = 0, red at t = 1)
@@ -16,10 +16,11 @@ Drawn:
   end-effector      orange sphere; the curve point P(t) it is being matched to is the green sphere, with the error between
                     them in red. For so3r3 a frame at each shows the end-effector's rotation and the slerped target
                     rotation, so the rotation error can be seen
-  trail             where the end-effector has been over the iterations so far
+  trail             where the end-effector has been over the iterations so far (orange), and in qs where P(t) has been (green)
 
-The slider steps through the projection iterations. t does not move (it is held fixed), so P(t) and the segment stay; the
-arm walks to them.
+The slider steps through the projection iterations. In qt t does not move, so P(t) and the segment stay and the arm walks to
+them. In qs the segment stays but t moves along it (the green sphere moves, with a green trail), and the end-effector
+ends on the segment wherever it first reaches it.
 """
 
 import argparse
@@ -126,7 +127,7 @@ def main():
     play = gui.add_checkbox("Play", False)
     speed = gui.add_slider("Steps per second", min=1, max=20, step=1, initial_value=4)
 
-    info_t = gui.add_text("t (held fixed)", initial_value="", disabled=True)
+    info_t = gui.add_text("t", initial_value="", disabled=True)
     info_segment = gui.add_text("segment, s along it", initial_value="", disabled=True)
     info_error = gui.add_text("|err|", initial_value="", disabled=True)
     info_position = gui.add_text("position error (m)", initial_value="", disabled=True)
@@ -153,7 +154,7 @@ def main():
 
     # ---- the scene of the loaded dump ----
     nodes = []  # scene handles of the loaded dump, removed when another one is loaded
-    current = {"dump": None, "iterations": [], "ee_trail": []}
+    current = {"dump": None, "iterations": [], "ee_trail": [], "curve_trail": []}
 
     def keep(handle, layer=None):
         nodes.append(handle)
@@ -223,6 +224,7 @@ def main():
         current["dump"] = d
         current["iterations"] = d["iterations"]
         current["ee_trail"] = [np.array(it["arm"][-1]) for it in d["iterations"]]
+        current["curve_trail"] = [np.array(it["curve_point"]) for it in d["iterations"]]
 
         if "reference_output" in d and "traced_output" in d:
             difference = np.max(np.abs(np.array(d["reference_output"]) - np.array(d["traced_output"])))
@@ -265,6 +267,13 @@ def main():
             ee_points = [ee, ee]
 
         scene.add_line_segments("/ee_trail", points=segments(ee_points), colors=(255, 140, 0), thickness=0.004)
+
+        if d.get("mode") == "qs":
+            curve_points = current["curve_trail"][: step + 1]
+            if len(curve_points) < 2:
+                curve_points = [point, point]
+
+            scene.add_line_segments("/curve_trail", points=segments(curve_points), colors=(60, 220, 90), thickness=0.004)
 
         info_t.value = f"{it['t']:.5f}"
         info_segment.value = f"{it['segment']} (keyframes {it['segment']} to {it['segment'] + 1}), s = {it['s']:.4f}"
