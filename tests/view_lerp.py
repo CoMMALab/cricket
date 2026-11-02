@@ -90,7 +90,7 @@ def main():
     parser.add_argument(
         "--urdf",
         type=Path,
-        default=Path(__file__).resolve().parent.parent / "resources/panda/panda.urdf",
+        default=Path(__file__).resolve().parent.parent / "resources/iiwa_tool/iiwa_tool.urdf",
         help="URDF (with meshes) of the robot the dumps were made for; its actuated joints must match q",
     )
     parser.add_argument("--once", action="store_true", help="load every dump once and exit (for testing)")

@@ -1,0 +1,253 @@
+<?xml version="1.0"?>
+<!-- iiwa: single-file URDF of models/iiwa/iiwa_finray.dmd.yaml for the
+     non-Drake baselines (mink via MuJoCo, pink via Pinocchio).
+     Hand-maintained: transcribed from the directive and the source
+     models. Names are <model instance>/<name>, matching Drake's scoped
+     names. Collision geometry only. Joints of inactive instances
+     (grippers, head) are fixed at their Drake default (the WSG fingers
+     at the 0.0906 m opening); continuous joints are revolute
+     with +-1000 rad limits so that they stay 1-DOF in Pinocchio.
+     Position and velocity limits include the RobotSpec overrides.
+     tests/test_external_models.py checks it against the Drake model. -->
+<robot name="iiwa">
+  <link name="world" />
+  <link name="iiwa/base" />
+  <link name="iiwa/iiwa_link_0">
+    <inertial>
+      <origin rpy="0 0 0" xyz="-0.1 0 0.07" />
+      <mass value="5" />
+      <inertia ixx="0.05" ixy="0" ixz="0" iyy="0.06" iyz="0" izz="0.03" />
+    </inertial>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../meshes/link_0_convex_decimated.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="iiwa/iiwa_link_1">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 -0.03 0.12" />
+      <mass value="5.76" />
+      <inertia ixx="0.033" ixy="0" ixz="0" iyy="0.0333" iyz="0" izz="0.0123" />
+    </inertial>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../meshes/link_1_convex_decimated.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="iiwa/iiwa_link_2">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0003 0.059 0.042" />
+      <mass value="6.35" />
+      <inertia ixx="0.0305" ixy="0" ixz="0" iyy="0.0304" iyz="0" izz="0.011" />
+    </inertial>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../meshes/link_2_convex_decimated.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="iiwa/iiwa_link_3">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0.03 0.13" />
+      <mass value="3.5" />
+      <inertia ixx="0.025" ixy="0" ixz="0" iyy="0.0238" iyz="0" izz="0.0076" />
+    </inertial>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../meshes/link_3_convex_decimated.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="iiwa/iiwa_link_4">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0.067 0.034" />
+      <mass value="3.5" />
+      <inertia ixx="0.017" ixy="0" ixz="0" iyy="0.0164" iyz="0" izz="0.006" />
+    </inertial>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../meshes/link_4_convex_decimated.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="iiwa/iiwa_link_5">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.0001 0.021 0.076" />
+      <mass value="3.5" />
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.0087" iyz="0" izz="0.00449" />
+    </inertial>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../meshes/link_5_convex_decimated.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="iiwa/iiwa_link_6">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0.0006 0.0004" />
+      <mass value="1.8" />
+      <inertia ixx="0.0049" ixy="0" ixz="0" iyy="0.0047" iyz="0" izz="0.0036" />
+    </inertial>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../meshes/link_6_convex_decimated.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="iiwa/iiwa_link_7">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0.02" />
+      <mass value="1.2" />
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001" />
+    </inertial>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../meshes/link_7_convex_decimated.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="iiwa/iiwa_link_ee_kuka" />
+  <link name="iiwa/iiwa_link_ee" />
+  <joint name="iiwa/iiwa_base_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="iiwa/base" />
+    <child link="iiwa/iiwa_link_0" />
+  </joint>
+  <joint name="iiwa/iiwa_joint_1" type="revolute">
+    <origin xyz="0 0 0.1575" rpy="0 0 0" />
+    <parent link="iiwa/iiwa_link_0" />
+    <child link="iiwa/iiwa_link_1" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.96705972839" upper="2.96705972839" velocity="1.4" effort="1000" />
+  </joint>
+  <joint name="iiwa/iiwa_joint_2" type="revolute">
+    <origin xyz="0 0 0.2025" rpy="1.57079632679 0 3.14159265359" />
+    <parent link="iiwa/iiwa_link_1" />
+    <child link="iiwa/iiwa_link_2" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.09439510239" upper="2.09439510239" velocity="1.4" effort="1000" />
+  </joint>
+  <joint name="iiwa/iiwa_joint_3" type="revolute">
+    <origin xyz="0 0.2045 0" rpy="1.57079632679 0 3.14159265359" />
+    <parent link="iiwa/iiwa_link_2" />
+    <child link="iiwa/iiwa_link_3" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.96705972839" upper="2.96705972839" velocity="1.7" effort="1000" />
+  </joint>
+  <joint name="iiwa/iiwa_joint_4" type="revolute">
+    <origin xyz="0 0 0.2155" rpy="1.57079632679 0 0" />
+    <parent link="iiwa/iiwa_link_3" />
+    <child link="iiwa/iiwa_link_4" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.09439510239" upper="2.09439510239" velocity="1.3" effort="1000" />
+  </joint>
+  <joint name="iiwa/iiwa_joint_5" type="revolute">
+    <origin xyz="0 0.1845 0" rpy="-1.57079632679 3.14159265359 0" />
+    <parent link="iiwa/iiwa_link_4" />
+    <child link="iiwa/iiwa_link_5" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.96705972839" upper="2.96705972839" velocity="2.2" effort="1000" />
+  </joint>
+  <joint name="iiwa/iiwa_joint_6" type="revolute">
+    <origin xyz="0 0 0.2155" rpy="1.57079632679 0 0" />
+    <parent link="iiwa/iiwa_link_5" />
+    <child link="iiwa/iiwa_link_6" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.09439510239" upper="2.09439510239" velocity="2.3" effort="1000" />
+  </joint>
+  <joint name="iiwa/iiwa_joint_7" type="revolute">
+    <origin xyz="0 0.081 0" rpy="-1.57079632679 3.14159265359 0" />
+    <parent link="iiwa/iiwa_link_6" />
+    <child link="iiwa/iiwa_link_7" />
+    <axis xyz="0 0 1" />
+    <limit lower="-3.05432619099" upper="3.05432619099" velocity="2.3" effort="1000" />
+  </joint>
+  <joint name="iiwa/iiwa_joint_ee" type="fixed">
+    <origin xyz="0 0 0.045" rpy="3.14159265359 3.14159265359 3.14159265359" />
+    <parent link="iiwa/iiwa_link_7" />
+    <child link="iiwa/iiwa_link_ee_kuka" />
+  </joint>
+  <joint name="iiwa/tool0_joint" type="fixed">
+    <origin xyz="0 0 0.045" rpy="0 -1.57079632679 0" />
+    <parent link="iiwa/iiwa_link_7" />
+    <child link="iiwa/iiwa_link_ee" />
+  </joint>
+  <joint name="iiwa/weld_base" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="world" />
+    <child link="iiwa/base" />
+  </joint>
+  <link name="wsg/body">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.988882" />
+      <inertia ixx="0.162992" ixy="0" ixz="0" iyy="0.162992" iyz="0" izz="0.164814" />
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <box size="0.146 0.0725 0.05" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="wsg/weld_body" type="fixed">
+    <origin xyz="0 0 0.09" rpy="1.57079632679 0 1.18682389136" />
+    <parent link="iiwa/iiwa_link_7" />
+    <child link="wsg/body" />
+  </joint>
+  <link name="wsg/left_finger">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.05" />
+      <inertia ixx="0.16" ixy="0" ixz="0" iyy="0.16" iyz="0" izz="0.16" />
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5707963267948966 3.141592653589793 0" />
+      <geometry>
+        <mesh filename="../wsg_umi/meshes/umi_finger.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <!-- Prismatic in Drake (inactive, held at the default opening 0.0453 per
+       finger); fixed here at that opening, with the rotation on the
+       collision origin as in the SDF. -->
+  <joint name="wsg/left_finger_sliding_joint" type="fixed">
+    <origin xyz="-0.0453 0.063185 0" rpy="0 0 0" />
+    <parent link="wsg/body" />
+    <child link="wsg/left_finger" />
+  </joint>
+  <link name="wsg/right_finger">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="0.05" />
+      <inertia ixx="0.16" ixy="0" ixz="0" iyy="0.16" iyz="0" izz="0.16" />
+    </inertial>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5707963267948966 0 0" />
+      <geometry>
+        <mesh filename="../wsg_umi/meshes/umi_finger.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="wsg/right_finger_sliding_joint" type="fixed">
+    <origin xyz="0.0453 0.063185 0" rpy="0 0 0" />
+    <parent link="wsg/body" />
+    <child link="wsg/right_finger" />
+  </joint>
+  <link name="wsg/tool" />
+  <joint name="wsg/tool_joint" type="fixed">
+    <origin xyz="0 0.1865 0" rpy="-1.57079632679 0 0" />
+    <parent link="wsg/body" />
+    <child link="wsg/tool" />
+  </joint>
+</robot>
