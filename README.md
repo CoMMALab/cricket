@@ -98,7 +98,7 @@ The script uses input JSON files that define what robot to load and what templat
 Cricket uses [inja](https://github.com/pantor/inja) to template code generation.
 The configuration file specifies:
 - The name of the robot
-- Path of the URDF and SRDF relative (or absolute) to the configuration file. Note that this robot must only have spheres for collision geometry.
+- Path of the URDF and SRDF relative (or absolute) to the configuration file. Note that this robot's collision geometry must be spheres, or spheres and boxes (see [Cuboids](#cuboids)).
 - The end-effector to use for attachments
 - Collision checking resolution
 - Output template and sub-templates to use
@@ -195,6 +195,10 @@ In addition to the specified input fields from the configuration file, the scrip
 - `joint_names`: name of joint corresponding to each DoF.
 - `link_names`: name of frame corresponding to index.
 - `per_link_spheres`: for each frame, the indices of the spheres associated with that frame.
+- `n_cuboids`: number of collision cuboids (boxes); 0 for a sphere-only robot.
+- `per_link_cuboids`: for each frame, the indices of the cuboids associated with that frame.
+- `n_bounding_spheres`, `cuboid_buffer_offset`: number of per-link bounding spheres, and the offset of the first cuboid in the traced buffer (see [Cuboids](#cuboids)).
+- `cuboidfk_code`, `cuboidfk_code_vars`, `cuboidfk_code_output`: as `spherefk_code`, for the cuboids only. Only present when `n_cuboids > 0`.
 - `links_with_geometry`: indices of the frames that have collision geometry.
 - `bounding_sphere_index`: mapping between frame index to bounding sphere index (where bounding spheres are at the end of the sphere buffer, after `n_spheres`).
 - `end_effector_collisions`: for each end-effector, which frames it can collide with.
@@ -206,3 +210,13 @@ In addition to the specified input fields from the configuration file, the scrip
 - `spherefk_code`, `spherefk_code_vars`, `spherefk_code_output`: C-style code for computing position of all spheres, the number of intermediate variables used, and the number of output variables.
 - `ccfk_code`, `ccfk_code_vars`, `ccfk_code_output`: C-style code for computing position of all spheres and bounding spheres for collision checking, the number of intermediate variables used, and the number of output variables.
 - `ccfkee_code`, `ccfkee_code_vars`, `ccfkee_code_output`: C-style code for computing position of all spheres and bounding spheres for collision checking as well as the position and quaternion for the end-effector, the number of intermediate variables used, and the number of output variables.
+
+## Cuboids
+
+In addition to spheres, a robot's collision geometry may include boxes (`<box size="..."/>` in the URDF's `<collision>` elements), so a link can be a cuboid instead of being covered by many spheres. Other shapes are still an error, and a robot needs at least one sphere.
+
+- **Bounding spheres** still gate every link. A link's bounding sphere is the smallest sphere containing its spheres *and* the circumscribed spheres of its boxes, so it stays conservative.
+- **Traced buffer layout** is `[spheres | bounding spheres | cuboids | end-effector pose]`. Spheres and bounding spheres use 4 floats each, and cuboids use 15 (center, three unit axes, half-lengths), in the argument order of `vamp::collision::OrientedBox`. Cuboids come after the bounding spheres so a robot without cuboids has exactly the layout (and generated code) it had before.
+- **Generated code** uses `cuboid_environment_in_collision` (environment), `sphere_cuboid_self_collision` and `cuboid_cuboid_self_collision` (self-collision), and `attachment_cuboid_collision` (attached objects), all from VAMP. Robots expose `n_cuboids`, and when it is nonzero, `Cuboids<rake>` and `cuboid_fk`. In `fkcc_debug`, the per-geometry results list the spheres, then the cuboids, and indices in colliding pairs that are `>= n_spheres` refer to cuboid `index - n_spheres`.
+- **Limitations:** cuboids are only generated for C++ (not Rust), and VAMP does not support them against pointcloud (CAPT) environments.
+

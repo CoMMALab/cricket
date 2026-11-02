@@ -52,6 +52,42 @@ namespace cricket
             data[index + 3] = ADCG(sphere.radius);
         }
 
+        // Traces a box as [center (3), axis 1 (3), axis 2 (3), axis 3 (3), half-lengths (3)], with the
+        // axes being the columns of the box's world rotation. The half-lengths are emitted as outputs
+        // (like sphere radii) so every consumer reads the box uniformly from one buffer.
+        auto trace_cuboid(const CuboidInfo &cuboid, const ADData &ad_data, ADVectorXs &data, std::size_t index)
+        {
+            const auto &joint_placement = ad_data.oMi[cuboid.parent_joint];
+
+            Eigen::Matrix<ADCG, 3, 1> local_translation;
+            Eigen::Matrix<ADCG, 3, 3> local_rotation;
+            for (auto i = 0; i < 3; ++i)
+            {
+                local_translation[i] = cuboid.relative.translation()[i];
+                for (auto j = 0; j < 3; ++j)
+                {
+                    local_rotation(i, j) = cuboid.relative.rotation()(i, j);
+                }
+            }
+
+            const Eigen::Matrix<ADCG, 3, 1> world_position =
+                joint_placement.rotation() * local_translation + joint_placement.translation();
+            const Eigen::Matrix<ADCG, 3, 3> world_rotation = joint_placement.rotation() * local_rotation;
+
+            for (auto i = 0; i < 3; ++i)
+            {
+                data[index + i] = world_position[i];
+
+                // Column j of the rotation is the box's axis j
+                for (auto j = 0; j < 3; ++j)
+                {
+                    data[index + 3 + 3 * j + i] = world_rotation(i, j);
+                }
+
+                data[index + 12 + i] = ADCG(cuboid.half_extents[i]);
+            }
+        }
+
         auto trace_frame(std::size_t ee_index, const ADData &ad_data, ADVectorXs &data, std::size_t index)
         {
             const auto &oMf = ad_data.oMf[ee_index];
@@ -80,7 +116,8 @@ namespace cricket
         const std::string &language,
         bool spheres,
         bool bounding_spheres,
-        bool fk) -> Traced
+        bool fk,
+        bool cuboids) -> Traced
     {
         auto nq = info.model.nq;
         ADModel ad_model = info.model.cast<ADCG>();
@@ -99,8 +136,9 @@ namespace cricket
 
         std::size_t n_spheres_data = (spheres) ? info.spheres.size() * 4 : 0;
         std::size_t n_bounding_spheres_data = (bounding_spheres) ? info.bounding_spheres.size() * 4 : 0;
+        std::size_t n_cuboids_data = (cuboids) ? info.cuboids.size() * cuboid_stride : 0;
         std::size_t n_fk_data = (fk) ? 12 * info.end_effector_indexes.size() : 0;
-        std::size_t n_out = n_spheres_data + n_bounding_spheres_data + n_fk_data;
+        std::size_t n_out = n_spheres_data + n_bounding_spheres_data + n_cuboids_data + n_fk_data;
 
         ADVectorXs data(n_out);
 
@@ -126,6 +164,18 @@ namespace cricket
             }
         }
 
+        if (cuboids)
+        {
+            for (const auto &cuboid : info.cuboids)
+            {
+                trace_cuboid(
+                    cuboid,
+                    ad_data,
+                    data,
+                    n_spheres_data + n_bounding_spheres_data + cuboid.index * cuboid_stride);
+            }
+        }
+
         if (fk)
         {
             for (auto i = 0U; i < info.end_effector_indexes.size(); ++i)
@@ -134,7 +184,7 @@ namespace cricket
                     info.end_effector_indexes[i],
                     ad_data,
                     data,
-                    n_spheres_data + n_bounding_spheres_data + i * 12);
+                    n_spheres_data + n_bounding_spheres_data + n_cuboids_data + i * 12);
             }
         }
 
@@ -376,6 +426,11 @@ namespace cricket
 
         nlohmann::json data = opts.data;
         const bool compact_collisions = opts.data.value("compact_collisions", false);
+        if (compact_collisions and not robot.cuboids.empty())
+        {
+            throw std::runtime_error("compact_collisions is not supported for robots with cuboid collision geometry");
+        }
+
         data.update(robot.json(opts.bounds, opts.data.value("skip_static_environment_collisions", false)));
         data["compact_collisions"] = compact_collisions;
 
@@ -401,17 +456,32 @@ namespace cricket
         data["eejac_code_vars"] = eejac.temp_variables;
         data["eejac_code_output"] = eejac.outputs;
 
+        if (opts.language != "c++" and not robot.cuboids.empty())
+        {
+            throw std::runtime_error(
+                fmt::format("Cuboid collision geometry is only supported for c++, not {}", opts.language));
+        }
+
         auto spherefk = trace_sphere_cc_fk(robot, opts.language, true, false, false);
         data["spherefk_code"] = spherefk.code;
         data["spherefk_code_vars"] = spherefk.temp_variables;
         data["spherefk_code_output"] = spherefk.outputs;
 
-        auto ccfk = trace_sphere_cc_fk(robot, opts.language, true, true, false);
+        // Only traced when there are cuboids; robots without them produce exactly the same code as before
+        if (not robot.cuboids.empty())
+        {
+            auto cuboidfk = trace_sphere_cc_fk(robot, opts.language, false, false, false, true);
+            data["cuboidfk_code"] = cuboidfk.code;
+            data["cuboidfk_code_vars"] = cuboidfk.temp_variables;
+            data["cuboidfk_code_output"] = cuboidfk.outputs;
+        }
+
+        auto ccfk = trace_sphere_cc_fk(robot, opts.language, true, true, false, true);
         data["ccfk_code"] = ccfk.code;
         data["ccfk_code_vars"] = ccfk.temp_variables;
         data["ccfk_code_output"] = ccfk.outputs;
 
-        auto ccfkee = trace_sphere_cc_fk(robot, opts.language, true, true, true);
+        auto ccfkee = trace_sphere_cc_fk(robot, opts.language, true, true, true, true);
         data["ccfkee_code"] = ccfkee.code;
         data["ccfkee_code_vars"] = ccfkee.temp_variables;
         data["ccfkee_code_output"] = ccfkee.outputs;
@@ -517,6 +587,11 @@ namespace cricket
         if (result.data.contains("n_spheres"))
         {
             result.n_spheres = result.data["n_spheres"].get<std::size_t>();
+        }
+
+        if (result.data.contains("n_cuboids"))
+        {
+            result.n_cuboids = result.data["n_cuboids"].get<std::size_t>();
         }
 
         return result;
