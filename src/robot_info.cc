@@ -26,6 +26,13 @@ namespace cricket
 {
     using namespace pinocchio;
 
+    auto CuboidInfo::bounding_radius() const -> float
+    {
+        return std::sqrt(
+            half_extents[0] * half_extents[0] + half_extents[1] * half_extents[1] +
+            half_extents[2] * half_extents[2]);
+    }
+
     auto min_sphere_of_spheres(const std::vector<SphereInfo> &info) -> std::array<float, 4>
     {
         using K = CGAL::Exact_predicates_inexact_constructions_kernel;
@@ -293,6 +300,11 @@ namespace cricket
         json["n_v"] = model.nv;
         json["n_u"] = get_randomness_dimension(model);
         json["n_spheres"] = spheres.size();
+        json["n_cuboids"] = cuboids.size();
+        json["n_bounding_spheres"] = bounding_spheres.size();
+        // Cuboids follow the spheres and bounding spheres in the traced buffer, 15 floats each:
+        // center (3), three axes (9), half-lengths (3).
+        json["cuboid_buffer_offset"] = (spheres.size() + bounding_spheres.size()) * 4;
         json["bound_lower"] = std::vector<float>(lower_bound.data(), lower_bound.data() + model.nq);
         json["bound_range"] = std::vector<float>(bound_range.data(), bound_range.data() + model.nq);
         json["bound_descale"] = std::vector<float>(bound_descale.data(), bound_descale.data() + model.nq);
@@ -313,6 +325,7 @@ namespace cricket
         json["joint_names"] = dof_to_joint_names();
         json["allowed_link_pairs"] = allowed_link_pairs;
         json["per_link_spheres"] = per_link_spheres;
+        json["per_link_cuboids"] = per_link_cuboids;
         json["links_with_geometry"] = links_with_geometry;
         json["bounding_sphere_index"] = bounding_sphere_index;
         nlohmann::json end_effector_collisions = nlohmann::json::array();
@@ -495,11 +508,13 @@ namespace cricket
         {
             const auto &geom_obj = collision_model.geometryObjects[i];
             const auto &sphere_ptr = std::dynamic_pointer_cast<coal::Sphere>(geom_obj.geometry);
+            const auto &box_ptr = std::dynamic_pointer_cast<coal::Box>(geom_obj.geometry);
 
             if (sphere_ptr)
             {
                 SphereInfo info;
-                info.geom_index = i;
+                // Slot among spheres only, so boxes interleaved in the URDF do not leave gaps
+                info.geom_index = spheres.size();
                 info.radius = sphere_ptr->radius;
                 info.parent_joint = geom_obj.parentJoint;
                 info.parent_frame = geom_obj.parentFrame;
@@ -518,11 +533,33 @@ namespace cricket
                     max_radius_mobile = std::max(max_radius_mobile, info.radius);
                 }
             }
+            else if (box_ptr)
+            {
+                CuboidInfo info;
+                info.index = cuboids.size();
+                // coal::Box::halfSide is already half the side length
+                info.half_extents = {
+                    static_cast<float>(box_ptr->halfSide[0]),
+                    static_cast<float>(box_ptr->halfSide[1]),
+                    static_cast<float>(box_ptr->halfSide[2])};
+                info.parent_joint = geom_obj.parentJoint;
+                info.parent_frame = geom_obj.parentFrame;
+                info.relative = geom_obj.placement;
+
+                cuboids.emplace_back(info);
+            }
             else
             {
                 throw std::runtime_error(
-                    fmt::format("Invalid non-sphere geometry in URDF {}", geom_obj.name));
+                    fmt::format("Invalid geometry (not a sphere or box) in URDF {}", geom_obj.name));
             }
+        }
+
+        if (spheres.empty())
+        {
+            // The generated code and robot interface assume at least one sphere (e.g., fixed-size
+            // sphere buffers). A box-only robot would need those special-cased.
+            throw std::runtime_error("Robot must have at least one sphere in its collision geometry.");
         }
 
         std::size_t bs = 0;
@@ -540,6 +577,27 @@ namespace cricket
             }
 
             per_link_spheres.emplace_back(sphere_indices);
+
+            // A link's bounding sphere must also contain its boxes. Each box contributes its
+            // circumscribed sphere, which keeps the bounding sphere conservative (it can only be
+            // larger than the tightest sphere around the box, never smaller).
+            std::vector<std::size_t> cuboid_indices;
+            for (const auto &cuboid : cuboids)
+            {
+                if (cuboid.parent_frame == i)
+                {
+                    SphereInfo circumscribed;
+                    circumscribed.geom_index = 0;  // unused by min_sphere_of_spheres
+                    circumscribed.radius = cuboid.bounding_radius();
+                    circumscribed.parent_joint = cuboid.parent_joint;
+                    circumscribed.parent_frame = cuboid.parent_frame;
+                    circumscribed.relative = cuboid.relative;
+                    link_info.emplace_back(circumscribed);
+                    cuboid_indices.emplace_back(cuboid.index);
+                }
+            }
+
+            per_link_cuboids.emplace_back(cuboid_indices);
 
             if (not link_info.empty())
             {

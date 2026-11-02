@@ -46,10 +46,23 @@ for (const auto &sp : cc_self_pairs)
     }
 }
 {% else %}
+{% if n_cuboids > 0 %}
+//
+// Pose cuboids from the traced buffer
+//
+
+{% for c in range(n_cuboids) %}
+{% set cuboid_loc = cuboid_buffer_offset + c * 15 %}
+const vamp::collision::OrientedBox<FloatVector<rake>> cuboid_{{ c }}(
+    {% for k in range(15) %}y[{{ cuboid_loc + k }}]{% if k < 14 %}, {% endif %}{% endfor %});
+{% endfor %}
+
+{% endif %}
 {% for i in range(length(environment_links)) %}
 {% set array_index = at(environment_links, i) %}
 {% set link_index = at(links_with_geometry, array_index) %}
 {% set link_spheres = at(per_link_spheres, link_index) %}
+{% set link_cuboids = at(per_link_cuboids, link_index) %}
 {% set bs_loc = (n_spheres + array_index) * 4 %}
 
 //
@@ -74,6 +87,12 @@ if (sphere_environment_in_collision(environment,
         return false;
     }
     {% endfor %}
+    {% for j in range(length(link_cuboids)) %}
+    if (vamp::cuboid_environment_in_collision(environment, cuboid_{{ at(link_cuboids, j) }})) [[unlikely]]
+    {
+        return false;
+    }
+    {% endfor %}
 }
 
 {% endfor %}
@@ -90,6 +109,8 @@ if (sphere_environment_in_collision(environment,
 {% set link_2_bs = at(bounding_sphere_index, link_2_index) %}
 {% set link_1_spheres = at(per_link_spheres, link_1_index) %}
 {% set link_2_spheres = at(per_link_spheres, link_2_index) %}
+{% set link_1_cuboids = at(per_link_cuboids, link_1_index) %}
+{% set link_2_cuboids = at(per_link_cuboids, link_2_index) %}
 {% set link_1_bs_loc = (n_spheres + link_1_bs) * 4 %}
 {% set link_2_bs_loc = (n_spheres + link_2_bs) * 4 %}
 
@@ -117,6 +138,50 @@ if (sphere_sphere_self_collision<decltype(x[0])>(y[{{link_1_bs_loc + 0}}],
                                                      y[{{ sphere_2_loc * 4 + 1}} ],
                                                      y[{{ sphere_2_loc * 4 + 2}} ],
                                                      y[{{ sphere_2_loc * 4 + 3}} ])) [[unlikely]]
+    {
+        return false;
+    }
+
+    {% endfor %}
+    {% endfor %}
+
+    {# link 1 spheres vs. link 2 cuboids #}
+    {% for j in range(length(link_1_spheres)) %}
+    {% for k in range(length(link_2_cuboids)) %}
+    {% set sphere_1_loc = at(link_1_spheres, j) %}
+    if (vamp::sphere_cuboid_self_collision(cuboid_{{ at(link_2_cuboids, k) }},
+                                           y[{{ sphere_1_loc * 4 + 0}} ],
+                                           y[{{ sphere_1_loc * 4 + 1}} ],
+                                           y[{{ sphere_1_loc * 4 + 2}} ],
+                                           y[{{ sphere_1_loc * 4 + 3}} ])) [[unlikely]]
+    {
+        return false;
+    }
+
+    {% endfor %}
+    {% endfor %}
+
+    {# link 1 cuboids vs. link 2 spheres #}
+    {% for j in range(length(link_1_cuboids)) %}
+    {% for k in range(length(link_2_spheres)) %}
+    {% set sphere_2_loc = at(link_2_spheres, k) %}
+    if (vamp::sphere_cuboid_self_collision(cuboid_{{ at(link_1_cuboids, j) }},
+                                           y[{{ sphere_2_loc * 4 + 0}} ],
+                                           y[{{ sphere_2_loc * 4 + 1}} ],
+                                           y[{{ sphere_2_loc * 4 + 2}} ],
+                                           y[{{ sphere_2_loc * 4 + 3}} ])) [[unlikely]]
+    {
+        return false;
+    }
+
+    {% endfor %}
+    {% endfor %}
+
+    {# link 1 cuboids vs. link 2 cuboids #}
+    {% for j in range(length(link_1_cuboids)) %}
+    {% for k in range(length(link_2_cuboids)) %}
+    if (vamp::cuboid_cuboid_self_collision(cuboid_{{ at(link_1_cuboids, j) }},
+                                           cuboid_{{ at(link_2_cuboids, k) }})) [[unlikely]]
     {
         return false;
     }

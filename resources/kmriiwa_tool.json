@@ -1,0 +1,10 @@
+{
+    "name": "KMRIiwaTool",
+    "urdf": "kmriiwa/external/kmriiwa_primitive.urdf",
+    "srdf": "kmriiwa/external/kmriiwa.srdf",
+    "end_effector": "wsg/tool",
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [{"name": "ccfk", "template": "templates/ccfk_template.hh"}],
+    "output": "kmriiwa_tool_fk.hh"
+}
