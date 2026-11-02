@@ -49,6 +49,7 @@ NB_MODULE(_core_ext, m)
             "Parse a robot URDF.")
         .def_prop_ro("dimension", [](cricket::RobotInfo &r) { return r.model.nq; })
         .def_prop_ro("n_spheres", [](cricket::RobotInfo &r) { return r.spheres.size(); })
+        .def_prop_ro("n_cuboids", [](cricket::RobotInfo &r) { return r.cuboids.size(); })
         .def_prop_ro("min_radius", [](cricket::RobotInfo &r) { return r.min_radius; })
         .def_prop_ro("max_radius", [](cricket::RobotInfo &r) { return r.max_radius; })
         .def_prop_ro("min_radius_mobile", [](cricket::RobotInfo &r) { return r.min_radius_mobile; })
@@ -112,6 +113,7 @@ NB_MODULE(_core_ext, m)
         .def_ro("robot_name", &cricket::GenResult::robot_name)
         .def_ro("dimension", &cricket::GenResult::dimension)
         .def_ro("n_spheres", &cricket::GenResult::n_spheres)
+        .def_ro("n_cuboids", &cricket::GenResult::n_cuboids)
         .def_prop_ro(
             "data", [](cricket::GenResult &r) { return nbjson::from_json<nlohmann::json>(r.data); });
 

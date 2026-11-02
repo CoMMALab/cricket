@@ -14,6 +14,7 @@ struct {{name}}
     static constexpr std::size_t dimension = {{n_q}};
     static constexpr std::size_t sample_dimension = {{n_u}};
     static constexpr std::size_t n_spheres = {{n_spheres}};
+    static constexpr std::size_t n_cuboids = {{n_cuboids}};
     static constexpr float min_radius = {{min_radius}};
     static constexpr float max_radius = {{max_radius}};
     static constexpr float min_radius_mobile = {{min_radius_mobile}};
@@ -49,6 +50,30 @@ struct {{name}}
         FloatVector<rake, n_spheres> z;
         FloatVector<rake, n_spheres> r;
     };
+
+    {% if n_cuboids > 0 %}
+    // Cuboid collision geometry, one row per cuboid. The layout matches vamp::collision::OrientedBox:
+    // center, three unit axes, and half-lengths along each axis.
+    template <std::size_t rake>
+    struct Cuboids
+    {
+        FloatVector<rake, n_cuboids> x;
+        FloatVector<rake, n_cuboids> y;
+        FloatVector<rake, n_cuboids> z;
+        FloatVector<rake, n_cuboids> axis_1_x;
+        FloatVector<rake, n_cuboids> axis_1_y;
+        FloatVector<rake, n_cuboids> axis_1_z;
+        FloatVector<rake, n_cuboids> axis_2_x;
+        FloatVector<rake, n_cuboids> axis_2_y;
+        FloatVector<rake, n_cuboids> axis_2_z;
+        FloatVector<rake, n_cuboids> axis_3_x;
+        FloatVector<rake, n_cuboids> axis_3_y;
+        FloatVector<rake, n_cuboids> axis_3_z;
+        FloatVector<rake, n_cuboids> axis_1_r;
+        FloatVector<rake, n_cuboids> axis_2_r;
+        FloatVector<rake, n_cuboids> axis_3_r;
+    };
+    {% endif %}
 
     alignas(Configuration::S::Alignment) static constexpr std::array<float, dimension> s_m{
         {{join(bound_range, ", ")}}
@@ -185,6 +210,39 @@ struct {{name}}
         }
     }
 
+    {% if n_cuboids > 0 %}
+    template <std::size_t rake>
+    static inline void cuboid_fk(const ConfigurationBlock<rake> &x, Cuboids<rake> &out) noexcept
+    {
+        std::array<FloatVector<rake, 1>, {{cuboidfk_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{cuboidfk_code_output}}> y;
+
+        {{cuboidfk_code}}
+
+        for (auto i = 0U; i < {{n_cuboids}}; ++i)
+        {
+            out.x[i] = y[i * 15 + 0];
+            out.y[i] = y[i * 15 + 1];
+            out.z[i] = y[i * 15 + 2];
+            out.axis_1_x[i] = y[i * 15 + 3];
+            out.axis_1_y[i] = y[i * 15 + 4];
+            out.axis_1_z[i] = y[i * 15 + 5];
+            out.axis_2_x[i] = y[i * 15 + 6];
+            out.axis_2_y[i] = y[i * 15 + 7];
+            out.axis_2_z[i] = y[i * 15 + 8];
+            out.axis_3_x[i] = y[i * 15 + 9];
+            out.axis_3_y[i] = y[i * 15 + 10];
+            out.axis_3_z[i] = y[i * 15 + 11];
+            out.axis_1_r[i] = y[i * 15 + 12];
+            out.axis_2_r[i] = y[i * 15 + 13];
+            out.axis_3_r[i] = y[i * 15 + 14];
+        }
+    }
+    {% endif %}
+
+    // For fkcc_debug: the first element has one entry per sphere, followed by one per cuboid. The second
+    // element lists colliding pairs of robot geometry; indices < n_spheres are spheres and
+    // n_spheres + i is cuboid i.
     using Debug = std::pair<std::vector<std::vector<std::string>>, std::vector<std::pair<std::size_t, std::size_t>>>;
 
     template <std::size_t rake>
@@ -196,6 +254,14 @@ struct {{name}}
         std::array<FloatVector<rake, 1>, {{ccfk_code_output}}> y;
 
         {{ccfk_code}}
+
+        {% if n_cuboids > 0 %}
+        {% for c in range(n_cuboids) %}
+        {% set cuboid_loc = cuboid_buffer_offset + c * 15 %}
+        const vamp::collision::OrientedBox<FloatVector<rake>> cuboid_{{ c }}(
+            {% for k in range(15) %}y[{{ cuboid_loc + k }}]{% if k < 14 %}, {% endif %}{% endfor %});
+        {% endfor %}
+        {% endif %}
 
         Debug output;
 
@@ -209,12 +275,18 @@ struct {{name}}
                 y[{{ i * 4 + 3 }}]));
         {% endfor %}
 
+        {% for c in range(n_cuboids) %}
+        output.first.emplace_back(vamp::cuboid_environment_get_collisions(environment, cuboid_{{ c }}));
+        {% endfor %}
+
         {% for i in range(length(allowed_link_pairs)) %}
         {% set pair = at(allowed_link_pairs, i) %}
         {% set link_1_index = at(pair, 0) %}
         {% set link_2_index = at(pair, 1) %}
         {% set link_1_spheres = at(per_link_spheres, link_1_index) %}
         {% set link_2_spheres = at(per_link_spheres, link_2_index) %}
+        {% set link_1_cuboids = at(per_link_cuboids, link_1_index) %}
+        {% set link_2_cuboids = at(per_link_cuboids, link_2_index) %}
 
         {% for j in range(length(link_1_spheres)) %}
         {% for k in range(length(link_2_spheres)) %}
@@ -234,6 +306,47 @@ struct {{name}}
             output.second.emplace_back({{ sphere_1_loc }}, {{ sphere_2_loc }});
         }
 
+        {% endfor %}
+        {% endfor %}
+
+        {% for j in range(length(link_1_spheres)) %}
+        {% for k in range(length(link_2_cuboids)) %}
+        {% set sphere_1_loc = at(link_1_spheres, j) %}
+        {% set cuboid_2 = at(link_2_cuboids, k) %}
+        if (vamp::sphere_cuboid_self_collision(cuboid_{{ cuboid_2 }},
+                                               y[{{ sphere_1_loc * 4 + 0}} ],
+                                               y[{{ sphere_1_loc * 4 + 1}} ],
+                                               y[{{ sphere_1_loc * 4 + 2}} ],
+                                               y[{{ sphere_1_loc * 4 + 3}} ]))
+        {
+            output.second.emplace_back({{ sphere_1_loc }}, n_spheres + {{ cuboid_2 }});
+        }
+        {% endfor %}
+        {% endfor %}
+
+        {% for j in range(length(link_1_cuboids)) %}
+        {% for k in range(length(link_2_spheres)) %}
+        {% set cuboid_1 = at(link_1_cuboids, j) %}
+        {% set sphere_2_loc = at(link_2_spheres, k) %}
+        if (vamp::sphere_cuboid_self_collision(cuboid_{{ cuboid_1 }},
+                                               y[{{ sphere_2_loc * 4 + 0}} ],
+                                               y[{{ sphere_2_loc * 4 + 1}} ],
+                                               y[{{ sphere_2_loc * 4 + 2}} ],
+                                               y[{{ sphere_2_loc * 4 + 3}} ]))
+        {
+            output.second.emplace_back(n_spheres + {{ cuboid_1 }}, {{ sphere_2_loc }});
+        }
+        {% endfor %}
+        {% endfor %}
+
+        {% for j in range(length(link_1_cuboids)) %}
+        {% for k in range(length(link_2_cuboids)) %}
+        {% set cuboid_1 = at(link_1_cuboids, j) %}
+        {% set cuboid_2 = at(link_2_cuboids, k) %}
+        if (vamp::cuboid_cuboid_self_collision(cuboid_{{ cuboid_1 }}, cuboid_{{ cuboid_2 }}))
+        {
+            output.second.emplace_back(n_spheres + {{ cuboid_1 }}, n_spheres + {{ cuboid_2 }});
+        }
         {% endfor %}
         {% endfor %}
         {% endfor %}
@@ -285,6 +398,7 @@ struct {{name}}
         {% set link_index = at(end_effector_collisions, i) %}
         {% set link_bs = at(bounding_sphere_index, link_index) %}
         {% set link_spheres = at(per_link_spheres, link_index) %}
+        {% set link_cuboids = at(per_link_cuboids, link_index) %}
 
         // Attachment vs. {{ at(link_names, link_index )}}
         if (attachment_sphere_collision<decltype(x[0])>(environment,
@@ -300,6 +414,12 @@ struct {{name}}
                                                             y[{{sphere_index * 4 + 1}}],
                                                             y[{{sphere_index * 4 + 2}}],
                                                             y[{{sphere_index * 4 + 3}}])) [[unlikely]]
+            {
+                return false;
+            }
+            {% endfor %}
+            {% for j in range(length(link_cuboids)) %}
+            if (vamp::attachment_cuboid_collision(environment, cuboid_{{ at(link_cuboids, j) }})) [[unlikely]]
             {
                 return false;
             }

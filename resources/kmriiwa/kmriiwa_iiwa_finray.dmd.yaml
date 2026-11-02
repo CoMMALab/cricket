@@ -1,0 +1,58 @@
+# KUKA KMR holonomic base (planar x, y, theta) carrying an iiwa14 with the
+# WSG 50 body and UMI's soft fingers (models/iiwa/wsg_umi/, see
+# iiwa/iiwa_finray.dmd.yaml for the tool frame and the finger joints).
+# Same arm + gripper as the single-arm scene. No
+# environment (the original kmriiwa_with_iiwa.dmd.yaml had shelves and a
+# table); collision checking is self-collision only.
+
+directives:
+
+- add_model:
+    name: kmr_base
+    file: package://diffik_benchmark/models/kmriiwa/urdf/kmriiwa.urdf
+    default_joint_positions:
+        x: [0]
+        y: [0]
+        theta: [0]
+
+- add_model:
+    name: iiwa
+    file: package://diffik_benchmark/models/iiwa/iiwa14_convex_decimated_collision.urdf
+
+- add_weld:
+    parent: kmr_base::kmriiwa_mount_frame
+    child: iiwa::base
+
+- add_model:
+    name: wsg
+    file: package://diffik_benchmark/models/iiwa/wsg_umi/wsg50_umi_fingers.sdf
+    default_joint_positions:
+        left_finger_sliding_joint: [0.0453]
+        right_finger_sliding_joint: [0.0453]
+
+- add_frame:
+    name: iiwa::wsg_attach
+    X_PF:
+      base_frame: iiwa::iiwa_link_7
+      translation: [0, 0, 0.09]
+      rotation: !Rpy { deg: [90.0, 0.0, 68.0] }
+
+- add_weld:
+    parent: iiwa::wsg_attach
+    child: wsg::body
+
+- add_frame:
+    name: wsg::tool
+    X_PF:
+      base_frame: wsg::body
+      translation: [0, 0.1865, 0]
+      rotation: !Rpy { deg: [-90.0, 0.0, 0.0] }
+
+# The fingers slide on prismatic joints (inactive in the benchmark's q,
+# held at the default opening; the replay moves them). Welded fingers were
+# filtered against each other, the body and link 7 automatically; keep
+# exactly that pair set now that they are jointed.
+- add_collision_filter_group:
+    name: wsg_hand
+    members: [iiwa::iiwa_link_7, wsg::body, wsg::left_finger, wsg::right_finger]
+    ignored_collision_filter_groups: [wsg_hand]

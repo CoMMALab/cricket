@@ -22,12 +22,26 @@ namespace cricket
         std::size_t outputs;
     };
 
+    /// Number of floats traced per cuboid: center (3), three axes (9), half-lengths (3), in the argument
+    /// order of vamp::collision::OrientedBox.
+    inline constexpr std::size_t cuboid_stride = 15;
+
+    /// Traces the world-frame poses of the collision geometry.
+    ///
+    /// The output buffer is laid out as [spheres | bounding spheres | cuboids | end-effector pose],
+    /// omitting any section whose flag is false (sections after an omitted one shift down). Spheres and
+    /// bounding spheres take 4 floats each (x, y, z, r), cuboids `cuboid_stride`, and the end-effector
+    /// pose 12 (translation, then the rotation matrix in column-major order).
+    ///
+    /// Putting cuboids after the bounding spheres means offsets of everything before them are the same
+    /// as for a robot without cuboids.
     auto trace_sphere_cc_fk(
         const RobotInfo &info,
         const std::string &language,
         bool spheres = true,
         bool bounding_spheres = true,
-        bool fk = true) -> Traced;
+        bool fk = true,
+        bool cuboids = false) -> Traced;
 
     /// Traces the end-effector pose together with its Jacobian.
     ///
@@ -72,6 +86,7 @@ namespace cricket
         std::string robot_name;
         std::size_t dimension = 0;
         std::size_t n_spheres = 0;
+        std::size_t n_cuboids = 0;
     };
 
     auto generate_robot_source(const GenOptions &opts) -> GenResult;
