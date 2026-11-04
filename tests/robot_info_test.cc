@@ -1,6 +1,7 @@
 #include <cricket/robot_info.hh>
 
-#include <cassert>
+#include "check.hh"
+
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -35,11 +36,11 @@ int main()
     cricket::RobotInfo robot(test_urdf, srdf, std::nullopt);
     const auto metadata = robot.json();
 
-    assert(metadata.at("n_q") == robot.model.nq);
-    assert(metadata.at("n_v") == robot.model.nv);
-    assert(metadata.at("n_u") == robot.model.nq);
-    assert(metadata.at("n_q") == 6);
-    assert(metadata.at("n_v") == 6);
+    CRICKET_CHECK(metadata.at("n_q") == robot.model.nq);
+    CRICKET_CHECK(metadata.at("n_v") == robot.model.nv);
+    CRICKET_CHECK(metadata.at("n_u") == robot.model.nq);
+    CRICKET_CHECK(metadata.at("n_q") == 6);
+    CRICKET_CHECK(metadata.at("n_v") == 6);
 
     return 0;
 }

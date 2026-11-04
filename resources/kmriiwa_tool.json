@@ -1,7 +1,7 @@
 {
     "name": "KmrIiwaTool",
     "module_name": "kmriiwa_tool",
-    "urdf": "kmriiwa_tool/kmriiwa_spherized.urdf",
+    "urdf": "kmriiwa/external/kmriiwa_primitive.urdf",
     "srdf": "kmriiwa_tool/kmriiwa.srdf",
     "end_effector": "wsg/tool",
     "constraints": true,

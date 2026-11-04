@@ -6,8 +6,12 @@
     clippy::excessive_precision,
 )]
 #![allow(clippy::assign_op_pattern)]
+#![no_std]
 #![feature(portable_simd)]
 
+extern crate alloc;
+
+use alloc::vec::Vec;
 use core::simd::Simd;
 
 use carom_core::{

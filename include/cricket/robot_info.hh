@@ -21,11 +21,28 @@ namespace cricket
 {
     struct SphereInfo
     {
+        // Slot of this sphere in the traced sphere buffer. Spheres are numbered contiguously in the
+        // order they appear in the collision model, independent of any cuboids interleaved with them.
         std::size_t geom_index;
         float radius;
         std::size_t parent_joint;
         std::size_t parent_frame;
         pinocchio::SE3 relative;
+    };
+
+    // A box-shaped collision geometry, posed relative to its parent joint. The box is centered at the
+    // origin of `relative` with half-lengths `half_extents` along the axes of `relative`'s rotation.
+    struct CuboidInfo
+    {
+        // Slot of this cuboid in the traced cuboid buffer (contiguous, in collision-model order)
+        std::size_t index;
+        std::array<float, 3> half_extents;
+        std::size_t parent_joint;
+        std::size_t parent_frame;
+        pinocchio::SE3 relative;
+
+        // Radius of the smallest sphere, centered at the box center, that contains the box
+        auto bounding_radius() const -> float;
     };
 
     auto min_sphere_of_spheres(const std::vector<SphereInfo> &info) -> std::array<float, 4>;
@@ -135,6 +152,8 @@ namespace cricket
 
         auto dof_to_joint_names() -> std::vector<std::string>;
         auto get_frames_colliding_end_effector(std::size_t frame_index) -> std::vector<std::size_t>;
+        // Extracts the collision geometry. Spheres and boxes are supported; anything else is an error.
+        // (The name predates box support.)
         auto extract_spheres() -> void;
         auto collision_pair_to_frame_pair(const pinocchio::CollisionPair &cp)
             -> std::pair<std::size_t, std::size_t>;
@@ -163,9 +182,11 @@ namespace cricket
         float max_bounding_radius_mobile{std::numeric_limits<float>::min()};
         std::array<float, 3> base_position{0.0F, 0.0F, 0.0F};
         std::vector<SphereInfo> spheres;
+        std::vector<CuboidInfo> cuboids;
         std::map<std::size_t, SphereInfo> bounding_spheres;
         std::vector<std::size_t> links_with_geometry;
         std::vector<std::vector<std::size_t>> per_link_spheres;
+        std::vector<std::vector<std::size_t>> per_link_cuboids;
         std::set<std::pair<std::size_t, std::size_t>> allowed_link_pairs;
         std::vector<std::size_t> bounding_sphere_index;
     };
