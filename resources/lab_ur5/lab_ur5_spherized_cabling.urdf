@@ -390,6 +390,19 @@
 			</geometry>
 			<origin xyz="0 0 0.02" rpy="0 0 0"></origin>
 		</collision>
+		<!-- The wrist camera on the bracket plate, measured from the lab's depth cloud. -->
+		<collision>
+			<geometry>
+				<sphere radius="0.036"></sphere>
+			</geometry>
+			<origin xyz="0 -0.0485 0.015" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.036"></sphere>
+			</geometry>
+			<origin xyz="0 -0.0755 0.015" rpy="0 0 0"></origin>
+		</collision>
 	</link>
 	<link name="robotiq_85_left_knuckle_link">
 		<inertial>
@@ -676,7 +689,8 @@
 	<joint name="robotiq_85_base_joint" type="fixed">
 		<parent link="fts_toolside"></parent>
 		<child link="robotiq_85_base_link"></child>
-		<origin rpy="-1.57 0.0 0.0" xyz="0.0 0.0 -0.037"></origin>
+		<!-- The 6 mm camera bracket plate sits between the sensor and the gripper. -->
+		<origin rpy="-1.57 0.0 0.0" xyz="0.0 0.006 -0.037"></origin>
 	</joint>
 	<joint name="robotiq_85_left_knuckle_joint" type="fixed">
 		<origin xyz="0.0306011444260539 0 0.0627920162695395" rpy="0 0 0"></origin>
