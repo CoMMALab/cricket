@@ -7,7 +7,6 @@
         "wsg_left/tool",
         "wsg_right/tool"
     ],
-    "constraints": true,
     "resolution": 32,
     "template": "templates/fk_template.hh",
     "subtemplates": [
