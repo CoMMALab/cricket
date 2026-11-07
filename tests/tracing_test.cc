@@ -84,5 +84,23 @@ int main()
     }
     CRICKET_CHECK(rejected);
 
+    // Bounded least squares: nq outputs, and the active-set conditionals compile to SIMD blends
+    const auto bounded =
+        cricket::trace_solve_tsr(info, "c++", cricket::ProjMethod::BoundedLS);
+    assert(bounded.outputs == static_cast<std::size_t>(info.model.nq));
+    assert(bounded.temp_variables > 0);
+    assert(bounded.code.find(".blend(") != std::string::npos);
+
+    bool rejected_rust = false;
+    try
+    {
+        cricket::trace_solve_tsr(info, "rust", cricket::ProjMethod::BoundedLS);
+    }
+    catch (const std::runtime_error &)
+    {
+        rejected_rust = true;
+    }
+    assert(rejected_rust);
+
     return 0;
 }
