@@ -10,7 +10,7 @@ namespace vamp::robots
 {
 struct {{name}}
 {
-    static constexpr const char *name = "{{lower(name)}}";
+    static constexpr const char *name = "{{module_name}}";
     static constexpr std::size_t dimension = {{n_q}};
     static constexpr std::size_t sample_dimension = {{n_u}};
     static constexpr std::size_t n_spheres = {{n_spheres}};

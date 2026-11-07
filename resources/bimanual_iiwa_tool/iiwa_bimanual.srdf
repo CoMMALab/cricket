@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<!-- iiwa_bimanual: link pairs (both with collision geometry) whose collisions
+     Drake filters: adjacent and welded bodies plus the models' and
+     directives' collision filter groups. Every other pair is checked.
+     tests/test_external_models.py checks it against the Drake model. -->
+<robot name="iiwa_bimanual">
+  <disable_collisions link1="iiwa_left/iiwa_link_0" link2="iiwa_left/iiwa_link_1" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_0" link2="iiwa_left/iiwa_link_2" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_0" link2="iiwa_left/iiwa_link_3" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_0" link2="iiwa_right/iiwa_link_0" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_1" link2="iiwa_left/iiwa_link_2" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_1" link2="iiwa_left/iiwa_link_3" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_2" link2="iiwa_left/iiwa_link_3" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_3" link2="iiwa_left/iiwa_link_4" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_4" link2="iiwa_left/iiwa_link_5" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_4" link2="iiwa_left/iiwa_link_6" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_4" link2="iiwa_left/iiwa_link_7" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_5" link2="iiwa_left/iiwa_link_6" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_5" link2="iiwa_left/iiwa_link_7" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_6" link2="iiwa_left/iiwa_link_7" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_7" link2="wsg_left/body" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_7" link2="wsg_left/left_finger" reason="filtered" />
+  <disable_collisions link1="iiwa_left/iiwa_link_7" link2="wsg_left/right_finger" reason="filtered" />
+  <disable_collisions link1="wsg_left/body" link2="wsg_left/left_finger" reason="filtered" />
+  <disable_collisions link1="wsg_left/body" link2="wsg_left/right_finger" reason="filtered" />
+  <disable_collisions link1="wsg_left/left_finger" link2="wsg_left/right_finger" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_0" link2="iiwa_right/iiwa_link_1" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_0" link2="iiwa_right/iiwa_link_2" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_0" link2="iiwa_right/iiwa_link_3" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_1" link2="iiwa_right/iiwa_link_2" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_1" link2="iiwa_right/iiwa_link_3" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_2" link2="iiwa_right/iiwa_link_3" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_3" link2="iiwa_right/iiwa_link_4" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_4" link2="iiwa_right/iiwa_link_5" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_4" link2="iiwa_right/iiwa_link_6" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_4" link2="iiwa_right/iiwa_link_7" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_5" link2="iiwa_right/iiwa_link_6" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_5" link2="iiwa_right/iiwa_link_7" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_6" link2="iiwa_right/iiwa_link_7" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_7" link2="wsg_right/body" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_7" link2="wsg_right/left_finger" reason="filtered" />
+  <disable_collisions link1="iiwa_right/iiwa_link_7" link2="wsg_right/right_finger" reason="filtered" />
+  <disable_collisions link1="wsg_right/body" link2="wsg_right/left_finger" reason="filtered" />
+  <disable_collisions link1="wsg_right/body" link2="wsg_right/right_finger" reason="filtered" />
+  <disable_collisions link1="wsg_right/left_finger" link2="wsg_right/right_finger" reason="filtered" />
+</robot>
