@@ -199,15 +199,30 @@ struct {{name}}
 
         Debug output;
 
-        {% for i in range(n_spheres) %}
+        {% for i in range(n_spheres) %}{% if at(sphere_env_skip, i) %}
+        output.first.emplace_back();{% else %}
         output.first.emplace_back(
             sphere_environment_get_collisions<decltype(x[0])>(
                 environment,
                 y[{{ i * 4 + 0 }}],
                 y[{{ i * 4 + 1 }}],
                 y[{{ i * 4 + 2 }}],
-                y[{{ i * 4 + 3 }}]));
+                y[{{ i * 4 + 3 }}]));{% endif %}
         {% endfor %}
+
+        {% if compact_collisions %}
+        for (std::size_t i = 0; i < cc_self_pair_a.size(); ++i)
+        {
+            const auto a = cc_self_pair_a[i] * 4;
+            const auto b = cc_self_pair_b[i] * 4;
+            if (sphere_sphere_self_collision<decltype(x[0])>(
+                    y[a + 0], y[a + 1], y[a + 2], y[a + 3],
+                    y[b + 0], y[b + 1], y[b + 2], y[b + 3]))
+            {
+                output.second.emplace_back(cc_self_pair_a[i], cc_self_pair_b[i]);
+            }
+        }
+        {% else %}
 
         {% for i in range(length(allowed_link_pairs)) %}
         {% set pair = at(allowed_link_pairs, i) %}
@@ -237,6 +252,7 @@ struct {{name}}
         {% endfor %}
         {% endfor %}
         {% endfor %}
+        {% endif %}
 
         return output;
     }
@@ -319,6 +335,29 @@ struct {{name}}
 
         return to_isometry(y.data());
     }
+
+    {% if compact_collisions %}
+    struct CCEnvLink { unsigned int bs_array_idx; unsigned int body_start; unsigned int body_count; };
+    struct CCSelfPair { unsigned int bs1_idx; unsigned int bs2_idx; unsigned int pair_start; unsigned int pair_count; };
+
+    static constexpr std::array<CCEnvLink, {{ length(compact_env_entries) }}> cc_env_links = {
+        {% for e in compact_env_entries %}CCEnvLink{ {{at(e,0)}}, {{at(e,1)}}, {{at(e,2)}} },
+        {% endfor %}
+    };
+    static constexpr std::array<unsigned int, {{ length(compact_env_body_idx) }}> cc_env_body_idx = {
+        {% for v in compact_env_body_idx %}{{v}}, {% endfor %}
+    };
+    static constexpr std::array<CCSelfPair, {{ length(compact_self_entries) }}> cc_self_pairs = {
+        {% for e in compact_self_entries %}CCSelfPair{ {{at(e,0)}}, {{at(e,1)}}, {{at(e,2)}}, {{at(e,3)}} },
+        {% endfor %}
+    };
+    static constexpr std::array<unsigned int, {{ length(compact_self_pair_a) }}> cc_self_pair_a = {
+        {% for v in compact_self_pair_a %}{{v}}, {% endfor %}
+    };
+    static constexpr std::array<unsigned int, {{ length(compact_self_pair_b) }}> cc_self_pair_b = {
+        {% for v in compact_self_pair_b %}{{v}}, {% endfor %}
+    };
+    {% endif %}
 };
 }
 
