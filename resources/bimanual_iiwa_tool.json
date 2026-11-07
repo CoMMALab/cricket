@@ -1,0 +1,20 @@
+{
+    "name": "BimanualIiwaTool",
+    "module_name": "bimanual_iiwa_tool",
+    "urdf": "bimanual_iiwa_tool/iiwa_bimanual_spherized.urdf",
+    "srdf": "bimanual_iiwa_tool/iiwa_bimanual.srdf",
+    "end_effector": [
+        "wsg_left/tool",
+        "wsg_right/tool"
+    ],
+    "constraints": true,
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [
+        {
+            "name": "ccfk",
+            "template": "templates/ccfk_template.hh"
+        }
+    ],
+    "output": "bimanual_iiwa_tool_fk.hh"
+}

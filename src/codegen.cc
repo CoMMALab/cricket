@@ -13,6 +13,7 @@
 #include <inja/inja.hpp>
 #include <nlohmann/json.hpp>
 
+#include <cctype>
 #include <sstream>
 #include <stdexcept>
 
@@ -184,6 +185,17 @@ namespace cricket
         const bool compact_collisions = opts.data.value("compact_collisions", false);
         data.update(robot.json(opts.bounds, opts.data.value("skip_static_environment_collisions", false)));
         data["compact_collisions"] = compact_collisions;
+
+        // Python/C++ module identifier; must match the registered binding module name.
+        if (not data.contains("module_name"))
+        {
+            std::string module_name = data["name"].get<std::string>();
+            for (auto &c : module_name)
+            {
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            }
+            data["module_name"] = module_name;
+        }
 
         auto eefk = trace_sphere_cc_fk(robot, opts.language, false, false, true);
         data["eefk_code"] = eefk.code;
