@@ -174,7 +174,7 @@ struct {{name}}
         // for non-Euclidean robots; constants and operands get wrapped as
         // V(x).blend(V(y), (V(...) CMP V(...))) so .blend() always has a
         // vector receiver.
-        using V = FloatVector<rake, 1>;
+        using V [[maybe_unused]] = FloatVector<rake, 1>;
         {% if interpolate_block_code_vars > 0 %}std::array<V, {{interpolate_block_code_vars}}> v;{% endif %}
         {{interpolate_block_code}}
     }
@@ -361,6 +361,362 @@ struct {{name}}
 
         return to_isometry(y.data() + 12 * eef_index);
     }
+
+    {% if has_constraints %}
+    //
+    // TSR (task-space region) constraint functions
+    //
+
+    static constexpr std::size_t n_eef = {{num_end_effectors}};
+
+    // Input: q (dimension), then per end-effector rTe (7), wTr (7), lb (6), ub (6); transforms
+    // are wxyz quaternion + xyz translation. Output: d(err)/dq (6 * n_eef * dimension,
+    // row-major), then the raw error (6 * n_eef).
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto tsr_error(const InputVector &x, OutputVector &out) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the se(3) log map's conditionals
+        using V [[maybe_unused]] = FloatVector<rake, 1>;
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{tsr_error_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{tsr_error_code_output}}> y;
+
+        {{tsr_error_code}}
+
+        for (auto i = 0U; i < {{tsr_error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Input for the solvers: J (6 * n_eef * dimension, row-major), then err (6 * n_eef).
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_error_lm_inner(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_tsr_error_lm_inner_code_vars}}> v;
+
+        {{solve_tsr_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_error_lm_outer(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_tsr_error_lm_outer_code_vars}}> v;
+
+        {{solve_tsr_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_error_gradient_descent(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_tsr_error_gradient_descent_code_vars}}> v;
+
+        {{solve_tsr_error_gradient_descent_code}}
+    }
+
+    {% if has_bounded_ls %}
+    // Bounded least-squares projection step for the TSR error.
+    // Input: the solver input above, then lower - q (dimension entries) and upper - q (dimension entries): the
+    // allowed step to each joint limit. Minimises the damped least squares subject to those bounds.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_error_bounded_ls(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V [[maybe_unused]] = FloatVector<rake, 1>;
+        [[maybe_unused]] std::array<V, {{solve_tsr_error_bounded_ls_code_vars}}> v;
+
+        {{solve_tsr_error_bounded_ls_code}}
+    }
+    {% endif %}
+
+    {% if num_end_effectors > 1 %}
+    // Relative-pose TSR between the first two end-effectors.
+    // Input: q (dimension), then the reference relative transform lTr (7), lb (6), ub (6).
+    // Output: d(err)/dq (6 * dimension, row-major), then the raw error (6).
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto tsr_bimanual_error(const InputVector &x, OutputVector &out) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the se(3) log map's conditionals
+        using V [[maybe_unused]] = FloatVector<rake, 1>;
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{tsr_bimanual_error_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{tsr_bimanual_error_code_output}}> y;
+
+        {{tsr_bimanual_error_code}}
+
+        for (auto i = 0U; i < {{tsr_bimanual_error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Input for the relative solvers: J (6 * dimension, row-major), then err (6).
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_relative_error_lm_inner(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_tsr_relative_error_lm_inner_code_vars}}> v;
+
+        {{solve_tsr_relative_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_relative_error_lm_outer(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_tsr_relative_error_lm_outer_code_vars}}> v;
+
+        {{solve_tsr_relative_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_relative_error_gradient_descent(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_tsr_relative_error_gradient_descent_code_vars}}> v;
+
+        {{solve_tsr_relative_error_gradient_descent_code}}
+    }
+
+    {% if has_bounded_ls %}
+    // Bounded least-squares projection step for the relative-pose TSR error.
+    // Input: the solver input above, then lower - q (dimension entries) and upper - q (dimension entries): the
+    // allowed step to each joint limit. Minimises the damped least squares subject to those bounds.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_tsr_relative_error_bounded_ls(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V [[maybe_unused]] = FloatVector<rake, 1>;
+        [[maybe_unused]] std::array<V, {{solve_tsr_relative_error_bounded_ls_code_vars}}> v;
+
+        {{solve_tsr_relative_error_bounded_ls_code}}
+    }
+    {% endif %}
+    {% endif %}
+    {% endif %}
+
+    {% if has_com %}
+    //
+    // Center-of-mass kinematics
+    //
+
+    static constexpr bool has_com = true;
+
+    // Input: q (dimension). Output: d(com)/dq (3 * dimension, row-major), then the center of
+    // mass (3){% if length(com_reference_frames) > 0 %}, relative to the mean position of: {{join(com_reference_frames, ", ")}}{% endif %}.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto com_jacobian(const InputVector &x, OutputVector &out) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{com_jacobian_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{com_jacobian_code_output}}> y;
+
+        {{com_jacobian_code}}
+
+        for (auto i = 0U; i < {{com_jacobian_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Input for the solvers: J (2 * dimension, row-major), then err (2), the xy
+    // support-polygon error of the center of mass.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_com_error_lm_inner(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_com_error_lm_inner_code_vars}}> v;
+
+        {{solve_com_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_com_error_lm_outer(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_com_error_lm_outer_code_vars}}> v;
+
+        {{solve_com_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_com_error_gradient_descent(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_com_error_gradient_descent_code_vars}}> v;
+
+        {{solve_com_error_gradient_descent_code}}
+    }
+
+    {% if has_bounded_ls %}
+    // Bounded least-squares projection step for the center-of-mass error.
+    // Input: the solver input above, then lower - q (dimension entries) and upper - q (dimension entries): the
+    // allowed step to each joint limit. Minimises the damped least squares subject to those bounds.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_com_error_bounded_ls(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V [[maybe_unused]] = FloatVector<rake, 1>;
+        [[maybe_unused]] std::array<V, {{solve_com_error_bounded_ls_code_vars}}> v;
+
+        {{solve_com_error_bounded_ls_code}}
+    }
+    {% endif %}
+    {% endif %}
+
+    {% if has_closed_loops %}
+    //
+    // Loop-closure distance constraints
+    //
+
+    static constexpr std::size_t n_closed_loops = {{num_closed_loops}};
+
+    // Input: q (dimension). Output: d(err)/dq (n_closed_loops * dimension, row-major), then
+    // err (n_closed_loops), where each row is the deviation of the distance between the
+    // loop's cut frames from its fixed length.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto closed_loop_error(const InputVector &x, OutputVector &out) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{closed_loop_error_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{closed_loop_error_code_output}}> y;
+
+        {{closed_loop_error_code}}
+
+        for (auto i = 0U; i < {{closed_loop_error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Input for the solvers: J (n_closed_loops * dimension, row-major), then err
+    // (n_closed_loops).
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_closed_loop_error_lm_inner(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_closed_loop_error_lm_inner_code_vars}}> v;
+
+        {{solve_closed_loop_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_closed_loop_error_lm_outer(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_closed_loop_error_lm_outer_code_vars}}> v;
+
+        {{solve_closed_loop_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_closed_loop_error_gradient_descent(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_closed_loop_error_gradient_descent_code_vars}}> v;
+
+        {{solve_closed_loop_error_gradient_descent_code}}
+    }
+
+    {% if has_bounded_ls %}
+    // Bounded least-squares projection step for the closed-loop error.
+    // Input: the solver input above, then lower - q (dimension entries) and upper - q (dimension entries): the
+    // allowed step to each joint limit. Minimises the damped least squares subject to those bounds.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_closed_loop_error_bounded_ls(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V [[maybe_unused]] = FloatVector<rake, 1>;
+        [[maybe_unused]] std::array<V, {{solve_closed_loop_error_bounded_ls_code_vars}}> v;
+
+        {{solve_closed_loop_error_bounded_ls_code}}
+    }
+    {% endif %}
+    {% endif %}
+
+    {% if has_lead_screw %}
+    //
+    // Lead-screw coupling constraint functions
+    //
+
+    static constexpr bool has_lead_screw = true;
+
+    // Input: q (dimension), then rTe (7), wTr (7), pitch (1); transforms are wxyz
+    // quaternion + xyz translation. Output: d(h)/dq (dimension, row-major), then h (1):
+    // the axial advance of the offset end-effector frame along wTr's z-axis minus the
+    // pitch-scaled rotation about it. dh/dq is the Pfaffian row a(q)^T of the velocity
+    // coupling a(q)^T qdot = 0; h itself is the conserved quantity of the integrable
+    // (holonomic) form.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto lead_screw_error(const InputVector &x, OutputVector &out) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the se(3) log map's conditionals
+        using V [[maybe_unused]] = FloatVector<rake, 1>;
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{lead_screw_error_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{lead_screw_error_code_output}}> y;
+
+        {{lead_screw_error_code}}
+
+        for (auto i = 0U; i < {{lead_screw_error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+
+    // Input for the solvers: J (dimension, row-major), then err (1).
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_lead_screw_error_lm_inner(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_lead_screw_error_lm_inner_code_vars}}> v;
+
+        {{solve_lead_screw_error_lm_inner_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_lead_screw_error_lm_outer(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_lead_screw_error_lm_outer_code_vars}}> v;
+
+        {{solve_lead_screw_error_lm_outer_code}}
+    }
+
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_lead_screw_error_gradient_descent(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{solve_lead_screw_error_gradient_descent_code_vars}}> v;
+
+        {{solve_lead_screw_error_gradient_descent_code}}
+    }
+
+    {% if has_bounded_ls %}
+    // Bounded least-squares projection step for the lead-screw error.
+    // Input: the solver input above, then lower - q (dimension entries) and upper - q (dimension entries): the
+    // allowed step to each joint limit. Minimises the damped least squares subject to those bounds.
+    template <std::size_t rake, typename InputVector>
+    static inline auto solve_lead_screw_error_bounded_ls(const InputVector &x, ConfigurationBlock<rake> &y) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the solver's conditionals
+        using V [[maybe_unused]] = FloatVector<rake, 1>;
+        [[maybe_unused]] std::array<V, {{solve_lead_screw_error_bounded_ls_code_vars}}> v;
+
+        {{solve_lead_screw_error_bounded_ls_code}}
+    }
+    {% endif %}
+    {% endif %}
+
+    {% if has_twist %}
+    //
+    // Twist Jacobians for constant-coefficient Pfaffian velocity constraints
+    //
+
+    static constexpr bool has_twist = true;
+
+    // Input: q (dimension), then rTe (7), wTr (7); transforms are wxyz quaternion + xyz
+    // translation. Output (12 x dimension, row-major): the twist Jacobian [linear;
+    // angular] of the offset frame (eef * rTe^-1) expressed in the reference frame wTr's
+    // axes, then the same expressed in the offset frame's own (body) axes. Purely
+    // geometric (no log map), so rows are smooth for unbounded rotation.
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto twist_jacobians(const InputVector &x, OutputVector &out) noexcept
+    {
+        [[maybe_unused]] std::array<FloatVector<rake, 1>, {{twist_jacobians_code_vars}}> v;
+        std::array<FloatVector<rake, 1>, {{twist_jacobians_code_output}}> y;
+
+        {{twist_jacobians_code}}
+
+        for (auto i = 0U; i < {{twist_jacobians_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+    {% endif %}
 
     {% if compact_collisions %}
     struct CCEnvLink { unsigned int bs_array_idx; unsigned int body_start; unsigned int body_count; };
