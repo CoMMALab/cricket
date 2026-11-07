@@ -137,9 +137,7 @@ namespace cricket
 
     namespace
     {
-        auto compute_extended_bounds(
-            const pinocchio::Model &model,
-            const std::optional<Bounds> &bounds)
+        auto compute_extended_bounds(const pinocchio::Model &model, const std::optional<Bounds> &bounds)
             -> std::pair<Eigen::VectorXd, Eigen::VectorXd>
         {
             Eigen::VectorXd lower = model.lowerPositionLimit;
@@ -246,8 +244,7 @@ namespace cricket
         }
     }  // namespace
 
-    auto RobotInfo::json(const std::optional<Bounds> &bounds, bool skip_static_environment)
-        -> nlohmann::json
+    auto RobotInfo::json(const std::optional<Bounds> &bounds, bool skip_static_environment) -> nlohmann::json
     {
         // A frame is static when its parent joint is the universe (0): every joint
         // between it and the world was fixed.
