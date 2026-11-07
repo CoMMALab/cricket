@@ -68,9 +68,8 @@ namespace cricket
         // When `skip_static_environment` is set, links with no mobile joint between them
         // and the world (frame parent joint 0) are omitted from the emitted
         // environment-collision tables; self-collision tables are unaffected.
-        auto json(
-            const std::optional<Bounds> &bounds = std::nullopt,
-            bool skip_static_environment = false) -> nlohmann::json;
+        auto json(const std::optional<Bounds> &bounds = std::nullopt, bool skip_static_environment = false)
+            -> nlohmann::json;
 
         auto dof_to_joint_names() -> std::vector<std::string>;
         auto get_frames_colliding_end_effector() -> std::vector<std::size_t>;

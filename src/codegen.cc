@@ -175,8 +175,7 @@ namespace cricket
 
         nlohmann::json data = opts.data;
         const bool compact_collisions = opts.data.value("compact_collisions", false);
-        data.update(robot.json(
-            opts.bounds, opts.data.value("skip_static_environment_collisions", false)));
+        data.update(robot.json(opts.bounds, opts.data.value("skip_static_environment_collisions", false)));
         data["compact_collisions"] = compact_collisions;
 
         auto eefk = trace_sphere_cc_fk(robot, opts.language, false, false, true);

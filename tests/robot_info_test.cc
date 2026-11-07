@@ -69,7 +69,8 @@ int main()
     {
         static_links += (robot.model.frames[link.get<std::size_t>()].parentJoint == 0) ? 1 : 0;
     }
-    CRICKET_CHECK(skipped.at("environment_links").size() + static_links == metadata.at("environment_links").size());
+    CRICKET_CHECK(
+        skipped.at("environment_links").size() + static_links == metadata.at("environment_links").size());
 
     return 0;
 }
