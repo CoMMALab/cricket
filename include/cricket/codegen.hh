@@ -56,7 +56,7 @@ namespace cricket
         std::filesystem::path urdf;
         std::optional<std::filesystem::path> dynamics_urdf;
         std::optional<std::filesystem::path> srdf;
-        std::optional<std::string> end_effector;
+        std::vector<std::string> end_effectors;
         std::filesystem::path template_path;
         std::map<std::string, std::filesystem::path> subtemplates;
         std::string language = "c++";
