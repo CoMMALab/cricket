@@ -89,6 +89,17 @@ namespace cricket
         const std::filesystem::path &urdf_file,
         const std::optional<std::filesystem::path> &srdf_file,
         const std::optional<std::string> &end_effector)
+      : RobotInfo(
+            urdf_file,
+            srdf_file,
+            end_effector ? std::vector<std::string>{*end_effector} : std::vector<std::string>{})
+    {
+    }
+
+    RobotInfo::RobotInfo(
+        const std::filesystem::path &urdf_file,
+        const std::optional<std::filesystem::path> &srdf_file,
+        const std::vector<std::string> &end_effectors)
     {
         if (not std::filesystem::exists(urdf_file))
         {
@@ -117,22 +128,36 @@ namespace cricket
         }
 
         extract_spheres();
+        resolve_end_effectors(end_effectors);
+    }
 
-        if (not end_effector)
+    auto RobotInfo::resolve_end_effectors(const std::vector<std::string> &end_effectors) -> void
+    {
+        if (end_effectors.empty())
         {
-            end_effector_name = model.frames[model.nframes - 1].name;
-            fmt::print("No EE provided, using distal link `{}`.\n", end_effector_name);
-        }
-        else if (not model.existFrame(*end_effector))
-        {
-            throw std::runtime_error(fmt::format("Invalid EE name {}", *end_effector));
+            end_effector_names.push_back(model.frames[model.nframes - 1].name);
+            fmt::print("No EE provided, using distal link `{}`.\n", end_effector_names.front());
         }
         else
         {
-            end_effector_name = *end_effector;
+            for (const auto &name : end_effectors)
+            {
+                if (not model.existFrame(name, pinocchio::BODY))
+                {
+                    throw std::runtime_error(fmt::format("Invalid EE name {}", name));
+                }
+
+                end_effector_names.push_back(name);
+            }
         }
 
-        end_effector_index = model.getFrameId(end_effector_name);
+        for (const auto &name : end_effector_names)
+        {
+            end_effector_indexes.push_back(model.getFrameId(name, pinocchio::BODY));
+        }
+
+        end_effector_name = end_effector_names.front();
+        end_effector_index = end_effector_indexes.front();
     }
 
     namespace
@@ -276,6 +301,8 @@ namespace cricket
         json["measure"] = measure;
         json["end_effector"] = end_effector_name;
         json["end_effector_index"] = end_effector_index;
+        json["end_effectors"] = end_effector_names;
+        json["num_end_effectors"] = end_effector_names.size();
         json["min_radius"] = min_radius;
         json["max_radius"] = max_radius;
         json["min_radius_mobile"] = min_radius_mobile;
@@ -288,7 +315,12 @@ namespace cricket
         json["per_link_spheres"] = per_link_spheres;
         json["links_with_geometry"] = links_with_geometry;
         json["bounding_sphere_index"] = bounding_sphere_index;
-        json["end_effector_collisions"] = get_frames_colliding_end_effector();
+        nlohmann::json end_effector_collisions = nlohmann::json::array();
+        for (const auto &frame_index : end_effector_indexes)
+        {
+            end_effector_collisions.push_back(get_frames_colliding_end_effector(frame_index));
+        }
+        json["end_effector_collisions"] = end_effector_collisions;
         json["euclidean"] = is_euclidean(model);
         json["joint_topology"] = generate_joint_topology(model);
         json["so3_offsets"] = generate_so3_offsets(model);
@@ -299,6 +331,24 @@ namespace cricket
             link_names.emplace_back(model.frames[i].name);
         }
         json["link_names"] = link_names;
+
+        // Link pairs (frame indices, a <= b, including a == b) among links with geometry that are NOT
+        // self-collision checked. With an SRDF these are exactly its disabled pairs plus each link
+        // with itself: the links a link may touch without being flagged.
+        nlohmann::json exempt_link_pairs = nlohmann::json::array();
+        for (auto i = 0U; i < links_with_geometry.size(); ++i)
+        {
+            for (auto j = i; j < links_with_geometry.size(); ++j)
+            {
+                const auto a = std::min(links_with_geometry[i], links_with_geometry[j]);
+                const auto b = std::max(links_with_geometry[i], links_with_geometry[j]);
+                if (allowed_link_pairs.find({a, b}) == allowed_link_pairs.end())
+                {
+                    exempt_link_pairs.push_back({a, b});
+                }
+            }
+        }
+        json["exempt_link_pairs"] = exempt_link_pairs;
 
         // Array indexes (into links_with_geometry, descending — the template's iteration
         // order) of links checked against the environment.
@@ -405,9 +455,9 @@ namespace cricket
         return dof_to_joint_name;
     }
 
-    auto RobotInfo::get_frames_colliding_end_effector() -> std::vector<std::size_t>
+    auto RobotInfo::get_frames_colliding_end_effector(std::size_t frame_index) -> std::vector<std::size_t>
     {
-        std::size_t end_effector_joint = model.frames[end_effector_index].parentJoint;
+        std::size_t end_effector_joint = model.frames[frame_index].parentJoint;
 
         std::vector<std::size_t> frames;
         for (auto i = 0U; i < model.frames.size(); ++i)

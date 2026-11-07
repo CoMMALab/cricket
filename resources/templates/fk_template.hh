@@ -26,6 +26,17 @@ struct {{name}}
 
     static constexpr std::array<std::string_view, dimension> joint_names = {"{{join(joint_names, "\", \"")}}"};
     static constexpr const char *end_effector = "{{end_effector}}";
+    static constexpr std::array<std::string_view, {{num_end_effectors}}> end_effectors = {"{{join(end_effectors, "\", \"")}}"};
+
+    // Frame names, indexed by the link ids used below and by Attachment::allowed_links.
+    static constexpr std::array<std::string_view, {{length(link_names)}}> link_names = {"{{join(link_names, "\", \"")}}"};
+
+    // Pairs of links (a <= b, a == b included) that are never self-collision checked, i.e. links that
+    // may touch each other. An attachment that is allowed to touch a link is also allowed to touch these.
+    static constexpr std::array<std::array<std::size_t, 2>, {{length(exempt_link_pairs)}}> exempt_link_pairs = {
+        {% for e in exempt_link_pairs %}std::array<std::size_t, 2>{ {{at(e, 0)}}, {{at(e, 1)}} },
+        {% endfor %}
+    };
 
     using Configuration = FloatVector<dimension>;
     using ConfigurationArray = std::array<FloatT, dimension>;
@@ -282,8 +293,10 @@ struct {{name}}
         {{ccfkee_code}}
         {% include "ccfk" %}
 
-        // attaching at {{ end_effector }}
-        set_attachment_pose(environment, to_isometry(&y[{{ccfkee_code_output - 12}}]));
+        {% for k in range(num_end_effectors) %}
+        // attaching at {{ at(end_effectors, k) }}
+        set_attachment_pose(environment, {{k}}, to_isometry(&y[{{ccfkee_code_output - 12 * (num_end_effectors - k)}}]));
+        {% endfor %}
 
         //
         // attachment vs. environment collisions
@@ -292,18 +305,30 @@ struct {{name}}
         {
             return false;
         }
+        {% if num_end_effectors > 1 %}
+
+        //
+        // attachment vs. attachment collisions (across end-effectors)
+        //
+        if (attachment_attachment_collision(environment)) [[unlikely]]
+        {
+            return false;
+        }
+        {% endif %}
 
         //
         // attachment vs. robot collisions
         //
 
-        {% for i in range(length(end_effector_collisions)) %}
-        {% set link_index = at(end_effector_collisions, i) %}
+        {% for k in range(num_end_effectors) %}
+        {% set eef_collisions = at(end_effector_collisions, k) %}
+        {% for i in range(length(eef_collisions)) %}
+        {% set link_index = at(eef_collisions, i) %}
         {% set link_bs = at(bounding_sphere_index, link_index) %}
         {% set link_spheres = at(per_link_spheres, link_index) %}
 
-        // Attachment vs. {{ at(link_names, link_index )}}
-        if (attachment_sphere_collision<decltype(x[0])>(environment,
+        // {{ at(end_effectors, k) }} attachments vs. {{ at(link_names, link_index )}}
+        if (attachment_sphere_collision<decltype(x[0])>(environment, {{k}}, {{link_index}}U,
                                                         y[{{(n_spheres + link_bs) * 4 + 0}}],
                                                         y[{{(n_spheres + link_bs) * 4 + 1}}],
                                                         y[{{(n_spheres + link_bs) * 4 + 2}}],
@@ -311,7 +336,7 @@ struct {{name}}
         {
             {% for j in range(length(link_spheres)) %}
             {% set sphere_index = at(link_spheres, j) %}
-            if (attachment_sphere_collision<decltype(x[0])>(environment,
+            if (attachment_sphere_collision<decltype(x[0])>(environment, {{k}}, {{link_index}}U,
                                                             y[{{sphere_index * 4 + 0}}],
                                                             y[{{sphere_index * 4 + 1}}],
                                                             y[{{sphere_index * 4 + 2}}],
@@ -322,18 +347,19 @@ struct {{name}}
             {% endfor %}
         }
         {% endfor %}
+        {% endfor %}
 
         return true;
     }
 
-    static inline auto eefk(const std::array<float, {{n_q}}> &x) noexcept -> Eigen::Isometry3f
+    static inline auto eefk(const std::array<float, {{n_q}}> &x, std::size_t eef_index = 0) noexcept -> Eigen::Isometry3f
     {
         std::array<float, {{eefk_code_vars}}> v;
         std::array<float, {{eefk_code_output}}> y;
 
         {{eefk_code}}
 
-        return to_isometry(y.data());
+        return to_isometry(y.data() + 12 * eef_index);
     }
 
     {% if compact_collisions %}

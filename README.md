@@ -126,6 +126,8 @@ For a custom robot, you only need to change the `name`, `urdf`, `srdf`, and `end
 Some notes:
 - If your robot does not have an SRDF, then the script will attempt to guess the self-collisions of the robot by randomly sampling one million configurations and seeing what is always in collision and what never collides. However, this is unreliable and probably should just be done by hand.
 - If you do not provide an end-effector, the last frame in the robot will be used. For serial link manipulators, this is probably the tool frame, but you should set this yourself.
+- `end_effector` may also be a list of frame names for robots with several end-effectors (e.g. a bimanual robot). The first one is the primary end-effector (the `end_effector` name constant). The generated `eefk(x, i)` returns the pose of end-effector `i` (default 0), and `fkcc_attach` poses attachments on each end-effector with `set_attachment_pose(environment, i, pose)`, checks each end-effector's attachments against the frames it can collide with, and checks attachments on different end-effectors against each other.
+- Attachments are checked against the links their end-effector is self-collision checked against. The generated header also exposes `link_names` (frame names; the index is the link id) and `exempt_link_pairs` (every pair of links that is not self-collision checked, each link with itself included). With an SRDF these are exactly its `disable_collisions` pairs, so vamp can let an attachment touch a given link plus everything that link may touch (`Attachment.allowed_links`, robot module `exempt_links(names)`). Without an SRDF the collision pairs are guessed by sampling and the table also contains pairs that merely never collided, so only use it with an SRDF.
 - `compact_collisions` (default `false`, C++ template only): instead of unrolling every collision check into straight-line code, emit constant tables of sphere indices and loop over them. The generated header is much smaller and compiles faster, which matters for robots with many spheres; the collision results are the same.
 - `skip_static_environment_collisions` (default `false`): do not check links that no mobile joint connects to the world (fixed to the base) against the environment. Self-collision checks are unaffected.
 - You may need to increase the collision checking resolution used (`resolution`) if your robot is especially high-dimensional (e.g., for Panda and Fetch 32 is used, for Baxter, 64).
@@ -180,7 +182,8 @@ In addition to the specified input fields from the configuration file, the scrip
 - `bound_lower`: lower bound of joint ranges.
 - `bound_range`: range between lower and upper bound of joint ranges.
 - `measure`: total measure of robot joint space.
-- `end_effector_index`: frame index of end-effector.
+- `end_effector_index`: frame index of the first (primary) end-effector.
+- `end_effectors`: names of all end-effectors, in declaration order; `num_end_effectors`: how many.
 - `min_radius`: minimum sphere radius on robot.
 - `max_radius`: maximum sphere radius on robot.
 - `min_radius_mobile`: minimum sphere radius among mobile (non-fixed) spheres, i.e. spheres whose kinematic chain includes at least one moving joint.
@@ -193,12 +196,12 @@ In addition to the specified input fields from the configuration file, the scrip
 - `per_link_spheres`: for each frame, the indices of the spheres associated with that frame.
 - `links_with_geometry`: indices of the frames that have collision geometry.
 - `bounding_sphere_index`: mapping between frame index to bounding sphere index (where bounding spheres are at the end of the sphere buffer, after `n_spheres`).
-- `end_effector_collisions`: which frames the end-effector can collide with.
+- `end_effector_collisions`: for each end-effector, which frames it can collide with.
 - `environment_links`: indices (into `links_with_geometry`, in the order the template iterates them) of the links checked against the environment; this is every link with geometry unless `skip_static_environment_collisions` is set.
 - `compact_env_entries`, `compact_env_body_idx`, `compact_self_entries`, `compact_self_pair_a`, `compact_self_pair_b`: the index tables behind `compact_collisions`.
 - `sphere_env_skip`: per sphere, whether its environment check is skipped (used by `fkcc_debug`).
 - `allowed_link_pairs`: sphere indices that are allowed to collide with each other.
-- `eefk_code`, `eefk_code_vars`, `eefk_code_output`: C-style code for computing end-effector pose in position and quaternion, the number of intermediate variables used, and the number of output variables.
+- `eefk_code`, `eefk_code_vars`, `eefk_code_output`: C-style code for computing end-effector poses in position and quaternion (12 output values per end-effector, in declaration order), the number of intermediate variables used, and the number of output variables.
 - `spherefk_code`, `spherefk_code_vars`, `spherefk_code_output`: C-style code for computing position of all spheres, the number of intermediate variables used, and the number of output variables.
 - `ccfk_code`, `ccfk_code_vars`, `ccfk_code_output`: C-style code for computing position of all spheres and bounding spheres for collision checking, the number of intermediate variables used, and the number of output variables.
 - `ccfkee_code`, `ccfkee_code_vars`, `ccfkee_code_output`: C-style code for computing position of all spheres and bounding spheres for collision checking as well as the position and quaternion for the end-effector, the number of intermediate variables used, and the number of output variables.

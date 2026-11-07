@@ -98,7 +98,7 @@ namespace cricket
 
         std::size_t n_spheres_data = (spheres) ? info.spheres.size() * 4 : 0;
         std::size_t n_bounding_spheres_data = (bounding_spheres) ? info.bounding_spheres.size() * 4 : 0;
-        std::size_t n_fk_data = (fk) ? 12 : 0;
+        std::size_t n_fk_data = (fk) ? 12 * info.end_effector_indexes.size() : 0;
         std::size_t n_out = n_spheres_data + n_bounding_spheres_data + n_fk_data;
 
         ADVectorXs data(n_out);
@@ -127,7 +127,14 @@ namespace cricket
 
         if (fk)
         {
-            trace_frame(info.end_effector_index, ad_data, data, n_spheres_data + n_bounding_spheres_data);
+            for (auto i = 0U; i < info.end_effector_indexes.size(); ++i)
+            {
+                trace_frame(
+                    info.end_effector_indexes[i],
+                    ad_data,
+                    data,
+                    n_spheres_data + n_bounding_spheres_data + i * 12);
+            }
         }
 
         // Create the AD function
@@ -171,7 +178,7 @@ namespace cricket
                     opts.template_path.string()));
         }
 
-        RobotInfo robot(opts.urdf, opts.srdf, opts.end_effector);
+        RobotInfo robot(opts.urdf, opts.srdf, opts.end_effectors);
 
         nlohmann::json data = opts.data;
         const bool compact_collisions = opts.data.value("compact_collisions", false);
