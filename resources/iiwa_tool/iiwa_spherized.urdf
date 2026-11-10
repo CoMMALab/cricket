@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="iiwa" path="models/iiwa/external/iiwa.urdf">
+	<link name="world"></link>
+	<link name="iiwa/base"></link>
+	<link name="iiwa/iiwa_link_0">
+		<inertial>
+			<origin rpy="0 0 0" xyz="-0.1 0 0.07"></origin>
+			<mass value="5"></mass>
+			<inertia ixx="0.05" ixy="0" ixz="0" iyy="0.06" iyz="0" izz="0.03"></inertia>
+		</inertial>
+		<collision>
+			<geometry>
+				<sphere radius="0.10707984119653702"></sphere>
+			</geometry>
+			<origin xyz="-0.07455945014953613 -0.0546792633831501 0.08070900291204453" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.10380999743938446"></sphere>
+			</geometry>
+			<origin xyz="-0.07673101872205734 0.05336577817797661 0.07828888297080994" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.10753893107175827"></sphere>
+			</geometry>
+			<origin xyz="0.05116410553455353 -0.04664674773812294 0.06534116715192795" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.1087912768125534"></sphere>
+			</geometry>
+			<origin xyz="0.0503959096968174 0.04698997363448143 0.06288658082485199" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa/iiwa_link_1">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0 -0.03 0.12"></origin>
+			<mass value="5.76"></mass>
+			<inertia ixx="0.033" ixy="0" ixz="0" iyy="0.0333" iyz="0" izz="0.0123"></inertia>
+		</inertial>
+		<collision>
+			<geometry>
+				<sphere radius="0.10312904417514801"></sphere>
+			</geometry>
+			<origin xyz="0.0067050340585410595 -0.04001707583665848 0.06871850788593292" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08511051535606384"></sphere>
+			</geometry>
+			<origin xyz="-0.05040042847394943 0.02947273664176464 0.05819471552968025" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08064163476228714"></sphere>
+			</geometry>
+			<origin xyz="0.03550434485077858 0.02955572120845318 0.0508122555911541" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08868111670017242"></sphere>
+			</geometry>
+			<origin xyz="-0.03502897545695305 -0.06494908034801483 0.21138973534107208" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08867537975311279"></sphere>
+			</geometry>
+			<origin xyz="-0.038473762571811676 0.00740834791213274 0.19831253588199615" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09841509163379669"></sphere>
+			</geometry>
+			<origin xyz="0.03080255165696144 -0.029119815677404404 0.18607863783836365" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa/iiwa_link_2">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0.0003 0.059 0.042"></origin>
+			<mass value="6.35"></mass>
+			<inertia ixx="0.0305" ixy="0" ixz="0" iyy="0.0304" iyz="0" izz="0.011"></inertia>
+		</inertial>
+		<collision>
+			<geometry>
+				<sphere radius="0.09776696562767029"></sphere>
+			</geometry>
+			<origin xyz="-0.026439562439918518 0.008623623289167881 0.03666773438453674" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08264695852994919"></sphere>
+			</geometry>
+			<origin xyz="0.0405803807079792 -0.005153116770088673 0.007007773965597153" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08298080414533615"></sphere>
+			</geometry>
+			<origin xyz="0.033473361283540726 -0.018875405192375183 0.0786600336432457" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08025694638490677"></sphere>
+			</geometry>
+			<origin xyz="-0.04323889687657356 0.1430189609527588 -0.028409341350197792" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.0812082439661026"></sphere>
+			</geometry>
+			<origin xyz="0.046144403517246246 0.1382657140493393 -0.02535979077219963" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09827996790409088"></sphere>
+			</geometry>
+			<origin xyz="0.0036827996373176575 0.13381826877593994 0.04496007412672043" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa/iiwa_link_3">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0 0.03 0.13"></origin>
+			<mass value="3.5"></mass>
+			<inertia ixx="0.025" ixy="0" ixz="0" iyy="0.0238" iyz="0" izz="0.0076"></inertia>
+		</inertial>
+		<collision>
+			<geometry>
+				<sphere radius="0.07903851568698883"></sphere>
+			</geometry>
+			<origin xyz="-0.04090699553489685 -0.014650879427790642 0.05890486389398575" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.07758472859859467"></sphere>
+			</geometry>
+			<origin xyz="0.03871218487620354 -0.015814905986189842 0.05332966893911362" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09089556336402893"></sphere>
+			</geometry>
+			<origin xyz="-0.0042814454063773155 0.037128277122974396 0.06316453963518143" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08252393454313278"></sphere>
+			</geometry>
+			<origin xyz="-0.025908324867486954 -0.00685749389231205 0.2024764120578766" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08632023632526398"></sphere>
+			</geometry>
+			<origin xyz="0.03249534219503403 -0.0028326858300715685 0.19632679224014282" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.09117089956998825"></sphere>
+			</geometry>
+			<origin xyz="0.00010560175724094734 0.0619877427816391 0.1878637671470642" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa/iiwa_link_4">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0 0.067 0.034"></origin>
+			<mass value="3.5"></mass>
+			<inertia ixx="0.017" ixy="0" ixz="0" iyy="0.0164" iyz="0" izz="0.006"></inertia>
+		</inertial>
+		<collision>
+			<geometry>
+				<sphere radius="0.08541522920131683"></sphere>
+			</geometry>
+			<origin xyz="0.005948834121227264 0.015936117619276047 0.008147326298058033" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.08027253299951553"></sphere>
+			</geometry>
+			<origin xyz="-0.004482982214540243 0.013936861418187618 0.061854809522628784" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.07160906493663788"></sphere>
+			</geometry>
+			<origin xyz="-0.03546897694468498 0.13274449110031128 -0.029342681169509888" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06971738487482071"></sphere>
+			</geometry>
+			<origin xyz="0.03402969241142273 0.13312482833862305 -0.028700105845928192" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.0868489220738411"></sphere>
+			</geometry>
+			<origin xyz="0.005900354590266943 0.12478365749120712 0.039634350687265396" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa/iiwa_link_5">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0.0001 0.021 0.076"></origin>
+			<mass value="3.5"></mass>
+			<inertia ixx="0.01" ixy="0" ixz="0" iyy="0.0087" iyz="0" izz="0.00449"></inertia>
+		</inertial>
+		<collision>
+			<geometry>
+				<sphere radius="0.06700577586889267"></sphere>
+			</geometry>
+			<origin xyz="-0.03388931602239609 -0.02037576399743557 0.04884447157382965" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06917984038591385"></sphere>
+			</geometry>
+			<origin xyz="0.03768425062298775 -0.023049667477607727 0.049744442105293274" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06941942125558853"></sphere>
+			</geometry>
+			<origin xyz="-0.03095800243318081 0.04429056867957115 0.05159454047679901" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06915021687746048"></sphere>
+			</geometry>
+			<origin xyz="0.029032407328486443 0.04536554589867592 0.04844992607831955" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06985804438591003"></sphere>
+			</geometry>
+			<origin xyz="-0.02267375960946083 0.030198058113455772 0.14345423877239227" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06884539127349854"></sphere>
+			</geometry>
+			<origin xyz="0.024658285081386566 0.031255822628736496 0.14460228383541107" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.053858671337366104"></sphere>
+			</geometry>
+			<origin xyz="-0.018390361219644547 0.05510539561510086 0.21194928884506226" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.05341479927301407"></sphere>
+			</geometry>
+			<origin xyz="0.01909494213759899 0.055015675723552704 0.21312318742275238" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa/iiwa_link_6">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0 0.0006 0.0004"></origin>
+			<mass value="1.8"></mass>
+			<inertia ixx="0.0049" ixy="0" ixz="0" iyy="0.0047" iyz="0" izz="0.0036"></inertia>
+		</inertial>
+		<collision>
+			<geometry>
+				<sphere radius="0.07015649974346161"></sphere>
+			</geometry>
+			<origin xyz="0.004819107707589865 -0.02323812060058117 -0.02243161015212536" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.06913942098617554"></sphere>
+			</geometry>
+			<origin xyz="0.004912600386887789 -0.02720375545322895 0.023769861087203026" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.07281078398227692"></sphere>
+			</geometry>
+			<origin xyz="-0.005252409726381302 0.028890272602438927 -0.026416797190904617" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.07149577140808105"></sphere>
+			</geometry>
+			<origin xyz="0.004715785384178162 0.029479237273335457 0.020322784781455994" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa/iiwa_link_7">
+		<inertial>
+			<origin rpy="0 0 0" xyz="0 0 0.02"></origin>
+			<mass value="1.2"></mass>
+			<inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"></inertia>
+		</inertial>
+		<collision>
+			<geometry>
+				<sphere radius="0.03728210926055908"></sphere>
+			</geometry>
+			<origin xyz="-0.020162537693977356 -0.029750438407063484 0.0033123984467238188" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.03553653135895729"></sphere>
+			</geometry>
+			<origin xyz="-0.019638018682599068 -0.028282735496759415 0.027606913819909096" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.03572847694158554"></sphere>
+			</geometry>
+			<origin xyz="-0.021261511370539665 0.009134642779827118 0.017603863030672073" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.03728210926055908"></sphere>
+			</geometry>
+			<origin xyz="0.03574521467089653 -0.005576038733124733 0.003392144339159131" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.03553653135895729"></sphere>
+			</geometry>
+			<origin xyz="0.034258220344781876 -0.0049781110137701035 0.027683790773153305" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.03572847694158554"></sphere>
+			</geometry>
+			<origin xyz="0.008132950402796268 0.02184474840760231 0.017645791172981262" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="iiwa/iiwa_link_ee_kuka"></link>
+	<link name="iiwa/iiwa_link_ee"></link>
+	<link name="wsg/body">
+		<inertial>
+			<origin xyz="0 0 0" rpy="0 0 0"></origin>
+			<mass value="0.988882"></mass>
+			<inertia ixx="0.162992" ixy="0" ixz="0" iyy="0.162992" iyz="0" izz="0.164814"></inertia>
+		</inertial>
+		<collision>
+			<geometry>
+				<sphere radius="0.04504387080669403"></sphere>
+			</geometry>
+			<origin xyz="-0.03851541876792908 -0.018213791772723198 0.0019244900904595852" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.044608667492866516"></sphere>
+			</geometry>
+			<origin xyz="-0.038429081439971924 0.018616104498505592 0.0023550984915345907" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.04444586858153343"></sphere>
+			</geometry>
+			<origin xyz="0.03838452324271202 -0.01773819886147976 -0.002015518257394433" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.04475165531039238"></sphere>
+			</geometry>
+			<origin xyz="0.038983091711997986 0.018110724166035652 0.0016171218594536185" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="wsg/left_finger">
+		<inertial>
+			<origin xyz="0 0 0" rpy="0 0 0"></origin>
+			<mass value="0.05"></mass>
+			<inertia ixx="0.16" ixy="0" ixz="0" iyy="0.16" iyz="0" izz="0.16"></inertia>
+		</inertial>
+		<collision>
+			<geometry>
+				<sphere radius="0.02373422309756279"></sphere>
+			</geometry>
+			<origin xyz="-0.022088363766670227 0.013456161133944988 0.0006482815369963646" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.023232506588101387"></sphere>
+			</geometry>
+			<origin xyz="-0.020563973113894463 0.03913266211748123 -0.0011020206147804856" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.034265194088220596"></sphere>
+			</geometry>
+			<origin xyz="-0.011950614862143993 0.08739637583494186 0.0007444352959282696" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="wsg/right_finger">
+		<inertial>
+			<origin xyz="0 0 0" rpy="0 0 0"></origin>
+			<mass value="0.05"></mass>
+			<inertia ixx="0.16" ixy="0" ixz="0" iyy="0.16" iyz="0" izz="0.16"></inertia>
+		</inertial>
+		<collision>
+			<geometry>
+				<sphere radius="0.02373422309756279"></sphere>
+			</geometry>
+			<origin xyz="0.022088363766670227 0.013456161133944988 0.0006482815369963646" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.023232506588101387"></sphere>
+			</geometry>
+			<origin xyz="0.020563973113894463 0.03913266211748123 -0.0011020206147804856" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.034265194088220596"></sphere>
+			</geometry>
+			<origin xyz="0.011950614862143993 0.08739637583494186 0.0007444352959282696" rpy="0 0 0"></origin>
+		</collision>
+	</link>
+	<link name="wsg/tool"></link>
+	<joint name="iiwa/iiwa_base_joint" type="fixed">
+		<origin xyz="0 0 0" rpy="0 0 0"></origin>
+		<parent link="iiwa/base"></parent>
+		<child link="iiwa/iiwa_link_0"></child>
+	</joint>
+	<joint name="iiwa/iiwa_joint_1" type="revolute">
+		<origin xyz="0 0 0.1575" rpy="0 0 0"></origin>
+		<parent link="iiwa/iiwa_link_0"></parent>
+		<child link="iiwa/iiwa_link_1"></child>
+		<axis xyz="0 0 1"></axis>
+		<limit lower="-2.96705972839" upper="2.96705972839" velocity="1.4" effort="1000"></limit>
+	</joint>
+	<joint name="iiwa/iiwa_joint_2" type="revolute">
+		<origin xyz="0 0 0.2025" rpy="1.57079632679 0 3.14159265359"></origin>
+		<parent link="iiwa/iiwa_link_1"></parent>
+		<child link="iiwa/iiwa_link_2"></child>
+		<axis xyz="0 0 1"></axis>
+		<limit lower="-2.09439510239" upper="2.09439510239" velocity="1.4" effort="1000"></limit>
+	</joint>
+	<joint name="iiwa/iiwa_joint_3" type="revolute">
+		<origin xyz="0 0.2045 0" rpy="1.57079632679 0 3.14159265359"></origin>
+		<parent link="iiwa/iiwa_link_2"></parent>
+		<child link="iiwa/iiwa_link_3"></child>
+		<axis xyz="0 0 1"></axis>
+		<limit lower="-2.96705972839" upper="2.96705972839" velocity="1.7" effort="1000"></limit>
+	</joint>
+	<joint name="iiwa/iiwa_joint_4" type="revolute">
+		<origin xyz="0 0 0.2155" rpy="1.57079632679 0 0"></origin>
+		<parent link="iiwa/iiwa_link_3"></parent>
+		<child link="iiwa/iiwa_link_4"></child>
+		<axis xyz="0 0 1"></axis>
+		<limit lower="-2.09439510239" upper="2.09439510239" velocity="1.3" effort="1000"></limit>
+	</joint>
+	<joint name="iiwa/iiwa_joint_5" type="revolute">
+		<origin xyz="0 0.1845 0" rpy="-1.57079632679 3.14159265359 0"></origin>
+		<parent link="iiwa/iiwa_link_4"></parent>
+		<child link="iiwa/iiwa_link_5"></child>
+		<axis xyz="0 0 1"></axis>
+		<limit lower="-2.96705972839" upper="2.96705972839" velocity="2.2" effort="1000"></limit>
+	</joint>
+	<joint name="iiwa/iiwa_joint_6" type="revolute">
+		<origin xyz="0 0 0.2155" rpy="1.57079632679 0 0"></origin>
+		<parent link="iiwa/iiwa_link_5"></parent>
+		<child link="iiwa/iiwa_link_6"></child>
+		<axis xyz="0 0 1"></axis>
+		<limit lower="-2.09439510239" upper="2.09439510239" velocity="2.3" effort="1000"></limit>
+	</joint>
+	<joint name="iiwa/iiwa_joint_7" type="revolute">
+		<origin xyz="0 0.081 0" rpy="-1.57079632679 3.14159265359 0"></origin>
+		<parent link="iiwa/iiwa_link_6"></parent>
+		<child link="iiwa/iiwa_link_7"></child>
+		<axis xyz="0 0 1"></axis>
+		<limit lower="-3.05432619099" upper="3.05432619099" velocity="2.3" effort="1000"></limit>
+	</joint>
+	<joint name="iiwa/iiwa_joint_ee" type="fixed">
+		<origin xyz="0 0 0.045" rpy="3.14159265359 3.14159265359 3.14159265359"></origin>
+		<parent link="iiwa/iiwa_link_7"></parent>
+		<child link="iiwa/iiwa_link_ee_kuka"></child>
+	</joint>
+	<joint name="iiwa/tool0_joint" type="fixed">
+		<origin xyz="0 0 0.045" rpy="0 -1.57079632679 0"></origin>
+		<parent link="iiwa/iiwa_link_7"></parent>
+		<child link="iiwa/iiwa_link_ee"></child>
+	</joint>
+	<joint name="iiwa/weld_base" type="fixed">
+		<origin xyz="0 0 0" rpy="0 0 0"></origin>
+		<parent link="world"></parent>
+		<child link="iiwa/base"></child>
+	</joint>
+	<joint name="wsg/weld_body" type="fixed">
+		<origin xyz="0 0 0.09" rpy="1.57079632679 0 1.18682389136"></origin>
+		<parent link="iiwa/iiwa_link_7"></parent>
+		<child link="wsg/body"></child>
+	</joint>
+	<joint name="wsg/left_finger_sliding_joint" type="fixed">
+		<origin xyz="-0.0453 0.063185 0" rpy="0 0 0"></origin>
+		<parent link="wsg/body"></parent>
+		<child link="wsg/left_finger"></child>
+	</joint>
+	<joint name="wsg/right_finger_sliding_joint" type="fixed">
+		<origin xyz="0.0453 0.063185 0" rpy="0 0 0"></origin>
+		<parent link="wsg/body"></parent>
+		<child link="wsg/right_finger"></child>
+	</joint>
+	<joint name="wsg/tool_joint" type="fixed">
+		<origin xyz="0 0.1865 0" rpy="-1.57079632679 0 0"></origin>
+		<parent link="wsg/body"></parent>
+		<child link="wsg/tool"></child>
+	</joint>
+</robot>
