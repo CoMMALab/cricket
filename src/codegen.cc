@@ -321,6 +321,42 @@ namespace cricket
                 trace_solve_jacobian(robot, language, ProjMethod::BoundedLS, 6), "solve_lerp_so3r3_error_bounded_ls");
         }
 
+        // The pose curve of the other end-effectors ("lerp_end_effectors": [0, 1, ...], indexes into "end_effector"; 0, the
+        // default, is the first and is what lerp_so3r3_error is): the error kernel of end-effector k is lerp_so3r3_error_ek, the
+        // solvers are the same (they only see the 6-row error and its Jacobian), and lerp_so3r3_error_for(k, ...) picks one at run time.
+        nlohmann::json lerp_extra_end_effectors = nlohmann::json::array();
+        if (lerp_so3r3_constraint and data.contains("lerp_end_effectors"))
+        {
+            for (const auto &entry : data["lerp_end_effectors"])
+            {
+                const auto k = entry.get<std::size_t>();
+                if (k >= robot.end_effector_indexes.size())
+                {
+                    throw std::runtime_error(fmt::format(
+                        "\"lerp_end_effectors\": end-effector {} does not exist (the recipe has {})",
+                        k,
+                        robot.end_effector_indexes.size()));
+                }
+
+                if (k == 0)
+                {
+                    continue;
+                }
+
+                auto robot_k = robot;  // the same robot with end-effector k first, which is the one the kernel traces
+                std::swap(robot_k.end_effector_indexes[0], robot_k.end_effector_indexes[k]);
+                const auto traced = trace_lerp_so3r3_error<lerp_points>(robot_k, language);
+                lerp_extra_end_effectors.push_back(
+                    {{"index", k},
+                     {"suffix", fmt::format("_ee{}", k)},
+                     {"error_code", traced.code},
+                     {"error_code_vars", traced.temp_variables},
+                     {"error_code_output", traced.outputs}});
+            }
+        }
+
+        data["lerp_so3r3_extra_ees"] = lerp_extra_end_effectors;
+
         data["has_lerp_r3_segment_constraint"] = lerp_r3_segment_constraint;
         if (lerp_r3_segment_constraint)
         {
@@ -361,10 +397,13 @@ namespace cricket
         //   {"frame": "world"}                                 world-frame CoM (the default frame)
         //   {"frame": "feet", "reference_frames": [f1, f2]}    CoM minus the mean position of the reference
         //                                                      frames (e.g. the feet), in world axes
-        // "reference_frames" is only valid, and required, with "frame": "feet".
+        //   {"frame": "body", "body": "link"}                  CoM in the axes of a body frame, R^T (com - p): a support
+        //                                                      polygon fixed to a mobile base, in the base's own frame
+        // "reference_frames" is only valid, and required, with "frame": "feet"; "body" with "frame": "body".
         // The support-polygon error consuming these is 2D (xy), hence err_size 2 solvers.
         bool has_com = false;
         std::vector<std::string> com_reference_frames;
+        std::string com_body_frame;
         if (data.contains("com"))
         {
             const auto &cm = data["com"];
@@ -385,6 +424,20 @@ namespace cricket
 
                     com_reference_frames = cm["reference_frames"].get<std::vector<std::string>>();
                 }
+                else if (frame == "body")
+                {
+                    if (not cm.contains("body") or not cm["body"].is_string() or cm["body"].get<std::string>().empty())
+                    {
+                        throw std::runtime_error("\"com\": {\"frame\": \"body\"} requires \"body\", the name of a frame");
+                    }
+
+                    if (cm.contains("reference_frames"))
+                    {
+                        throw std::runtime_error("\"com\": \"reference_frames\" is only valid with \"frame\": \"feet\"");
+                    }
+
+                    com_body_frame = cm["body"].get<std::string>();
+                }
                 else if (frame == "world")
                 {
                     if (cm.contains("reference_frames"))
@@ -395,7 +448,7 @@ namespace cricket
                 }
                 else
                 {
-                    throw std::runtime_error("\"com\": \"frame\" must be \"world\" or \"feet\", got \"" + frame + "\"");
+                    throw std::runtime_error("\"com\": \"frame\" must be \"world\", \"feet\" or \"body\", got \"" + frame + "\"");
                 }
             }
         }
@@ -404,7 +457,8 @@ namespace cricket
         if (has_com)
         {
             data["com_reference_frames"] = com_reference_frames;
-            set_trace(trace_com_jacobian(robot, com_reference_frames, language), "com_jacobian");
+            data["com_body_frame"] = com_body_frame;
+            set_trace(trace_com_jacobian(robot, com_reference_frames, language, com_body_frame), "com_jacobian");
             set_trace(
                 trace_solve_jacobian(robot, language, ProjMethod::InnerLM, 2),
                 "solve_com_error_lm_inner");

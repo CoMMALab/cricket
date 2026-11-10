@@ -558,12 +558,29 @@ namespace cricket
     auto trace_com_jacobian(
         const RobotInfo &info,
         const std::vector<std::string> &reference_frames,
-        const std::string &language) -> Traced
+        const std::string &language,
+        const std::string &body_frame) -> Traced
     {
         const auto nq = static_cast<std::size_t>(info.model.nq);
 
         ADModel ad_model = info.model.cast<ADCG>();
         ADData ad_data(ad_model);
+
+        if (not body_frame.empty() and not reference_frames.empty())
+        {
+            throw std::runtime_error("the center of mass is relative to either reference frames or a body frame, not both");
+        }
+
+        FrameIndex body_id = 0;
+        if (not body_frame.empty())
+        {
+            if (not ad_model.existFrame(body_frame, BODY))
+            {
+                throw std::runtime_error(fmt::format("CoM body frame `{}` does not exist in the model", body_frame));
+            }
+
+            body_id = ad_model.getFrameId(body_frame, BODY);
+        }
 
         std::vector<FrameIndex> reference_ids;
         for (const auto &name : reference_frames)
@@ -607,9 +624,22 @@ namespace cricket
         }
 
         ADVectorXs data(3);
-        for (auto i = 0U; i < 3; ++i)
+        if (not body_frame.empty())
         {
-            data[i] = com[i] - reference[i];
+            // in the axes of the body frame: R^T (com - p)
+            const Eigen::Vector3<ADCG> in_body =
+                ad_data.oMf[body_id].rotation().transpose() * (com - ad_data.oMf[body_id].translation());
+            for (auto i = 0U; i < 3; ++i)
+            {
+                data[i] = in_body[i];
+            }
+        }
+        else
+        {
+            for (auto i = 0U; i < 3; ++i)
+            {
+                data[i] = com[i] - reference[i];
+            }
         }
 
         ADFun<CGD> com_func(ad_inp, data);

@@ -101,6 +101,8 @@ namespace cricket
     // see LerpPoseInputLayout. Output: d(err)/dq (6 x nq, row-major), then the raw error (6).
     template <std::size_t N>
     auto trace_lerp_so3r3_error(const RobotInfo &info, const std::string &language) -> Traced;
+    // (It traces the first end-effector; for another one, pass a RobotInfo with that end-effector first, which is what
+    // the recipe's "lerp_end_effectors" does.)
 
     // The same lerp kernels with the curve parameter t an unknown of the projection next to the joints ("segment"): the segment
     // is the one the extra input t_segment is on, and t is the parameter within it, so the end-effector may move along the
@@ -146,11 +148,15 @@ namespace cricket
     // Center-of-mass position and Jacobian, optionally expressed relative to the mean
     // position of a set of reference (body) frames, e.g. the feet of a standing humanoid so
     // that a support polygon can be stated in the stance frame.
+    // With a non-empty `body_frame` the center of mass is instead expressed in the axes of that (body) frame:
+    // R^T (com - p) of the frame, so a support polygon fixed to a mobile base can be stated in the base's own frame
+    // (then `reference_frames` has to be empty).
     // Input: q (nq). Output: d(com)/dq (3 x nq, row-major), then com (3).
     auto trace_com_jacobian(
         const RobotInfo &info,
         const std::vector<std::string> &reference_frames,
-        const std::string &language) -> Traced;
+        const std::string &language,
+        const std::string &body_frame = "") -> Traced;
 
     // Loop-closure distance constraint: the distance between two (body) frames must equal a
     // fixed length, e.g. a rigid rod cut from a closed kinematic chain.

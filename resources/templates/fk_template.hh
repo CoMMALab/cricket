@@ -618,7 +618,7 @@ struct {{name}}
     static constexpr bool has_com = true;
 
     // Input: q (dimension). Output: d(com)/dq (3 * dimension, row-major), then the center of
-    // mass (3){% if length(com_reference_frames) > 0 %}, relative to the mean position of: {{join(com_reference_frames, ", ")}}{% endif %}.
+    // mass (3){% if length(com_reference_frames) > 0 %}, relative to the mean position of: {{join(com_reference_frames, ", ")}}{% endif %}{% if com_body_frame != "" %}, in the axes of the frame {{com_body_frame}}{% endif %}.
     template <std::size_t rake, typename InputVector, typename OutputVector>
     static inline auto com_jacobian(const InputVector &x, OutputVector &out) noexcept
     {
@@ -876,7 +876,49 @@ struct {{name}}
         {{solve_lerp_so3r3_error_bounded_ls_code}}
     }
     {% endif %}
-    {% endif %}
+    {% endif %}{% if has_lerp_so3r3_constraint %}{% if length(lerp_so3r3_extra_ees) > 0 %}
+
+    //
+    // The pose curves of the other end-effectors: the same kernel as lerp_so3r3_error with the pose of end-effector k
+    // (the index in the recipe's "end_effector") in place of the first's. The projection steps above are shared, as they
+    // only see the 6-row error and its Jacobian.
+    //
+    {% for e in lerp_so3r3_extra_ees %}
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto lerp_so3r3_error{{e.suffix}}(const InputVector &x, OutputVector &out) noexcept
+    {
+        // V is referenced by the SIMD blends emitted for the segment selection's conditionals
+        using V = FloatVector<rake, 1>;
+        std::array<V, {{e.error_code_vars}}> v;
+        std::array<V, {{e.error_code_output}}> y;
+
+        {{e.error_code}}
+
+        for (auto i = 0U; i < {{e.error_code_output}}; ++i)
+        {
+            out[i] = y[i];
+        }
+    }
+    {% endfor %}
+
+    // The number of end-effectors with a pose-curve kernel: the first, and the others of "lerp_end_effectors"
+    static constexpr std::size_t lerp_so3r3_end_effectors = {{1 + length(lerp_so3r3_extra_ees)}};
+
+    // The error kernel of end-effector `ee` (0 is the first: lerp_so3r3_error), picked at run time
+    template <std::size_t rake, typename InputVector, typename OutputVector>
+    static inline auto lerp_so3r3_error_for(std::size_t ee, const InputVector &x, OutputVector &out) noexcept
+    {
+        switch (ee)
+        {
+            {% for e in lerp_so3r3_extra_ees %}case {{e.index}}:
+                lerp_so3r3_error{{e.suffix}}<rake>(x, out);
+                return;
+            {% endfor %}default:
+                lerp_so3r3_error<rake>(x, out);
+                return;
+        }
+    }
+    {% endif %}{% endif %}
 
     {% if has_lerp_r3_segment_constraint %}
     //
