@@ -13,6 +13,7 @@
 #include <inja/inja.hpp>
 #include <nlohmann/json.hpp>
 
+#include <cctype>
 #include <sstream>
 #include <stdexcept>
 
@@ -98,7 +99,7 @@ namespace cricket
 
         std::size_t n_spheres_data = (spheres) ? info.spheres.size() * 4 : 0;
         std::size_t n_bounding_spheres_data = (bounding_spheres) ? info.bounding_spheres.size() * 4 : 0;
-        std::size_t n_fk_data = (fk) ? 12 : 0;
+        std::size_t n_fk_data = (fk) ? 12 * info.end_effector_indexes.size() : 0;
         std::size_t n_out = n_spheres_data + n_bounding_spheres_data + n_fk_data;
 
         ADVectorXs data(n_out);
@@ -127,7 +128,14 @@ namespace cricket
 
         if (fk)
         {
-            trace_frame(info.end_effector_index, ad_data, data, n_spheres_data + n_bounding_spheres_data);
+            for (auto i = 0U; i < info.end_effector_indexes.size(); ++i)
+            {
+                trace_frame(
+                    info.end_effector_indexes[i],
+                    ad_data,
+                    data,
+                    n_spheres_data + n_bounding_spheres_data + i * 12);
+            }
         }
 
         // Create the AD function
@@ -171,12 +179,23 @@ namespace cricket
                     opts.template_path.string()));
         }
 
-        RobotInfo robot(opts.urdf, opts.srdf, opts.end_effector);
+        RobotInfo robot(opts.urdf, opts.srdf, opts.end_effectors);
 
         nlohmann::json data = opts.data;
         const bool compact_collisions = opts.data.value("compact_collisions", false);
         data.update(robot.json(opts.bounds, opts.data.value("skip_static_environment_collisions", false)));
         data["compact_collisions"] = compact_collisions;
+
+        // Python/C++ module identifier; must match the registered binding module name.
+        if (not data.contains("module_name"))
+        {
+            std::string module_name = data["name"].get<std::string>();
+            for (auto &c : module_name)
+            {
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            }
+            data["module_name"] = module_name;
+        }
 
         auto eefk = trace_sphere_cc_fk(robot, opts.language, false, false, true);
         data["eefk_code"] = eefk.code;
