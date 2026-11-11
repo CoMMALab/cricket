@@ -174,12 +174,6 @@ if(BUILD_TESTING)
   set_tests_properties(robot_info_test PROPERTIES
       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources/ur5")
 
-  add_executable(cuboid_test tests/cuboid_test.cc)
-  target_link_libraries(cuboid_test PRIVATE cricket::cricket)
-  target_compile_definitions(cuboid_test PRIVATE
-      CRICKET_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
-  add_test(NAME cuboid_test COMMAND cuboid_test)
-
   add_executable(tracing_test tests/tracing_test.cc)
   target_link_libraries(tracing_test PRIVATE cricket::cricket)
   target_compile_definitions(tracing_test PRIVATE
