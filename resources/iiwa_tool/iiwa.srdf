@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!-- iiwa: link pairs (both with collision geometry) whose collisions
+     Drake filters: adjacent and welded bodies plus the models' and
+     directives' collision filter groups. Every other pair is checked.
+     tests/test_external_models.py checks it against the Drake model. -->
+<robot name="iiwa">
+  <disable_collisions link1="iiwa/iiwa_link_0" link2="iiwa/iiwa_link_1" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_0" link2="iiwa/iiwa_link_2" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_0" link2="iiwa/iiwa_link_3" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_1" link2="iiwa/iiwa_link_2" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_1" link2="iiwa/iiwa_link_3" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_2" link2="iiwa/iiwa_link_3" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_3" link2="iiwa/iiwa_link_4" reason="filtered" />
+  <!-- Not a Drake filter: the spheres of link 3 (r 69-79 mm) and link 5 overlap
+       by up to 11 mm when joint 4 is almost fully flexed, where Drake's convex
+       hulls do not touch (28 of the benchmark's 259 iiwa starts). The pair is
+       still checked by the benchmark's scorer with Drake. Differs on purpose
+       from diffik-benchmark/models/iiwa/external/iiwa.srdf. -->
+  <disable_collisions link1="iiwa/iiwa_link_3" link2="iiwa/iiwa_link_5" reason="sphere_overlap" />
+  <!-- Likewise link 5 against the gripper body (spheres 28/30/32 of link 5, r 69
+       mm, against sphere 47 of wsg/body, r 44 mm): up to 14 mm of overlap with
+       the wrist folded back (benchmark iiwa starts 63 and 221), where Drake's
+       hulls do not touch. The scorer still checks the pair with Drake. -->
+  <disable_collisions link1="iiwa/iiwa_link_5" link2="wsg/body" reason="sphere_overlap" />
+  <disable_collisions link1="iiwa/iiwa_link_4" link2="iiwa/iiwa_link_5" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_4" link2="iiwa/iiwa_link_6" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_4" link2="iiwa/iiwa_link_7" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_5" link2="iiwa/iiwa_link_6" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_5" link2="iiwa/iiwa_link_7" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_6" link2="iiwa/iiwa_link_7" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_7" link2="wsg/body" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_7" link2="wsg/left_finger" reason="filtered" />
+  <disable_collisions link1="iiwa/iiwa_link_7" link2="wsg/right_finger" reason="filtered" />
+  <disable_collisions link1="wsg/body" link2="wsg/left_finger" reason="filtered" />
+  <disable_collisions link1="wsg/body" link2="wsg/right_finger" reason="filtered" />
+  <disable_collisions link1="wsg/left_finger" link2="wsg/right_finger" reason="filtered" />
+</robot>
