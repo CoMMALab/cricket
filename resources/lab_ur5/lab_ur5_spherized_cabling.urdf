@@ -390,18 +390,31 @@
 			</geometry>
 			<origin xyz="0 0 0.02" rpy="0 0 0"></origin>
 		</collision>
-		<!-- The wrist camera on the bracket plate, measured from the lab's depth cloud. -->
+		<!-- Wrist D405 camera. -->
 		<collision>
 			<geometry>
-				<sphere radius="0.036"></sphere>
+				<sphere radius="0.029"></sphere>
 			</geometry>
-			<origin xyz="0 -0.0485 0.015" rpy="0 0 0"></origin>
+			<origin xyz="-0.0333 -0.0708 0.0196" rpy="0 0 0"></origin>
 		</collision>
 		<collision>
 			<geometry>
-				<sphere radius="0.036"></sphere>
+				<sphere radius="0.029"></sphere>
 			</geometry>
-			<origin xyz="0 -0.0755 0.015" rpy="0 0 0"></origin>
+			<origin xyz="-0.0133 -0.0703 0.0206" rpy="0 0 0"></origin>
+		</collision>
+		<collision>
+			<geometry>
+				<sphere radius="0.029"></sphere>
+			</geometry>
+			<origin xyz="0.0067 -0.0699 0.0216" rpy="0 0 0"></origin>
+		</collision>
+		<!-- The bracket arm that holds the camera above the gripper. -->
+		<collision>
+			<geometry>
+				<sphere radius="0.02"></sphere>
+			</geometry>
+			<origin xyz="-0.014 -0.0475 0.003" rpy="0 0 0"></origin>
 		</collision>
 	</link>
 	<link name="robotiq_85_left_knuckle_link">
