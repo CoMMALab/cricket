@@ -65,6 +65,11 @@ namespace cricket
             const std::optional<std::filesystem::path> &srdf_file,
             const std::optional<std::string> &end_effector);
 
+        RobotInfo(
+            const std::filesystem::path &urdf_file,
+            const std::optional<std::filesystem::path> &srdf_file,
+            const std::vector<std::string> &end_effectors);
+
         // When `skip_static_environment` is set, links with no mobile joint between them
         // and the world (frame parent joint 0) are omitted from the emitted
         // environment-collision tables; self-collision tables are unaffected.
@@ -72,18 +77,26 @@ namespace cricket
             -> nlohmann::json;
 
         auto dof_to_joint_names() -> std::vector<std::string>;
-        auto get_frames_colliding_end_effector() -> std::vector<std::size_t>;
+        auto get_frames_colliding_end_effector(std::size_t frame_index) -> std::vector<std::size_t>;
         auto extract_spheres() -> void;
         auto collision_pair_to_frame_pair(const pinocchio::CollisionPair &cp)
             -> std::pair<std::size_t, std::size_t>;
         auto extract_collision_data() -> void;
         auto get_adjacent_frames() -> std::set<std::pair<std::size_t, std::size_t>>;
         auto guess_self_collisions(std::size_t n = 1000000U) -> void;
+        auto resolve_end_effectors(const std::vector<std::string> &end_effectors) -> void;
 
         pinocchio::Model model;
         pinocchio::GeometryModel collision_model;
+
+        // First end-effector, kept for single-EE conveniences (e.g. the emitted
+        // `end_effector` name constant).
         std::string end_effector_name;
         std::size_t end_effector_index;
+
+        // All end-effectors, in declaration order.
+        std::vector<std::string> end_effector_names;
+        std::vector<std::size_t> end_effector_indexes;
 
         float min_radius{std::numeric_limits<float>::max()};
         float max_radius{std::numeric_limits<float>::min()};

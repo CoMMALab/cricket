@@ -5,7 +5,9 @@
 #include "check.hh"
 
 #include <filesystem>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 int main()
 {
@@ -50,6 +52,37 @@ int main()
     CRICKET_CHECK(eejac.code.find("cos(") != std::string::npos);
     // The Rust backend cannot emit conditionals, so a trace containing one would be silently wrong.
     CRICKET_CHECK(eejac.code.find(" ? ") == std::string::npos);
+
+    // Several end-effectors: one 12-value pose per end-effector, in declaration order.
+    cricket::RobotInfo two(
+        spherized, srdf, std::vector<std::string>{"robotiq_85_base_link", "wrist_3_link"});
+    CRICKET_CHECK(two.end_effector_names.size() == 2);
+    CRICKET_CHECK(two.end_effector_indexes.size() == 2);
+    CRICKET_CHECK(two.end_effector_name == "robotiq_85_base_link");
+    CRICKET_CHECK(two.end_effector_index == two.end_effector_indexes.front());
+    CRICKET_CHECK(two.end_effector_indexes.front() != two.end_effector_indexes.back());
+
+    const auto fk_one = cricket::trace_sphere_cc_fk(info, "c++", false, false, true);
+    CRICKET_CHECK(fk_one.outputs == 12);
+    const auto fk_two = cricket::trace_sphere_cc_fk(two, "c++", false, false, true);
+    CRICKET_CHECK(fk_two.outputs == 24);
+
+    const auto metadata = two.json();
+    CRICKET_CHECK(metadata.at("num_end_effectors") == 2);
+    CRICKET_CHECK(metadata.at("end_effectors").size() == 2);
+    CRICKET_CHECK(metadata.at("end_effector_collisions").size() == 2);
+    CRICKET_CHECK(metadata.at("end_effector") == "robotiq_85_base_link");
+
+    bool rejected = false;
+    try
+    {
+        cricket::RobotInfo bad(spherized, srdf, std::vector<std::string>{"robotiq_85_base_link", "no_such_frame"});
+    }
+    catch (const std::runtime_error &)
+    {
+        rejected = true;
+    }
+    CRICKET_CHECK(rejected);
 
     return 0;
 }

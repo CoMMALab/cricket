@@ -193,9 +193,9 @@ fn attach_fkcc<const L: usize>(
     {{ccfkee_code}}
     {% include "ccfk" %}
 
-    // attaching at {{ end_effector }}
+    // attaching at {{ at(end_effectors, 0) }}
     attachment.set_pose(&Isometry::from_carom_buf(
-        *y[{{ccfkee_code_output - 12}}..{{ccfkee_code_output}}].as_array().unwrap()
+        *y[{{ccfkee_code_output - 12 * num_end_effectors}}..{{ccfkee_code_output - 12 * num_end_effectors + 12}}].as_array().unwrap()
     ));
 
     //
@@ -210,8 +210,9 @@ fn attach_fkcc<const L: usize>(
     // attachment vs. robot collisions
     //
 
-    {% for i in range(length(end_effector_collisions)) %}
-    {% set link_index = at(end_effector_collisions, i) %}
+    {% set eef_collisions = at(end_effector_collisions, 0) %}
+    {% for i in range(length(eef_collisions)) %}
+    {% set link_index = at(eef_collisions, i) %}
     {% set link_bs = at(bounding_sphere_index, link_index) %}
     {% set link_spheres = at(per_link_spheres, link_index) %}
 
@@ -262,7 +263,9 @@ fn eefk<const L: usize>(x: &ConfigurationBlock<L>) -> Isometry<Simd<f32, L>, 3>
 
     {{eefk_code}}
 
-    Isometry::from_carom_buf(y)
+    {% if num_end_effectors > 1 %}// first end-effector
+    Isometry::from_carom_buf(*y[0..12].as_array().unwrap())
+    {% else %}Isometry::from_carom_buf(y){% endif %}
 }
 
 fn eefk_jacobian<const L: usize>(

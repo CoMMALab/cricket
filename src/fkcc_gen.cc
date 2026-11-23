@@ -69,10 +69,17 @@ int main(int argc, char **argv)
         srdf_path = parent_path / data["srdf"];
     }
 
-    std::optional<std::string> end_effector_name = {};
+    std::vector<std::string> end_effector_names;
     if (data.contains("end_effector"))
     {
-        end_effector_name = data["end_effector"];
+        if (data["end_effector"].is_array())
+        {
+            end_effector_names = data["end_effector"].get<std::vector<std::string>>();
+        }
+        else
+        {
+            end_effector_names.push_back(data["end_effector"].get<std::string>());
+        }
     }
 
     std::string language = "c++";
@@ -108,7 +115,7 @@ int main(int argc, char **argv)
         gen_options.dynamics_urdf = parent_path / data["dynamics_urdf"].get<std::string>();
     }
     gen_options.srdf = srdf_path;
-    gen_options.end_effector = end_effector_name;
+    gen_options.end_effectors = end_effector_names;
     gen_options.template_path = parent_path / data["template"];
     gen_options.language = language;
     gen_options.bounds = bounds;
