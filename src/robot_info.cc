@@ -137,9 +137,7 @@ namespace cricket
 
     namespace
     {
-        auto compute_extended_bounds(
-            const pinocchio::Model &model,
-            const std::optional<Bounds> &bounds)
+        auto compute_extended_bounds(const pinocchio::Model &model, const std::optional<Bounds> &bounds)
             -> std::pair<Eigen::VectorXd, Eigen::VectorXd>
         {
             Eigen::VectorXd lower = model.lowerPositionLimit;
@@ -246,8 +244,12 @@ namespace cricket
         }
     }  // namespace
 
-    auto RobotInfo::json(const std::optional<Bounds> &bounds) -> nlohmann::json
+    auto RobotInfo::json(const std::optional<Bounds> &bounds, bool skip_static_environment) -> nlohmann::json
     {
+        // A frame is static when its parent joint is the universe (0): every joint
+        // between it and the world was fixed.
+        const auto is_static_link = [&](std::size_t link_index)
+        { return model.frames[link_index].parentJoint == 0; };
         const auto [lower_bound, upper_bound] = compute_extended_bounds(model, bounds);
         const Eigen::VectorXd bound_range = upper_bound - lower_bound;
         const Eigen::VectorXd bound_descale = bound_range.cwiseInverse();
@@ -297,6 +299,84 @@ namespace cricket
             link_names.emplace_back(model.frames[i].name);
         }
         json["link_names"] = link_names;
+
+        // Array indexes (into links_with_geometry, descending — the template's iteration
+        // order) of links checked against the environment.
+        nlohmann::json environment_links = nlohmann::json::array();
+        nlohmann::json env_entries = nlohmann::json::array();
+        nlohmann::json env_body_idx = nlohmann::json::array();
+        const std::size_t n_links = links_with_geometry.size();
+        std::size_t body_offset = 0;
+        float env_min_radius = std::numeric_limits<float>::max();
+        float env_max_radius = std::numeric_limits<float>::lowest();
+        for (std::size_t i = 0; i < n_links; ++i)
+        {
+            const std::size_t array_index = n_links - 1 - i;
+            const std::size_t link_index = links_with_geometry[array_index];
+            if (skip_static_environment and is_static_link(link_index))
+            {
+                continue;
+            }
+            environment_links.push_back(array_index);
+            const auto &body = per_link_spheres[link_index];
+            env_entries.push_back({array_index, body_offset, body.size()});
+            for (const auto &s : body)
+            {
+                env_body_idx.push_back(s);
+                env_min_radius = std::min(env_min_radius, spheres[s].radius);
+                env_max_radius = std::max(env_max_radius, spheres[s].radius);
+            }
+            body_offset += body.size();
+        }
+        json["environment_links"] = environment_links;
+        json["compact_env_entries"] = env_entries;
+        json["compact_env_body_idx"] = env_body_idx;
+
+        // min/max_radius cover the fine spheres queried against the environment, restricted to
+        // links that actually get environment checks (mobile links under skip_static_environment).
+        // The per-link bounding spheres that gate fine-sphere checks in fkcc are deliberately
+        // excluded: CAPT answers queries above max_radius conservatively, so the gate stays sound
+        // without inflating the build contract.
+        if (not environment_links.empty())
+        {
+            json["min_radius"] = env_min_radius;
+            json["max_radius"] = env_max_radius;
+        }
+
+        // Per-sphere skip markers so fkcc_debug's per-sphere environment queries stay
+        // consistent with fkcc (skipped spheres get an empty collision list).
+        nlohmann::json sphere_env_skip = nlohmann::json::array();
+        for (const auto &sphere : spheres)
+        {
+            sphere_env_skip.push_back(skip_static_environment and sphere.parent_joint == 0);
+        }
+        json["sphere_env_skip"] = sphere_env_skip;
+
+        nlohmann::json self_entries = nlohmann::json::array();
+        nlohmann::json self_pair_a = nlohmann::json::array();
+        nlohmann::json self_pair_b = nlohmann::json::array();
+        std::size_t pair_offset = 0;
+        for (const auto &[link1, link2] : allowed_link_pairs)
+        {
+            const std::size_t bs1 = bounding_sphere_index[link1];
+            const std::size_t bs2 = bounding_sphere_index[link2];
+            const auto &spheres1 = per_link_spheres[link1];
+            const auto &spheres2 = per_link_spheres[link2];
+            const std::size_t count = spheres1.size() * spheres2.size();
+            self_entries.push_back({bs1, bs2, pair_offset, count});
+            for (const auto &a : spheres1)
+            {
+                for (const auto &b : spheres2)
+                {
+                    self_pair_a.push_back(a);
+                    self_pair_b.push_back(b);
+                }
+            }
+            pair_offset += count;
+        }
+        json["compact_self_entries"] = self_entries;
+        json["compact_self_pair_a"] = self_pair_a;
+        json["compact_self_pair_b"] = self_pair_b;
 
         return json;
     }
