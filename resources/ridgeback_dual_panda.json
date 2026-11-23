@@ -1,0 +1,20 @@
+{
+    "name": "RidgebackDualPanda",
+    "module_name": "ridgeback_dual_panda",
+    "urdf": "ridgeback_dual_panda/ridgeback_dual_panda_full_primitive.urdf",
+    "srdf": "ridgeback_dual_panda/ridgeback_dual_panda.srdf",
+    "end_effector": [
+        "gripperleft_0_eef",
+        "gripperright_0_eef"
+    ],
+    "constraints": true,
+    "resolution": 64,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [
+        {
+            "name": "ccfk",
+            "template": "templates/ccfk_template.hh"
+        }
+    ],
+    "output": "ridgeback_dual_panda_fk.hh"
+}
