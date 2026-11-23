@@ -1,0 +1,21 @@
+{
+    "name": "IiwaTool",
+    "module_name": "iiwa_tool",
+    "urdf": "iiwa_tool/iiwa_spherized.urdf",
+    "srdf": "iiwa_tool/iiwa.srdf",
+    "end_effector": "wsg/tool",
+    "constraints": true,
+    "lerp_r3_constraint": true,
+    "lerp_so3r3_constraint": true,
+    "lerp_r3_segment_constraint": true,
+    "lerp_so3r3_segment_constraint": true,
+    "resolution": 32,
+    "template": "templates/fk_template.hh",
+    "subtemplates": [
+        {
+            "name": "ccfk",
+            "template": "templates/ccfk_template.hh"
+        }
+    ],
+    "output": "iiwa_tool_fk.hh"
+}
