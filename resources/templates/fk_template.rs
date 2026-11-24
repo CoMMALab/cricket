@@ -4,6 +4,7 @@
     clippy::unreadable_literal,
     clippy::collapsible_if,
     clippy::excessive_precision,
+    clippy::inline_always,
 )]
 #![allow(clippy::assign_op_pattern)]
 #![no_std]
@@ -153,7 +154,7 @@ where
     where
         Simd<f32, L>: crate::SimdArithmetic<f32, L>,
     {
-        attach_fkcc(&cfgs.0, world, attachment)
+        attach_fkcc(&cfgs.0, world, Some(attachment))
     }
 }
 
@@ -173,25 +174,24 @@ impl DynamicsKernel<{DIM}, {{n_v}}, f32> for {{name}} {
 {% endif %}
 
 fn fkcc<const L: usize>(x: &ConfigurationBlock<L>, environment: &impl Collide3<f32>) -> bool {
-    let mut v = [Simd::splat(0.0); {{ccfk_code_vars}}];
-    let mut y = [Simd::splat(0.0); {{ccfk_code_output}}];
-
-    {{ccfk_code}}
-    {% include "ccfk" %}
-    true
+    attach_fkcc(x, environment, None)
 }
 
-
+#[inline(always)]
 fn attach_fkcc<const L: usize>(
     x: &ConfigurationBlock<L>,
     environment: &impl Collide3<f32>,
-    attachment: &mut PosedAttachment<f32, L>,
+    attachment: Option<&mut PosedAttachment<f32, L>>,
 ) -> bool {
     let mut v = [Simd::splat(0.0); {{ccfkee_code_vars}}];
     let mut y = [Simd::splat(0.0); {{ccfkee_code_output}}];
 
     {{ccfkee_code}}
     {% include "ccfk" %}
+
+    let Some(attachment) = attachment else {
+        return true;
+    };
 
     // attaching at {{ end_effector }}
     attachment.set_pose(&Isometry::from_carom_buf(
