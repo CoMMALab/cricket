@@ -83,6 +83,30 @@ namespace cricket
                 static_cast<float>(position[2]),
             };
         }
+
+        // Entries this close to 0 or 1 are rounding noise.
+        // Rounding back to integers saves on performance.
+        constexpr double SNAP_TOLERANCE = 1e-8;
+
+        // If `value` is very close to -1, 0, or 1, round it.
+        auto snap(double value) -> double
+        {
+            for (const double target : {0.0, 1.0, -1.0})
+            {
+                if (std::abs(value - target) < SNAP_TOLERANCE)
+                {
+                    return target;
+                }
+            }
+            return value;
+        }
+
+        // Apply snapping to an SE(3) transform, rounding values very close to -1, 0, or 1 to integers.
+        auto snap_se3(SE3 &placement) -> void
+        {
+            placement.rotation() = placement.rotation().unaryExpr(&snap).eval();
+            placement.translation() = placement.translation().unaryExpr(&snap).eval();
+        }
     }  // namespace
 
     RobotInfo::RobotInfo(
@@ -97,6 +121,19 @@ namespace cricket
 
         pinocchio::urdf::buildModel(urdf_file, model, false, true);
         pinocchio::urdf::buildGeom(model, urdf_file, COLLISION, collision_model);
+
+        for (auto &placement : model.jointPlacements)
+        {
+            snap_placement(placement);
+        }
+        for (auto &frame : model.frames)
+        {
+            snap_placement(frame.placement);
+        }
+        for (auto &geom_obj : collision_model.geometryObjects)
+        {
+            snap_placement(geom_obj.placement);
+        }
 
         base_position = compute_base_position(model);
 
