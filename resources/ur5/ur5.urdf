@@ -9,7 +9,7 @@
  <joint name="offset_joint" type="fixed">
     <parent link="offset_link"/>
     <child link="base_link"/>
-    <origin xyz="0.0 0.0 0.9144" rpy="0 0 1.57" />
+    <origin xyz="0.0 0.0 0.9144" rpy="0 0 1.5707963267948966" />
  </joint>
   <link name="base_link">
     <visual>
@@ -63,7 +63,7 @@
   <joint name="shoulder_lift_joint" type="revolute">
     <parent link="shoulder_link"/>
     <child link="upper_arm_link"/>
-    <origin rpy="0.0 1.570796325 0.0" xyz="0.0 0.13585 0.0"/>
+    <origin rpy="0.0 1.5707963267948966 0.0" xyz="0.0 0.13585 0.0"/>
     <!--      <origin xyz="0.0 ${shoulder_offset} 0.0" rpy="0.0 ${angle_offset} 0.0" /> -->
     <axis xyz="0 1 0"/>
     <!-- <limit effort="150.0" lower="-3.14159265" upper="3.14159265" velocity="3.15"/> -->
@@ -122,7 +122,7 @@
   <joint name="wrist_1_joint" type="revolute">
     <parent link="forearm_link"/>
     <child link="wrist_1_link"/>
-    <origin rpy="0.0 1.570796325 0.0" xyz="0.0 0.0 0.39225"/>
+    <origin rpy="0.0 1.5707963267948966 0.0" xyz="0.0 0.0 0.39225"/>
     <axis xyz="0 1 0"/>
     <!-- <limit effort="28.0" lower="-3.14159265" upper="3.14159265" velocity="3.2"/> -->
     <limit effort="28.0" lower="-3.14159265" upper="3.14159265" velocity="0.5"/>
@@ -209,7 +209,7 @@
   <joint name="ee_fixed_joint" type="fixed">
     <parent link="wrist_3_link"/>
     <child link="ee_link"/>
-    <origin rpy="0.0 0.0 1.570796325" xyz="0.0 0.0823 0.0"/>
+    <origin rpy="0.0 0.0 1.5707963267948966" xyz="0.0 0.0823 0.0"/>
   </joint>
   <link name="ee_link">
     <collision>
@@ -221,14 +221,14 @@
   </link>
   <link name="tool0"/>
   <joint name="wrist_3_link-tool0_fixed_joint" type="fixed">
-    <origin rpy="-1.570796325 0 0" xyz="0 0.0823 0"/>
+    <origin rpy="-1.5707963267948966 0 0" xyz="0 0.0823 0"/>
     <parent link="wrist_3_link"/>
     <child link="tool0"/>
   </joint>
   <!-- mount the fts to the robot -->
   <joint name="fts_fix" type="fixed">
     <!--In most cases origin would be flange adapter plate: <origin xyz="0 0 0.009" rpy="0 0 0"/> /-->
-    <origin rpy="0.0 0 -1.57" xyz="0.035 0 0.0"/>
+    <origin rpy="0.0 0 -1.5707963267948966" xyz="0.035 0 0.0"/>
     <parent link="ee_link"/>
     <child link="fts_robotside"/>
   </joint>
@@ -422,7 +422,7 @@
 	<joint name="robotiq_85_base_joint" type="fixed">
 		<parent link="fts_toolside"></parent>
 		<child link="robotiq_85_base_link"></child>
-		<origin rpy="-1.57 0.0 0.0" xyz="0.0 0.0 -0.037"></origin>
+		<origin rpy="-1.5707963267948966 0.0 0.0" xyz="0.0 0.0 -0.037"></origin>
 	</joint>
 	<joint name="robotiq_85_left_knuckle_joint" type="fixed">
 		<origin xyz="0.0306011444260539 0 0.0627920162695395" rpy="0 0 0"></origin>
@@ -449,7 +449,7 @@
 		<axis xyz="0 -1 0"></axis>
 	</joint>
 	<joint name="robotiq_85_right_inner_knuckle_joint" type="fixed">
-		<origin xyz="-0.0126999999998499 0 0.0693075000000361" rpy="0 0 3.14159265358979"></origin>
+		<origin xyz="-0.0126999999998499 0 0.0693075000000361" rpy="0 0 3.141592653589793"></origin>
 		<parent link="robotiq_85_base_link"></parent>
 		<child link="robotiq_85_right_inner_knuckle_link"></child>
 		<axis xyz="0 1 0"></axis>
@@ -461,7 +461,7 @@
 		<axis xyz="0 1 0"></axis>
 	</joint>
 	<joint name="robotiq_85_right_knuckle_joint" type="fixed">
-		<origin xyz="-0.0306011444258893 0 0.0627920162695395" rpy="0 0 3.14159265358979"></origin>
+		<origin xyz="-0.0306011444258893 0 0.0627920162695395" rpy="0 0 3.141592653589793"></origin>
 		<parent link="robotiq_85_base_link"></parent>
 		<child link="robotiq_85_right_knuckle_link"></child>
 		<axis xyz="0 1 0"></axis>

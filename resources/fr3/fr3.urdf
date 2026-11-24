@@ -81,7 +81,7 @@
     </inertial>
   </link>
   <joint name="fr3_joint2" type="revolute">
-    <origin rpy="-1.570796326794897 0 0" xyz="0 0 0"/>
+    <origin rpy="-1.5707963267948966 0 0" xyz="0 0 0"/>
     <parent link="fr3_link1"/>
     <child link="fr3_link2"/>
     <axis xyz="0 0 1"/>
@@ -108,7 +108,7 @@
     </inertial>
   </link>
   <joint name="fr3_joint3" type="revolute">
-    <origin rpy="1.570796326794897 0 0" xyz="0 -0.316 0"/>
+    <origin rpy="1.5707963267948966 0 0" xyz="0 -0.316 0"/>
     <parent link="fr3_link2"/>
     <child link="fr3_link3"/>
     <axis xyz="0 0 1"/>
@@ -135,7 +135,7 @@
     </inertial>
   </link>
   <joint name="fr3_joint4" type="revolute">
-    <origin rpy="1.570796326794897 0 0" xyz="0.0825 0 0"/>
+    <origin rpy="1.5707963267948966 0 0" xyz="0.0825 0 0"/>
     <parent link="fr3_link3"/>
     <child link="fr3_link4"/>
     <axis xyz="0 0 1"/>
@@ -162,7 +162,7 @@
     </inertial>
   </link>
   <joint name="fr3_joint5" type="revolute">
-    <origin rpy="-1.570796326794897 0 0" xyz="-0.0825 0.384 0"/>
+    <origin rpy="-1.5707963267948966 0 0" xyz="-0.0825 0.384 0"/>
     <parent link="fr3_link4"/>
     <child link="fr3_link5"/>
     <axis xyz="0 0 1"/>
@@ -189,7 +189,7 @@
     </inertial>
   </link>
   <joint name="fr3_joint6" type="revolute">
-    <origin rpy="1.570796326794897 0 0" xyz="0 0 0"/>
+    <origin rpy="1.5707963267948966 0 0" xyz="0 0 0"/>
     <parent link="fr3_link5"/>
     <child link="fr3_link6"/>
     <axis xyz="0 0 1"/>
@@ -216,7 +216,7 @@
     </inertial>
   </link>
   <joint name="fr3_joint7" type="revolute">
-    <origin rpy="1.570796326794897 0 0" xyz="0.088 0 0"/>
+    <origin rpy="1.5707963267948966 0 0" xyz="0.088 0 0"/>
     <parent link="fr3_link6"/>
     <child link="fr3_link7"/>
     <axis xyz="0 0 1"/>

@@ -481,7 +481,7 @@
 		<dynamics D="1" K="7000" damping="0.003" friction="0.2" mu_coulomb="0" mu_viscous="16"></dynamics>
 	</joint>
 	<joint name="fr3_joint2" type="revolute">
-		<origin rpy="-1.570796326794897 0 0" xyz="0 0 0"></origin>
+		<origin rpy="-1.5707963267948966 0 0" xyz="0 0 0"></origin>
 		<parent link="fr3_link1"></parent>
 		<child link="fr3_link2"></child>
 		<axis xyz="0 0 1"></axis>
@@ -490,7 +490,7 @@
 		<dynamics D="1" K="7000" damping="0.003" friction="0.2" mu_coulomb="0" mu_viscous="16"></dynamics>
 	</joint>
 	<joint name="fr3_joint3" type="revolute">
-		<origin rpy="1.570796326794897 0 0" xyz="0 -0.316 0"></origin>
+		<origin rpy="1.5707963267948966 0 0" xyz="0 -0.316 0"></origin>
 		<parent link="fr3_link2"></parent>
 		<child link="fr3_link3"></child>
 		<axis xyz="0 0 1"></axis>
@@ -499,7 +499,7 @@
 		<dynamics D="1" K="7000" damping="0.003" friction="0.2" mu_coulomb="0" mu_viscous="16"></dynamics>
 	</joint>
 	<joint name="fr3_joint4" type="revolute">
-		<origin rpy="1.570796326794897 0 0" xyz="0.0825 0 0"></origin>
+		<origin rpy="1.5707963267948966 0 0" xyz="0.0825 0 0"></origin>
 		<parent link="fr3_link3"></parent>
 		<child link="fr3_link4"></child>
 		<axis xyz="0 0 1"></axis>
@@ -508,7 +508,7 @@
 		<dynamics D="1" K="7000" damping="0.003" friction="0.2" mu_coulomb="0" mu_viscous="16"></dynamics>
 	</joint>
 	<joint name="fr3_joint5" type="revolute">
-		<origin rpy="-1.570796326794897 0 0" xyz="-0.0825 0.384 0"></origin>
+		<origin rpy="-1.5707963267948966 0 0" xyz="-0.0825 0.384 0"></origin>
 		<parent link="fr3_link4"></parent>
 		<child link="fr3_link5"></child>
 		<axis xyz="0 0 1"></axis>
@@ -517,7 +517,7 @@
 		<dynamics D="1" K="7000" damping="0.003" friction="0.2" mu_coulomb="0" mu_viscous="16"></dynamics>
 	</joint>
 	<joint name="fr3_joint6" type="revolute">
-		<origin rpy="1.570796326794897 0 0" xyz="0 0 0"></origin>
+		<origin rpy="1.5707963267948966 0 0" xyz="0 0 0"></origin>
 		<parent link="fr3_link5"></parent>
 		<child link="fr3_link6"></child>
 		<axis xyz="0 0 1"></axis>
@@ -526,7 +526,7 @@
 		<dynamics D="1" K="7000" damping="0.003" friction="0.2" mu_coulomb="0" mu_viscous="16"></dynamics>
 	</joint>
 	<joint name="fr3_joint7" type="revolute">
-		<origin rpy="1.570796326794897 0 0" xyz="0.088 0 0"></origin>
+		<origin rpy="1.5707963267948966 0 0" xyz="0.088 0 0"></origin>
 		<parent link="fr3_link6"></parent>
 		<child link="fr3_link7"></child>
 		<axis xyz="0 0 1"></axis>

@@ -6,7 +6,7 @@
     clippy::excessive_precision,
     clippy::inline_always,
 )]
-#![allow(clippy::assign_op_pattern)]
+#![allow(clippy::assign_op_pattern, clippy::approx_constant)]
 #![no_std]
 #![feature(portable_simd)]
 

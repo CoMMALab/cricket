@@ -36,7 +36,7 @@
 		</collision>
 		<inertial>
 			<mass value="7.369"></mass>
-			<origin rpy="1.570796326794897 0 0" xyz="0.021 -0.027 0.0"></origin>
+			<origin rpy="1.5707963267948966 0 0" xyz="0.021 -0.027 0.0"></origin>
 			<inertia ixx="0.03408" ixy="2e-05" ixz="-0.00425" iyy="0.03529" iyz="8e-05" izz="0.02156"></inertia>
 		</inertial>
 	</link>
@@ -177,7 +177,7 @@
 		</collision>
 		<inertial>
 			<mass value="2.1"></mass>
-			<origin rpy="1.570796326794897 0 0" xyz="0.0 -0.018 0.007"></origin>
+			<origin rpy="1.5707963267948966 0 0" xyz="0.0 -0.018 0.007"></origin>
 			<inertia ixx="0.00296" ixy="-1e-05" ixz="0.0" iyy="0.00222" iyz="-0.00024" izz="0.00258"></inertia>
 		</inertial>
 	</link>
@@ -196,7 +196,7 @@
 		</collision>
 		<inertial>
 			<mass value="1.98"></mass>
-			<origin rpy="-1.570796326794897 0 0" xyz="0.0 0.018 -0.007"></origin>
+			<origin rpy="-1.5707963267948966 0 0" xyz="0.0 0.018 -0.007"></origin>
 			<inertia ixx="0.00296" ixy="-1e-05" ixz="0.0" iyy="0.00222" iyz="-0.00024" izz="0.00258"></inertia>
 		</inertial>
 	</link>
@@ -700,7 +700,7 @@
 	<joint name="shoulder_lift_joint" type="revolute">
 		<parent link="shoulder_link"></parent>
 		<child link="upper_arm_link"></child>
-		<origin rpy="1.570796327 0 0" xyz="0 0 0"></origin>
+		<origin rpy="1.5707963267948966 0 0" xyz="0 0 0"></origin>
 		<axis xyz="0 0 1"></axis>
 		<limit effort="330.0" lower="-3.141592653589793" upper="3.141592653589793" velocity="2.0943951023931953"></limit>
 		<dynamics damping="0" friction="0"></dynamics>
@@ -724,7 +724,7 @@
 	<joint name="wrist_2_joint" type="revolute">
 		<parent link="wrist_1_link"></parent>
 		<child link="wrist_2_link"></child>
-		<origin rpy="1.570796327 0 0" xyz="0 -0.11985 -2.458164590756244e-11"></origin>
+		<origin rpy="1.5707963267948966 0 0" xyz="0 -0.11985 -2.458164590756244e-11"></origin>
 		<axis xyz="0 0 1"></axis>
 		<limit effort="54.0" lower="-3.141592653589793" upper="3.141592653589793" velocity="3.141592653589793"></limit>
 		<dynamics damping="0" friction="0"></dynamics>
@@ -732,7 +732,7 @@
 	<joint name="wrist_3_joint" type="revolute">
 		<parent link="wrist_2_link"></parent>
 		<child link="wrist_3_link"></child>
-		<origin rpy="1.570796326589793 3.141592653589793 3.141592653589793" xyz="0 0.11655 -2.390480459346185e-11"></origin>
+		<origin rpy="1.5707963267948966 3.141592653589793 3.141592653589793" xyz="0 0.11655 -2.390480459346185e-11"></origin>
 		<axis xyz="0 0 1"></axis>
 		<limit effort="54.0" lower="-3.141592653589793" upper="3.141592653589793" velocity="3.141592653589793"></limit>
 		<dynamics damping="0" friction="0"></dynamics>
@@ -787,7 +787,7 @@
 		<axis xyz="0 -1 0"></axis>
 	</joint>
 	<joint name="robotiq_85_right_inner_knuckle_joint" type="fixed">
-		<origin xyz="-0.0126999999998499 0 0.0693075000000361" rpy="0 0 3.14159265358979"></origin>
+		<origin xyz="-0.0126999999998499 0 0.0693075000000361" rpy="0 0 3.141592653589793"></origin>
 		<parent link="robotiq_85_base_link"></parent>
 		<child link="robotiq_85_right_inner_knuckle_link"></child>
 		<axis xyz="0 1 0"></axis>
@@ -799,7 +799,7 @@
 		<axis xyz="0 1 0"></axis>
 	</joint>
 	<joint name="robotiq_85_right_knuckle_joint" type="fixed">
-		<origin xyz="-0.0306011444258893 0 0.0627920162695395" rpy="0 0 3.14159265358979"></origin>
+		<origin xyz="-0.0306011444258893 0 0.0627920162695395" rpy="0 0 3.141592653589793"></origin>
 		<parent link="robotiq_85_base_link"></parent>
 		<child link="robotiq_85_right_knuckle_link"></child>
 		<axis xyz="0 1 0"></axis>

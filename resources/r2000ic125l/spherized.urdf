@@ -379,7 +379,7 @@
 	<joint name="torch-torch_bend" type="fixed">
 		<parent link="torch"></parent>
 		<child link="torch_bend"></child>
-		<origin xyz="0 0 0.716495" rpy="0 -0.7853 0"></origin>
+		<origin xyz="0 0 0.716495" rpy="0 -0.7853981633974483 0"></origin>
 	</joint>
 	<joint name="torch_bend-tcp" type="fixed">
 		<parent link="torch_bend"></parent>

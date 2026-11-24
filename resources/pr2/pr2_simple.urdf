@@ -1066,7 +1066,7 @@
   </link>
   <gazebo reference="projector_wg6802418_child_frame">
     <projector name="projector_wg6802418_projector_wg6802418">
-      <pose>0 0 0 0 -1.5707 0</pose>
+      <pose>0 0 0 0 -1.5707963267948966 0</pose>
       <texture>stereo_projection_pattern_high_res_red.png</texture>
       <fov>0.9599310885968813</fov>
       <near_clip>0.1</near_clip>
@@ -1804,13 +1804,13 @@
     </inertial>
     <!-- for debugging only
       <visual>
-        <origin xyz="0 0 0" rpy="1.5708 0 0" />
+        <origin xyz="0 0 0" rpy="1.5707963267948966 0 0" />
         <geometry>
           <cylinder length="0.002" radius="0.025"/>
         </geometry>
       </visual>
       <collision>
-        <origin xyz="0 0 0" rpy="1.5708 0 0" />
+        <origin xyz="0 0 0" rpy="1.5707963267948966 0 0" />
         <geometry>
           <cylinder length="0.002" radius="0.025"/>
         </geometry>
@@ -2925,13 +2925,13 @@
     </inertial>
     <!-- for debugging only
       <visual>
-        <origin xyz="0 0 0" rpy="1.5708 0 0" />
+        <origin xyz="0 0 0" rpy="1.5707963267948966 0 0" />
         <geometry>
           <cylinder length="0.002" radius="0.025"/>
         </geometry>
       </visual>
       <collision>
-        <origin xyz="0 0 0" rpy="1.5708 0 0" />
+        <origin xyz="0 0 0" rpy="1.5707963267948966 0 0" />
         <geometry>
           <cylinder length="0.002" radius="0.025"/>
         </geometry>
