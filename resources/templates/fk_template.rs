@@ -92,6 +92,10 @@ impl Robot<DIM, f32> for {{name}}
         &Self::JOINT_NAMES
     }
 
+    fn step_size(&self) -> f32 {
+        Self::STEP_SIZE
+    }
+
     fn sphere_fk<const L: usize>(
         &self,
         cfgs: &Block<{ Self::DIM }, L, f32>,
