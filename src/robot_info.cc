@@ -124,15 +124,15 @@ namespace cricket
 
         for (auto &placement : model.jointPlacements)
         {
-            snap_placement(placement);
+            snap_se3(placement);
         }
         for (auto &frame : model.frames)
         {
-            snap_placement(frame.placement);
+            snap_se3(frame.placement);
         }
         for (auto &geom_obj : collision_model.geometryObjects)
         {
-            snap_placement(geom_obj.placement);
+            snap_se3(geom_obj.placement);
         }
 
         base_position = compute_base_position(model);
