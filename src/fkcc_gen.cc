@@ -114,6 +114,7 @@ int main(int argc, char **argv)
     gen_options.bounds = bounds;
     gen_options.forward_dynamics = data.value("forward_dynamics", false);
     gen_options.data = data;
+    gen_options.config = json_path;
     for (const auto &subt : data["subtemplates"])
     {
         gen_options.subtemplates.emplace(

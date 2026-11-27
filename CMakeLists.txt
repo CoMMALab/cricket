@@ -104,6 +104,32 @@ configure_file(
     @ONLY
 )
 
+# record the Git revision for provenance headers in generated source
+execute_process(
+    COMMAND git describe --always --dirty --abbrev=40
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE CRICKET_REVISION
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+if(NOT CRICKET_REVISION)
+    set(CRICKET_REVISION "unknown")
+endif()
+execute_process(
+    COMMAND git rev-parse --path-format=absolute --git-path logs/HEAD
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE _cricket_head_log
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+# Every commit or checkout appends to the HEAD reflog
+if(_cricket_head_log)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${_cricket_head_log})
+endif()
+# Only codegen.cc reads the revision, so a new revision rebuilds only that file
+set_source_files_properties(src/codegen.cc PROPERTIES
+    COMPILE_DEFINITIONS CRICKET_REVISION="${CRICKET_REVISION}")
+
 add_library(cricket
     src/robot_info.cc
     src/codegen.cc
